@@ -1,0 +1,1307 @@
+#!/bin/bash
+
+# sectpmctl key - A tool to store encrypted secrets in TPM2 key hash objects
+
+# copyright
+
+# reserve stdout only for validated output
+exec 4>&1
+exec 1>&2
+
+# to get errors from pipes
+set -o pipefail
+
+# name of tool
+ME="$(basename "${0}")"
+
+# timeout for TPM communication
+TIMEOUT_SECONDS="5"
+
+# fixed handles creates by 'sectpmctl provisioning'
+HANDLE_O_SRK="0x81000100"
+HANDLE_O_SRK_NODA="0x81000101"
+
+# pcr settings
+PCR_BIOS="0"
+PCR_SECUREBOOT="7"
+PCR_EXTENDED="11"
+PCR_BANK="sha256"
+PCR_HASH_LENGTH="32"
+KEYED_HASH="sha256"
+MAX_PIN_LENGTH="64"
+PCR_VAR="${PCR_EXTENDED},"
+PCRLIST_PRESEED_ONCE="${PCR_BANK}:${PCR_BIOS},8,9,${PCR_VAR}14"
+PCRLIST_PRIMARY_ONCE="${PCR_BANK}:${PCR_SECUREBOOT},8,9,${PCR_VAR}14"
+PCR_VAR=""
+PCRLIST_PRESEED_MANY="${PCR_BANK}:${PCR_BIOS},8,9,${PCR_VAR}14"
+PCRLIST_PRIMARY_MANY="${PCR_BANK}:${PCR_SECUREBOOT},8,9,${PCR_VAR}14"
+
+# path to keys
+KEY_PATH="/etc/mmstpm2/keys"
+
+# path to stored named key hash objects
+NAMED_OBJECTS="/var/lib/mmstpm2/objects"
+
+# SRK public keys set by 'sectpmctl provisioning'
+O_SRK_PUB="${KEY_PATH}/tpm_owner.pub"
+O_SRK_PUB_NODA="${KEY_PATH}/tpm_owner_noda.pub"
+
+# pcr values stored by by 'sectpmctl install'
+PROVISIONED_PCR7_VALUE="${KEY_PATH}/pcr7.dat"
+PROVISIONED_PCR11_VALUE="${KEY_PATH}/pcr11.dat"
+PROVISIONED_ZERO_VALUE="${KEY_PATH}/pcr_zero.dat"
+
+# input data
+CMD=""
+NAME=""
+NAME_DIR=""
+HANDLE=""
+KEY_FILE=""
+PIN=""
+NODA=false
+OLDPIN=""
+PARENT_PUBLIC=""
+PARENT_HANDLE=""
+PCRLIST=""
+PCR_EXTEND=false
+PCR_PRESEED=false
+PCRLIST=""
+EXTEND_FILE=""
+EXTEND_RANDOM=false
+EXTEND_STRING=""
+
+# erro and return codes
+ERR=false
+TIMEOUT=0
+
+_print_error() {
+  echo "${@}" 1>&2
+}
+
+_usage_short() {
+  cat 1>&4 <<__END
+$ME COMMAND [OPTIONS...]
+
+A tool to store encrypted secrets in TPM2 key hash objects
+
+Commands
+  changepin
+    <handle> [noda] <oldpin | oldpin-hex | oldpin-file>
+    <pin | pin-hex | pin-file>
+  extend
+    <[file] | [random] | [string]>
+  help
+  remove
+    <handle | name [name-dir]>
+  seal
+    <handle | name [name-dir]> [key-file] [noda] [pcr-extend] [pcr-preseed]
+    [pin | pin-hex | pin-file]
+  unseal
+    <handle | name [name-dir]> [noda] [pcr-extend] [pcr-preseed]
+    [pin | pin-hex | pin-file]
+
+Options
+  --file <file>
+  --handle <hex string>
+  --key-file <file>
+  --name <string>
+  --name-dir <directory>
+  --noda
+  --oldpin <string>
+  --oldpin-hex <hex string>
+  --oldpin-file <file>
+  --pcr-extend
+  --pcr-preseed
+  --pin <string>
+  --pin-hex <hex string>
+  --pin-file <file>
+  --random
+  --string <string>
+__END
+}
+
+_usage_long() {
+  cat 1>&4 <<__END
+$ME COMMAND [OPTIONS...]
+
+A tool to store encrypted secrets in TPM2 key hash objects
+
+
+Commands
+  changepin
+    <handle> [noda] <oldpin | oldpin-hex | oldpin-file>
+    <pin | pin-hex | pin-file>
+
+    Changes the PIN of a sealed object which is persisted in the TPM
+
+  extend
+    <[file] | [random] | [string]>
+
+  help
+    Show this help.
+
+  remove
+    <handle | name [name-dir]>
+
+    Remove either the wrapped key of a secret from the filesystem or from the
+    persistent handles inde the TPM.
+
+  seal
+    <handle | name [name-dir]> [key-file] [noda] [pcr-extend] [pcr-preseed]
+    [pin | pin-hex | pin-file]
+
+  unseal
+    <handle | name [name-dir]> [noda] [pcr-extend] [pcr-preseed]
+    [pin | pin-hex | pin-file]
+
+
+Options
+  --handle <hex string>
+  --name <string>
+  --name-dir <directory>
+
+  --key-file <file>
+
+  --noda
+
+  --pin <string>
+  --pin-hex <hex string>
+  --pin-file <file>
+
+  --oldpin <string>
+  --oldpin-hex <hex string>
+  --oldpin-file <file>
+
+  --pcr-extend
+  --pcr-preseed
+  
+  --file <file>
+  --random
+  --string <string>
+
+
+Examples
+  Seal secret
+    $ME seal --name dbkey --pin "1234"
+    Enter Password: secret
+ 
+    echo secret | $ME seal --name dbkey --pin "1234"
+
+    echo secret > key
+    $ME seal --name dbkey --key-file key --pin "1234"
+
+    openssl rand 64 | $ME seal --handle 0x81000003 --noda
+
+  Unseal secret
+    $ME unseal --name dbkey --pin "1234"
+
+    $ME unseal --handle 0x81000003 --noda
+
+  Change PIN of secret
+    $ME changepin --handle 0x81000003 --oldpin "1234" --pin "567989433"
+
+  Remove secret
+    $ME remove --name dbkey
+
+    $ME remove --handle 0x81000003
+  
+  Internal use
+    Manual install
+      seal
+      unseal
+    
+    Preseed install
+      seal
+      unseal
+      seal
+      unseal
+__END
+}
+
+_check_state() {
+  if (( UID != 0 )); then
+    _print_error "${ME}: Must be run as root"
+    return 1
+  fi
+  
+  p1="$( grep -c "/dev/shm" /proc/mounts )" || p1=""
+  p2="$( grep -c "^tmpfs /dev/shm tmpfs" /proc/mounts )" || p2=""
+  if [[ "${p1}" != "1" || "${p2}" != "1" ]]; then
+    _print_error "${ME}: /dev/shm is required"
+    return 1
+  fi
+
+  if [[ ! -d "${NAMED_OBJECTS}" ]]; then
+    if ! install -m 0700 -d "${NAMED_OBJECTS}"; then
+      _print_error "${ME}: Could not create directory '${NAMED_OBJECTS}'"
+      return 1
+    fi
+  fi
+
+  p1="$( tpm2_getcap handles-persistent | tr '[:upper:]' '[:lower:]' | grep -c "^\- ${HANDLE_O_SRK}$" )" || p1=""
+  if [[ "${p1}" != "1" || ! -f "${O_SRK_PUB}" ]]; then
+    _print_error "${ME}: Owner DA SRK not found, run 'sectpmctl provisioning' first"
+    return 1
+  fi
+
+  p1="$( tpm2_getcap handles-persistent | tr '[:upper:]' '[:lower:]' | grep -c "^\- ${HANDLE_O_SRK_NODA}$" )" || p1=""
+  if [[ "${p1}" != "1" || ! -f "${O_SRK_PUB_NODA}" ]]; then
+    _print_error "${ME}: Owner NODA SRK not found, run 'sectpmctl provisioning' first"
+    return 1
+  fi
+}
+
+_check_input_and_state() {
+  if (( ${#} == 0 )); then
+    _usage_short
+    return 0
+  fi
+
+  CMD="${1}"
+  
+  case "${CMD}" in
+    changepin | enterlockout | extend | leavelockout | remove | seal | unseal)
+      ;;
+    help)
+      _usage_long
+      return 0
+      ;;
+    *)
+      _print_error "${ME}: Invalid command '${CMD}'"
+      return 1
+      ;;
+  esac
+  shift
+
+  while [ ${#} != 0 ]; do
+    case "${1}" in
+      --handle)
+        case "${CMD}" in
+          changepin | remove | seal | unseal)
+            if (( ${#} >= 2 )) && [[ ! "${2}" =~ ^- ]]; then
+              if [[ -n "${NAME}" ]]; then
+                _print_error "${ME} ${CMD} ${1}: Option '--name' already set"
+                return 1
+              elif [[ -z "${HANDLE}" ]]; then
+                if [[ $( echo "${2}" | grep -cE '^0x([0-9A-Fa-f][0-9A-Fa-f])+$' ) == 1 ]]; then
+                  HANDLE="$( echo "${2}" | tr '[:upper:]' '[:lower:]' )"
+                  if [[ "${HANDLE}" == $( echo "${HANDLE_O_SRK}" | tr '[:upper:]' '[:lower:]' ) ]]; then
+                    _print_error "${ME} ${CMD} ${1}: Handle '${HANDLE}' can not be equal to owner DA SRK"
+                    return 1
+                  elif [[ "${HANDLE}" == $( echo "${HANDLE_O_SRK_NODA}" | tr '[:upper:]' '[:lower:]' ) ]]; then
+                    _print_error "${ME} ${CMD} ${1}: Handle '${HANDLE}' can not be equal to owner NODA SRK"
+                    return 1
+                  fi
+                else
+                  _print_error "${ME} ${CMD} ${1}: Option is not a hex string '${2}'"
+                  return 1
+                fi
+              else
+                _print_error "${ME} ${CMD} ${1}: Can not be set twice"
+                return 1
+              fi
+              shift
+            else
+              _print_error "${ME} ${CMD} ${1}: Argument is missing"
+              return 1
+            fi
+            ;;
+          *)
+            _print_error "${ME} ${CMD}: Command does't support option '${1}'"
+            return 1
+            ;;
+        esac
+        ;;
+      --name)
+        case "${CMD}" in
+          remove | seal | unseal)
+            if (( ${#} >= 2 )) && [[ ! "${2}" =~ ^- ]]; then
+              if [[ -n "${HANDLE}" ]]; then
+                _print_error "${ME} ${CMD} ${1}: Option '--handle' already set"
+                return 1
+              elif [[ -z "${NAME}" ]]; then
+                if [[ $( echo "${2}" | LC_ALL=en_US.UTF-8 grep -cE '^[[:alnum:] +:#.§_-]+$' ) == 1 ]]; then
+                  NAME="${2}"
+                else
+                  _print_error "${ME} ${CMD} ${1}: Option contains invalid characters '${2}'"
+                  return 1
+                fi
+              else
+                _print_error "${ME} ${CMD} ${1}: Can not be set twice"
+                return 1
+              fi
+              shift
+            else
+              _print_error "${ME} ${CMD} ${1}: Argument is missing"
+              return 1
+            fi
+            ;;
+          *)
+            _print_error "${ME} ${CMD}: Command does't support option '${1}'"
+            return 1
+            ;;
+        esac
+        ;;
+      --name-dir)
+        case "${CMD}" in
+          remove | seal | unseal)
+            if (( ${#} >= 2 )) && [[ ! "${2}" =~ ^- ]]; then
+              if [[ -n "${HANDLE}" ]]; then
+                _print_error "${ME} ${CMD} ${1}: Option '--handle' already set"
+                return 1
+              elif [[ -z "${NAME_DIR}" ]]; then
+                NAME_DIR="${2}"
+              else
+                _print_error "${ME} ${CMD} ${1}: Can not be set twice"
+                return 1
+              fi
+              shift
+            else
+              _print_error "${ME} ${CMD} ${1}: Argument is missing"
+              return 1
+            fi
+            ;;
+          *)
+            _print_error "${ME} ${CMD}: Command does't support option '${1}'"
+            return 1
+            ;;
+        esac
+        ;;
+      --key-file)
+        case "${CMD}" in
+          seal)
+            if (( ${#} >= 2 )) && [[ ! "${2}" =~ ^- ]]; then
+              if [[ -z "${KEY_FILE}" ]]; then
+                KEY_FILE="$( realpath "${2}" )"
+              else
+                _print_error "${ME} ${CMD} ${1}: Can not be set twice"
+                return 1
+              fi
+              shift
+            else
+              _print_error "${ME} ${CMD} ${1}: Argument is missing"
+              return 1
+            fi
+            ;;
+          *)
+            _print_error "${ME} ${CMD}: Command does't support option '${1}'"
+            return 1
+            ;;
+        esac
+        ;;
+      --noda)
+        case "${CMD}" in
+          changepin | seal | unseal)
+            if [[ -z "${PARENT_PUBLIC}" ]]; then
+              PARENT_PUBLIC="${O_SRK_PUB_NODA}"
+              PARENT_HANDLE="${HANDLE_O_SRK_NODA}"
+              NODA=true
+            else
+              _print_error "${ME} ${CMD} ${1}: Can not be set twice"
+              return 1
+            fi
+            ;;
+          *)
+            _print_error "${ME} ${CMD}: Command does't support option '${1}'"
+            return 1
+            ;;
+        esac
+        ;;
+      --pcr-extend)
+        case "${CMD}" in
+          seal | unseal)
+            if [[ ${PCR_EXTEND} == false ]]; then
+              PCR_EXTEND=true
+            else
+              _print_error "${ME} ${CMD} ${1}: Can not be set twice"
+              return 1
+            fi
+            ;;
+          *)
+            _print_error "${ME} ${CMD}: Command does't support option '${1}'"
+            return 1
+            ;;
+        esac
+        ;;
+      --pcr-preseed)
+        case "${CMD}" in
+          seal | unseal)
+            if [[ ${PCR_PRESEED} == false ]]; then
+              PCR_PRESEED=true
+            else
+              _print_error "${ME} ${CMD} ${1}: Can not be set twice"
+              return 1
+            fi
+            ;;
+          *)
+            _print_error "${ME} ${CMD}: Command does't support option '${1}'"
+            return 1
+            ;;
+        esac
+        ;;
+      --file)
+        case "${CMD}" in
+          extend)
+            if (( ${#} >= 2 )) && [[ ! "${2}" =~ ^- ]]; then
+              if [[ -z "${EXTEND_FILE}" && ${EXTEND_RANDOM} == false && -z "${EXTEND_STRING}" ]]; then
+                EXTEND_FILE="${2}"
+              else
+                _print_error "${ME} ${CMD} ${1}: Can not be set twice"
+                return 1
+              fi
+              shift
+            else
+              _print_error "${ME} ${CMD} ${1}: Argument is missing"
+              return 1
+            fi
+            ;;
+          *)
+            _print_error "${ME} ${CMD}: Command does't support option '${1}'"
+            return 1
+            ;;
+        esac
+        ;;
+      --random)
+        case "${CMD}" in
+          extend)
+            if [[ -z "${EXTEND_FILE}" && ${EXTEND_RANDOM} == false && -z "${EXTEND_STRING}" ]]; then
+              EXTEND_RANDOM=true
+            else
+              _print_error "${ME} ${CMD} ${1}: Can not be set twice"
+              return 1
+            fi
+            ;;
+          *)
+            _print_error "${ME} ${CMD}: Command does't support option '${1}'"
+            return 1
+            ;;
+        esac
+        ;;
+      --string)
+        case "${CMD}" in
+          extend)
+            if (( ${#} >= 2 )) && [[ ! "${2}" =~ ^- ]]; then
+              if [[ -z "${EXTEND_FILE}" && ${EXTEND_RANDOM} == false && -z "${EXTEND_STRING}" ]]; then
+                EXTEND_STRING="${2}"
+              else
+                _print_error "${ME} ${CMD} ${1}: Can not be set twice"
+                return 1
+              fi
+              shift
+            else
+              _print_error "${ME} ${CMD} ${1}: Argument is missing"
+              return 1
+            fi
+            ;;
+          *)
+            _print_error "${ME} ${CMD}: Command does't support option '${1}'"
+            return 1
+            ;;
+        esac
+        ;;
+      --pin)
+        case "${CMD}" in
+          changepin | seal | unseal)
+            if (( ${#} >= 2 )) && [[ ! "${2}" =~ ^- ]]; then
+              if [[ -z "${PIN}" ]]; then
+                PIN="$(echo -n "${2}" | od -A n -v -t x1 | tr -d ' \n')"
+                if (( $( echo -n "${PIN}" | wc -c ) > MAX_PIN_LENGTH*2 )); then
+                  _print_error "${ME} ${CMD} ${1}: Maximum length 64 bytes '${2}'"
+                  return 1
+                fi
+              else
+                _print_error "${ME} ${CMD} ${1}: Can not be set twice"
+                return 1
+              fi
+              shift
+            else
+              _print_error "${ME} ${CMD} ${1}: Argument is missing"
+              return 1
+            fi
+            ;;
+          *)
+            _print_error "${ME} ${CMD}: Command does't support option '${1}'"
+            return 1
+            ;;
+        esac
+        ;;
+      --pin-file)
+        case "${CMD}" in
+          changepin | seal | unseal)
+            if (( ${#} >= 2 )) && [[ ! "${2}" =~ ^- ]]; then
+              if [[ -z "${PIN}" ]]; then
+                p1="$( od -A n -v -t x1 "${2}" | tr -d ' \n')" || p1=""
+                if [[ "${p1}" == "" ]]; then
+                  _print_error "${ME} ${CMD} ${1}: Could not read file content '${2}'"
+                  return 1
+                elif (( $( echo -n "${p1}" | wc -c ) > MAX_PIN_LENGTH*2 )); then
+                  _print_error "${ME} ${CMD} ${1}: Maximum length is ${MAX_PIN_LENGTH} bytes '${2}'"
+                  return 1
+                fi
+                PIN="${p1}"
+              else
+                _print_error "${ME} ${CMD} ${1}: Can not be set twice"
+                return 1
+              fi
+              shift
+            else
+              _print_error "${ME} ${CMD} ${1}: Argument is missing"
+              return 1
+            fi
+            ;;
+          *)
+            _print_error "${ME} ${CMD}: Command does't support option '${1}'"
+            return 1
+            ;;
+        esac
+        ;;
+      --pin-hex)
+        case "${CMD}" in
+          changepin | seal | unseal)
+            if (( ${#} >= 2 )) && [[ ! "${2}" =~ ^- ]]; then
+              if [[ -z "${PIN}" ]]; then
+                if [[ $( echo "${2}" | grep -cE '^0x([0-9A-Fa-f][0-9A-Fa-f])+$' ) == 1 ]]; then
+                  PIN="$( echo "${2:2}" | tr '[:upper:]' '[:lower:]' )"
+                  if (( $( echo -n "${PIN}" | wc -c ) > MAX_PIN_LENGTH*2 )); then
+                    _print_error "${ME} ${CMD} ${1}: Maximum length 64 bytes '${2}'"
+                    return 1
+                  fi
+                else
+                  _print_error "${ME} ${CMD} ${1}: Option is not a hex string '${2}'"
+                  return 1
+                fi
+              else
+                _print_error "${ME} ${CMD} ${1}: Can not be set twice"
+                return 1
+              fi
+              shift
+            else
+              _print_error "${ME} ${CMD} ${1}: Argument is missing"
+              return 1
+            fi
+            ;;
+          *)
+            _print_error "${ME} ${CMD}: Command does't support option '${1}'"
+            return 1
+            ;;
+        esac
+        ;;
+      --oldpin)
+        case "${CMD}" in
+          changepin)
+            if (( ${#} >= 2 )) && [[ ! "${2}" =~ ^- ]]; then
+              if [[ -z "${OLDPIN}" ]]; then
+                OLDPIN="$(echo -n "${2}" | od -A n -v -t x1 | tr -d ' \n')"
+                if (( $( echo -n "${OLDPIN}" | wc -c ) > MAX_PIN_LENGTH*2 )); then
+                  _print_error "${ME} ${CMD} ${1}: Maximum length 64 bytes '${2}'"
+                  return 1
+                fi
+              else
+                _print_error "${ME} ${CMD} ${1}: Can not be set twice"
+                return 1
+              fi
+              shift
+            else
+              _print_error "${ME} ${CMD} ${1}: Argument is missing"
+              return 1
+            fi
+            ;;
+          *)
+            _print_error "${ME} ${CMD}: Command does't support option '${1}'"
+            return 1
+            ;;
+        esac
+        ;;
+      --oldpin-file)
+        case "${CMD}" in
+          changepin)
+            if (( ${#} >= 2 )) && [[ ! "${2}" =~ ^- ]]; then
+              if [[ -z "${OLDPIN}" ]]; then
+                p1="$( od -A n -v -t x1 "${2}" | tr -d ' \n')" || p1=""
+                if [[ "${p1}" == "" ]]; then
+                  _print_error "${ME} ${CMD} ${1}: Could not read file content '${2}'"
+                  return 1
+                elif (( $( echo -n "${p1}" | wc -c ) > MAX_PIN_LENGTH*2 )); then
+                  _print_error "${ME} ${CMD} ${1}: Maximum length is ${MAX_PIN_LENGTH} bytes '${2}'"
+                  return 1
+                fi
+                OLDPIN="${p1}"
+              else
+                _print_error "${ME} ${CMD} ${1}: Can not be set twice"
+                return 1
+              fi
+              shift
+            else
+              _print_error "${ME} ${CMD} ${1}: Argument is missing"
+              return 1
+            fi
+            ;;
+          *)
+            _print_error "${ME} ${CMD}: Command does't support option '${1}'"
+            return 1
+            ;;
+        esac
+        ;;
+      --oldpin-hex)
+        case "${CMD}" in
+          changepin)
+            if (( ${#} >= 2 )) && [[ ! "${2}" =~ ^- ]]; then
+              if [[ -z "${OLDPIN}" ]]; then
+                if [[ $( echo "${2}" | grep -cE '^0x([0-9A-Fa-f][0-9A-Fa-f])+$' ) == 1 ]]; then
+                  OLDPIN="$( echo "${2:2}" | tr '[:upper:]' '[:lower:]' )"
+                  if (( $( echo -n "${OLDPIN}" | wc -c ) > MAX_PIN_LENGTH*2 )); then
+                    _print_error "${ME} ${CMD} ${1}: Maximum length 64 bytes '${2}'"
+                    return 1
+                  fi
+                else
+                  _print_error "${ME} ${CMD} ${1}: Option is not a hex string '${2}'"
+                  return 1
+                fi
+              else
+                _print_error "${ME} ${CMD} ${1}: Can not be set twice"
+                return 1
+              fi
+              shift
+            else
+              _print_error "${ME} ${CMD} ${1}: Argument is missing"
+              return 1
+            fi
+            ;;
+          *)
+            _print_error "${ME} ${CMD}: Command does't support option '${1}'"
+            return 1
+            ;;
+        esac
+        ;;
+      *)
+        _print_error "${ME} ${CMD}: Invalid option '${1}'"
+        return 1
+        ;;
+    esac
+    shift
+  done
+  
+  if [[ -z "${PARENT_PUBLIC}" ]]; then
+    PARENT_PUBLIC="${O_SRK_PUB}"
+    PARENT_HANDLE="${HANDLE_O_SRK}"
+  fi
+  
+  if [[ -n "${NAME_DIR}" && -z "${NAME}" ]]; then
+    _print_error "${ME} ${CMD} --name-dir: Option '--name' required"
+    return 1
+  fi
+  
+  if [[ -z "${NAME_DIR}" ]]; then
+    NAME_DIR="${NAMED_OBJECTS}"
+  fi
+  
+  case "${CMD}" in
+    changepin)
+      if [[ -z "${PIN}" ]]; then
+        _print_error "${ME} ${CMD}: '--pin', '--pin-hex' or '--pin-file' required"
+        return 1
+      fi
+      if [[ -z "${OLDPIN}" ]]; then
+        _print_error "${ME} ${CMD}: '--oldpin', '--oldpin-hex' or '--oldpin-file' required"
+        return 1
+      fi
+      ;;
+    *)
+      ;;
+  esac
+  
+  case "${CMD}" in
+    extend)
+      if [[ -z "${EXTEND_FILE}" && ${EXTEND_RANDOM} == false && -z "${EXTEND_STRING}" ]]; then
+        _print_error "${ME} ${CMD}: '--file', '--random' or '--string' required"
+        return 1
+      fi
+      ;;
+    *)
+      ;;
+  esac
+  
+  case "${CMD}" in
+    changepin)
+      if [[ -z "${HANDLE}" ]]; then
+        _print_error "${ME} ${CMD}: Handle is required"
+        return 1
+      fi
+      ;;
+    remove | seal | unseal)
+      if [[ -z "${NAME}" && -z "${HANDLE}" ]] || [[ -n "${NAME}" && -n "${HANDLE}" ]]; then
+        _print_error "${ME} ${CMD}: Handle or name is required"
+        return 1
+      fi
+      ;;
+    *)
+      ;;
+  esac
+  
+  if [[ ${PCR_EXTEND} == false && ${PCR_PRESEED} == false ]]; then
+    PCRLIST="${PCRLIST_PRIMARY_MANY}"
+  elif [[ ${PCR_EXTEND} == false && ${PCR_PRESEED} == true ]]; then
+    PCRLIST="${PCRLIST_PRESEED_MANY}"
+  elif [[ ${PCR_EXTEND} == true && ${PCR_PRESEED} == false ]]; then
+    PCRLIST="${PCRLIST_PRIMARY_ONCE}"
+  else
+    PCRLIST="${PCRLIST_PRESEED_ONCE}"
+  fi
+  
+  if ! _check_state; then
+    return 1
+  fi
+  
+  # loop after emergency flushing of all saved session a second time in
+  # case of a TPM timeout. this is not too polite, but self defense.
+  # secbootctl requires a functional kernel signing facility. we can't
+  # risc any disturbance beause of unclean shutdown of any application 
+  # 'tpm2_getcap handles-saved-session' can be used to list all sessions
+  ret=0
+  for _ in {1..2}; do
+    TIMEOUT=0
+    case "${CMD}" in
+      extend)
+        _extend
+        ;;
+      enterlockout)
+        _enterlockout
+        ;;
+      leavelockout)
+        _leavelockout
+        ;;
+      remove)
+        _remove
+        ;;
+      seal)
+        _seal
+        ;;
+      unseal)
+        _unseal
+        ;;
+      changepin)
+        _changepin
+        ;;
+      *)
+        _print_error "${ME} ${CMD}: Unknown command"
+        return 1
+        ;;
+    esac
+    ret=${?}
+
+    if [[ "${TIMEOUT}" == "1" ]]; then
+      echo "${ME} ${CMD}: TPM Timeout, flushing all saved TPM sessions now" > /dev/kmsg
+      tpm2_flushcontext -s
+    else
+      break
+    fi
+  done
+  
+  if [[ "${TIMEOUT}" == "1" ]]; then
+    return 2
+  elif [[ "${ret}" != "0" ]]; then
+    return 1
+  else
+    return 0
+  fi
+}
+
+# exception for non TPM commands
+_ex() {
+  error_message=${1}
+  shift
+
+  "${@}"
+  
+  ret=${?}
+  if [[ ${ret} != 0 ]]; then
+    _print_error "${error_message}"
+    ERR=true
+    return 1
+  fi
+  
+  return 0
+}
+
+# exception with timeout. all TPM commands need timeout handling
+_tx() {
+  error_message=${1}
+  shift
+
+  timeout ${TIMEOUT_SECONDS} "${@}"
+  
+  ret=${?}
+  if [[ ${ret} == 124 ]]; then
+    TIMEOUT=1
+    ERR=true
+    return 2
+  elif [[ ${ret} != 0 ]]; then
+    _print_error "${error_message}"
+    ERR=true
+    return 1
+  fi
+  
+  return 0
+}
+
+# exception subshell return unwinding, needed in assignments which use break
+_xt() {
+  ret=${1}
+  
+  if [[ ${ret} == 2 ]]; then
+    TIMEOUT=1
+    ERR=true
+    return 1
+  elif [[ ${ret} != 0 ]]; then
+    ERR=true
+    return 1
+  fi
+
+  return 0
+}
+
+_enterlockout() {
+  sectpmctl key leavelockout 2> /dev/null > /dev/null
+
+  p1="$( _tx "${ME} ${CMD}: Could not read getcap properties-variable" \
+    tpm2_getcap properties-variable )" || _xt $? || return 1
+  if [[ "$( grep -c "TPM2_PT_MAX_AUTH_FAIL: 0x20" <<< "$p1" )" == "1" ]]; then
+    p1="$( _tx "${ME} ${CMD}: Could not get lockout authValue" \
+      cat /etc/mmstpm2/keys/lockout.pwd )" || _xt $? || return 1
+    _tx "${ME} ${CMD}: Could not reset lockout counter for testing" \
+      tpm2_dictionarylockout -Q -c --setup-parameters -p "${p1}" || return 1
+    _tx "${ME} ${CMD}: Could not set lowered lockout settings for testing" \
+      tpm2_dictionarylockout -Q --max-tries=8 --recovery-time=900 --lockout-recovery-time=900 --setup-parameters -p "${p1}" || return 1
+  fi
+
+  p1="$( _tx "${ME} ${CMD}: Could not read getcap properties-variable" \
+    tpm2_getcap properties-variable )" || _xt $? || return 1
+  if [[ "$( grep -c "TPM2_PT_MAX_AUTH_FAIL: 0x8" <<< "$p1" )" == "0" ]]; then
+    echo "${ME} ${CMD}: could not set lockout settings"
+    return 1
+  fi
+  p1="$( _tx "${ME} ${CMD}: Could not read getcap properties-variable" \
+    tpm2_getcap properties-variable )" || _xt $? || return 1
+  if [[ "$( grep -c "inLockout:                 1" <<< "$p1" )" == "1" ]]; then
+    echo "${ME} ${CMD}: already in lockout"
+    return 1
+  fi
+
+  sectpmctl key remove --handle 0x81000999 2> /dev/null > /dev/null
+  
+  _tx "${ME} ${CMD}: Could not seal lockout test object" \
+    echo "abc" | sectpmctl key seal --handle 0x81000999 --pin 123 --pcr-preseed || return 1
+
+  sectpmctl key unseal --handle 0x81000999 --pin wrongpwd --pcr-preseed 2> /dev/null > /dev/null
+  sectpmctl key unseal --handle 0x81000999 --pin wrongpwd --pcr-preseed 2> /dev/null > /dev/null
+  sectpmctl key unseal --handle 0x81000999 --pin wrongpwd --pcr-preseed 2> /dev/null > /dev/null
+  sectpmctl key unseal --handle 0x81000999 --pin wrongpwd --pcr-preseed 2> /dev/null > /dev/null
+  sectpmctl key unseal --handle 0x81000999 --pin wrongpwd --pcr-preseed 2> /dev/null > /dev/null
+  sectpmctl key unseal --handle 0x81000999 --pin wrongpwd --pcr-preseed 2> /dev/null > /dev/null
+  sectpmctl key unseal --handle 0x81000999 --pin wrongpwd --pcr-preseed 2> /dev/null > /dev/null
+  sectpmctl key unseal --handle 0x81000999 --pin wrongpwd --pcr-preseed 2> /dev/null > /dev/null
+  sectpmctl key unseal --handle 0x81000999 --pin wrongpwd --pcr-preseed 2> /dev/null > /dev/null
+
+  p1="$( _tx "${ME} ${CMD}: Could not read getcap properties-variable" \
+    tpm2_getcap properties-variable )" || _xt $? || return 1
+  if [[ "$( grep -c "inLockout:                 1" <<< "$p1" )" == "1" ]]; then
+    echo "in lockout" 1>&4
+  else
+    echo "${ME} ${CMD}: could not enter lockout"
+    return 1
+  fi
+}
+
+_leavelockout() {
+  p1="$( _tx "${ME} ${CMD}: Could not read getcap properties-variable" \
+    tpm2_getcap properties-variable )" || _xt $? || return 1
+  if [[ "$( grep -c "TPM2_PT_MAX_AUTH_FAIL: 0x8" <<< "$p1" )" == "1" ]]; then
+    p1="$( _tx "${ME} ${CMD}: Could not get lockout authValue" \
+      cat /etc/mmstpm2/keys/lockout.pwd )" || _xt $? || return 1
+    _tx "${ME} ${CMD}: Could not reset lockout counter for testing" \
+      tpm2_dictionarylockout -Q -c --setup-parameters -p "${p1}" || return 1
+    _tx "${ME} ${CMD}: Could not set lowered lockout settings for testing" \
+      tpm2_dictionarylockout -Q --max-tries=32 --recovery-time=600 --lockout-recovery-time=1800 --setup-parameters -p "${p1}" || return 1
+  fi
+
+  p1="$( _tx "${ME} ${CMD}: Could not read getcap properties-variable" \
+    tpm2_getcap properties-variable )" || _xt $? || return 1
+  if [[ "$( grep -c "TPM2_PT_MAX_AUTH_FAIL: 0x20" <<< "$p1" )" == "0" ]]; then
+    echo "${ME} ${CMD}: could not set lockout settings"
+    return 1
+  fi
+
+  sectpmctl key remove --handle 0x81000999 2> /dev/null > /dev/null
+
+  p1="$( _tx "${ME} ${CMD}: Could not read getcap properties-variable" \
+    tpm2_getcap properties-variable )" || _xt $? || return 1
+  if [[ "$( grep -c "inLockout:                 0" <<< "$p1" )" == "1" ]]; then
+    echo "out of lockout" 1>&4
+  else
+    echo "${ME} ${CMD}: could not leave lockout"
+    return 1
+  fi
+}
+
+_remove() {
+  if [[ -n ${NAME} ]]; then
+    name_key_priv="${NAME_DIR}/${NAME}_key.priv"
+    name_key_pub="${NAME_DIR}/${NAME}_key.pub"
+
+    _ex "${ME} ${CMD}: Could not remove private key '${NAME}'" \
+      shred -f -z -u "${name_key_priv}" || return 1
+      
+    _ex "${ME} ${CMD}: Could not remove public key '${NAME}'" \
+      shred -f -z -u "${name_key_pub}" || return 1
+  elif [[ -n ${HANDLE} ]]; then
+    _tx "${ME} ${CMD}: Could not remove handle '${HANDLE}'" \
+      tpm2_evictcontrol -Q -C o -c "${HANDLE}" || return 1
+  fi
+}
+
+_extend() {
+  for _ in {1..1}; do
+    if [[ -n ${EXTEND_FILE} ]]; then
+      p1="$( _ex "${ME} ${CMD}: Could not create hash from file '${EXTEND_FILE}'" \
+        cat "${EXTEND_FILE}" | ${PCR_BANK}sum | awk '{print $1;}' )" || return 1
+        
+      _tx "${ME} ${CMD}: Could not extend PCR '${PCR_BANK}:${PCR_EXTENDED}' with file '${EXTEND_FILE}'" \
+        tpm2_pcrextend -Q "${PCR_EXTENDED}:${PCR_BANK}=${p1}" || return 1
+    elif [[ ${EXTEND_RANDOM} == true ]]; then
+      p1="$( _tx "${ME} ${CMD}: Could not create random data with length ${PCR_HASH_LENGTH}" \
+        tpm2_getrandom --hex "${PCR_HASH_LENGTH}" )" || _xt $? || break
+        
+      _tx "${ME} ${CMD}: Could not extend PCR '${PCR_BANK}:${PCR_EXTENDED}' with random data" \
+        tpm2_pcrextend -Q "${PCR_EXTENDED}:${PCR_BANK}=${p1}" || return 1
+    elif [[ -n ${EXTEND_STRING} ]]; then
+      p1="$( _ex "${ME} ${CMD}: Could not create hash from string '${EXTEND_STRING}'" \
+        echo -n "${EXTEND_STRING}" | ${PCR_BANK}sum | awk '{print $1;}' )" || return 1
+        
+      _tx "${ME} ${CMD}: Could not extend PCR '${PCR_BANK}:${PCR_EXTENDED}' with input string '${EXTEND_STRING}'" \
+        tpm2_pcrextend -Q "${PCR_EXTENDED}:${PCR_BANK}=${p1}" || return 1
+    else
+      print_error "${ME} ${CMD}: Could not extend PCR, no input data"
+      return 1
+    fi
+  done
+}
+
+_changepin() {
+  ERR=false
+
+  tempdir="$( _ex "${ME} ${CMD}: Could not create temporary ramfs directory" \
+    mktemp -d -p /dev/shm )" || return 1
+
+  _ex "${ME} ${CMD}: Could not enter temporary ramfs directory" \
+    cd "${tempdir}" || return 1
+
+  for _ in {1..1}; do
+    if [[ -n ${HANDLE}  ]]; then
+      # read public part
+      _tx "${ME} ${CMD}: Could not read public key" \
+        tpm2_readpublic -Q -c "${HANDLE}" -o key.pub || break
+      # change authorisation
+      _tx "${ME} ${CMD}: Could not change authorisation" \
+        tpm2_changeauth -Q -c "${HANDLE}" -C "${PARENT_HANDLE}" -r new.priv -p "hex:${OLDPIN}" "hex:${PIN}" || break
+      # remove current object in handle, may fail if empty
+      tpm2_evictcontrol -Q -c "${HANDLE}" -C o 2> /dev/null > /dev/null || true
+      # load the key
+      _tx "${ME} ${CMD}: Could not load created key" \
+        tpm2_load -Q -C "${PARENT_HANDLE}" -u key.pub -r new.priv -n new.name -c new.ctx || return 1
+      # evict loaded key
+      _tx "${ME} ${CMD}: Could not evict loaded key to handle ${HANDLE@Q}" \
+        tpm2_evictcontrol -Q -c new.ctx "${HANDLE}" -C o || return 1
+    fi
+  done
+
+  if [[ -n ${HANDLE}  ]]; then
+    if [[ -f key.pub ]]; then
+      _ex "${ME} ${CMD}: Could not remove public key" \
+        shred -f -z -u key.pub || return 1
+    fi
+    if [[ -f new.priv ]]; then
+      _ex "${ME} ${CMD}: Could not remove new private key" \
+        shred -f -z -u new.priv || return 1
+    fi
+    if [[ -f new.name ]]; then
+      _ex "${ME} ${CMD}: Could not remove new private key name" \
+        shred -f -z -u new.name || return 1
+    fi
+    if [[ -f new.ctx ]]; then
+      _ex "${ME} ${CMD}: Could not remove new private key context" \
+        shred -f -z -u new.ctx || return 1
+    fi
+  fi
+
+  _ex "${ME} ${CMD}: Could not leave temporary ramfs directory" \
+    cd - > /dev/null || return 1
+
+  _ex "${ME} ${CMD}: Could not remove temporary ramfs directory" \
+    rmdir "${tempdir}" || return 1
+
+  if [[ $ERR == true ]]; then
+    return 1
+  fi
+}
+
+_seal() {
+  ERR=false
+
+  tempdir="$( _ex "${ME} ${CMD}: Could not create temporary ramfs directory" \
+    mktemp -d -p /dev/shm )" || return 1
+
+  _ex "${ME} ${CMD}: Could not enter temporary ramfs directory" \
+    cd "${tempdir}" || return 1
+
+  for _ in {1..1}; do
+    # we will provide the PCR values ourself
+    _ex "${ME} ${CMD}: Stored zero PCR value not found ${PROVISIONED_ZERO_VALUE@Q}, run 'sectpmctl install'" \
+      test -f "${PROVISIONED_ZERO_VALUE}" || break
+
+    # combine all pcr values into pcr_values.dat
+    # primary pcr 0 or 7 depends on PCR_PRESEED true or false
+    if [[ ${PCR_PRESEED} == true ]]; then
+      _tx "${ME} ${CMD}: Could not read PCR 0" \
+        tpm2_pcrread -Q -o pcr_values.dat "${PCR_BANK}:${PCR_BIOS}" || break
+    else
+      _ex "${ME} ${CMD}: Stored PCR 7 value not found ${PROVISIONED_PCR7_VALUE@Q}, run 'sectpmctl install'" \
+        test -f "${PROVISIONED_PCR7_VALUE}" || break
+      
+      _ex "${ME} ${CMD}: Could not copy PCR 7 to PCR value list" \
+        cp "${PROVISIONED_PCR7_VALUE}" pcr_values.dat || break
+    fi
+    # pcr 8 and 9
+    _ex "${ME} ${CMD}: Could not copy zero value PCR 8 to PCR value list" \
+      cat "${PROVISIONED_ZERO_VALUE}" >> pcr_values.dat || break
+    _ex "${ME} ${CMD}: Could not copy zero value PCR 9 to PCR value list" \
+      cat "${PROVISIONED_ZERO_VALUE}" >> pcr_values.dat || break
+    # pcr 11 depends on PCR_EXTEND true
+    if [[ ${PCR_EXTEND} == true ]]; then
+      _ex "${ME} ${CMD}: Stored PCR 11 value not found ${PROVISIONED_PCR11_VALUE@Q}, run 'sectpmctl install'" \
+        test -f "${PROVISIONED_PCR11_VALUE}" || break
+      
+      _ex "${ME} ${CMD}: Could not copy PCR 11 to PCR value list" \
+        cat "${PROVISIONED_PCR11_VALUE}" >> pcr_values.dat || break
+    fi
+    # pcr 14
+    _ex "${ME} ${CMD}: Could not copy zero value PCR 14 to PCR value list" \
+      cat "${PROVISIONED_ZERO_VALUE}" >> pcr_values.dat || break
+
+    # check size of pcr value list
+    expected_pcr_value_size="0"
+    if [[ ${PCR_EXTEND} == true ]]; then
+      expected_pcr_value_size="$(( PCR_HASH_LENGTH * 5 ))"
+    else
+      expected_pcr_value_size="$(( PCR_HASH_LENGTH * 4 ))"
+    fi
+    p1="$( _ex "${ME} ${CMD}: Could not check length of combined PCR values" \
+      wc -c pcr_values.dat | awk '{print $1;}' )" || _xt $? || break
+    _ex "${ME} ${CMD}: Wrong size of computed PCR values, it is ${p1@Q}, but should be ${expected_pcr_value_size@Q}" \
+      test "${p1}" == "$expected_pcr_value_size" || break
+
+    # create trial pcr with authvalue policy session
+    _tx "${ME} ${CMD}: Could not start trial session" \
+      tpm2_startauthsession -Q -S trialsession.ctx || break
+    _tx "${ME} ${CMD}: Could not add PCR policy to trial session" \
+      tpm2_policypcr -Q -S trialsession.ctx -l "${PCRLIST}" -f pcr_values.dat -L pcr.policy || break
+    if [[ -n ${PIN} ]]; then
+      _tx "${ME} ${CMD}: Could not add authValue policy to trial session" \
+        tpm2_policyauthvalue -Q -S trialsession.ctx -L pcr.policy || break
+    fi
+    _tx "${ME} ${CMD}: Could not flush trial session" \
+      tpm2_flushcontext trialsession.ctx || break
+    _ex "${ME} ${CMD}: Could not remove trial session context" \
+      shred -f -z -u trialsession.ctx || break
+    
+    # connect encrypted to the TPM with key enforcement (TOFU)
+    _tx "${ME} ${CMD}: Could not connect to known TPM" \
+      tpm2_startauthsession -Q --policy-session -S session.ctx -c "${PARENT_PUBLIC}" || break
+
+    p1="$( _tx "${ME} ${CMD}: Could not read session config" \
+      tpm2_sessionconfig session.ctx )" || _xt $? || break
+    if [[ "$( grep -c '[ |]encrypt' <<< "$p1" )" != "1" ]] || [[ "$( grep -c '[ |]decrypt' <<< "$p1" )" != "1" ]]; then
+      _print_error "${ME} ${CMD}: Session could not be encrypted"
+      ERR=true
+      break
+    fi
+    
+    name_key_priv="pcr_seal_key.priv"
+    name_key_pub="pcr_seal_key.pub"
+    if [[ -n ${NAME}  ]]; then
+      name_key_priv="${NAME_DIR}/${NAME}_key.priv"
+      name_key_pub="${NAME_DIR}/${NAME}_key.pub"
+    fi
+    input_file="-"
+    if [[ -n ${KEY_FILE}  ]]; then
+      input_file="${KEY_FILE}"
+    fi
+
+    # store secret in keyed hash object
+    nodaAttribute=""
+    if [[ ${NODA} == true ]]; then
+        nodaAttribute="|noda"
+    fi
+    if [[ -n ${PIN} ]]; then
+      _tx "${ME} ${CMD}: Could not seal data" \
+        tpm2_create -Q --session=session.ctx -g "${KEYED_HASH}" -u "${name_key_pub}" -r "${name_key_priv}" -i "${input_file}" -C "${PARENT_HANDLE}" -L pcr.policy -a "fixedtpm|fixedparent${nodaAttribute}" -p "hex:${PIN}" || break
+    else
+      _tx "${ME} ${CMD}: Could not seal data" \
+        tpm2_create -Q --session=session.ctx -g "${KEYED_HASH}" -u "${name_key_pub}" -r "${name_key_priv}" -i "${input_file}" -C "${PARENT_HANDLE}" -L pcr.policy -a "fixedtpm|fixedparent${nodaAttribute}" || break
+    fi
+    _tx "${ME} ${CMD}: Could not flush session" \
+      tpm2_flushcontext session.ctx || break
+    _ex "${ME} ${CMD}: Could not remove session context" \
+      shred -f -z -u session.ctx || break
+
+    # evict keyed hash to persistent memory when HANDLE is set
+    if [[ -n ${HANDLE} ]]; then
+      # remove current object in handle, may fail if empty
+      tpm2_evictcontrol -Q -C o -c "${HANDLE}" 2> /dev/null > /dev/null || true
+      # load the key
+      _tx "${ME} ${CMD}: Could not load created key" \
+        tpm2_load -Q -C "${PARENT_HANDLE}" -u pcr_seal_key.pub -r pcr_seal_key.priv -n pcr_seal_key.name -c pcr_seal_key.ctx || return 1
+      # evict loaded key
+      _tx "${ME} ${CMD}: Could not evict loaded key to handle '${HANDLE}'" \
+        tpm2_evictcontrol -Q -c pcr_seal_key.ctx "${HANDLE}" -C o || return 1
+    fi
+  done
+
+  if [[ -f trialsession.ctx ]]; then
+    tpm2_flushcontext -Q trialsession.ctx 2> /dev/null > /dev/null
+    _ex "${ME} ${CMD}: Could not remove trialsession context" \
+      shred -f -z -u trialsession.ctx || return 1
+  fi
+  if [[ -f session.ctx ]]; then
+    tpm2_flushcontext -Q session.ctx 2> /dev/null > /dev/null
+    _ex "${ME} ${CMD}: Could not remove session context" \
+      shred -f -z -u session.ctx || return 1
+  fi
+  if [[ -f pcr_values.dat ]]; then
+    _ex "${ME} ${CMD}: Could not remove PCR value data" \
+      shred -f -z -u pcr_values.dat || return 1
+  fi
+  if [[ -f pcr.policy ]]; then
+    _ex "${ME} ${CMD}: Could not remove policy file" \
+      shred -f -z -u pcr.policy || return 1
+  fi
+
+  if [[ -n ${HANDLE}  ]]; then
+    if [[ -f pcr_seal_key.priv ]]; then
+      _ex "${ME} ${CMD}: Could not remove private PCR sealing key" \
+        shred -f -z -u pcr_seal_key.priv || return 1
+    fi
+    if [[ -f pcr_seal_key.pub ]]; then
+      _ex "${ME} ${CMD}: Could not remove public PCR sealing key" \
+        shred -f -z -u pcr_seal_key.pub || return 1
+    fi
+    if [[ -f pcr_seal_key.ctx ]]; then
+      _ex "${ME} ${CMD}: Could not remove PCR sealing key context" \
+        shred -f -z -u pcr_seal_key.ctx || return 1
+    fi
+    if [[ -f pcr_seal_key.name ]]; then
+      _ex "${ME} ${CMD}: Could not remove PCR sealing key name" \
+        shred -f -z -u pcr_seal_key.name || return 1
+    fi
+  fi
+
+  _ex "${ME} ${CMD}: Could not leave temporary ramfs directory" \
+    cd - > /dev/null || return 1
+
+  _ex "${ME} ${CMD}: Could not remove temporary ramfs directory" \
+    rmdir "${tempdir}" || return 1
+
+  if [[ $ERR == true ]]; then
+    return 1
+  fi
+}
+
+_unseal() {
+  ERR=false
+
+  tempdir="$( _ex "${ME} ${CMD}: Could not create temporary ramfs directory" \
+    mktemp -d -p /dev/shm )" || return 1
+
+  _ex "${ME} ${CMD}: Could not enter temporary ramfs directory" \
+    cd "${tempdir}" || return 1
+
+  for _ in {1..1}; do
+    # connect encrypted to the TPM with key enforcement (TOFU)
+    _tx "${ME} ${CMD}: Could not connect to known TPM" \
+      tpm2_startauthsession -Q --policy-session -S session.ctx -c "${PARENT_PUBLIC}" || break
+
+    p1="$( _tx "${ME} ${CMD}: Could not read session config" \
+      tpm2_sessionconfig session.ctx )" || _xt $? || break
+    if [[ "$( grep -c '[ |]encrypt' <<< "$p1" )" != "1" ]] || [[ "$( grep -c '[ |]decrypt' <<< "$p1" )" != "1" ]]; then
+      _print_error "${ME} ${CMD}: Session could not be encrypted"
+      ERR=true
+      break
+    fi
+
+    # supply pcr and authvalue policy to session
+    _tx "${ME} ${CMD}: Could not create PCR policy" \
+      tpm2_policypcr -Q -S session.ctx -l ${PCRLIST} || break
+    if [[ -n ${PIN} ]]; then
+      _tx "${ME} ${CMD}: Could not create authValue policy" \
+        tpm2_policyauthvalue -Q -S session.ctx || break
+    fi
+    
+    context_handle=""
+    if [[ -n ${NAME} ]]; then
+      name_key_priv="${NAME_DIR}/${NAME}_key.priv"
+      name_key_pub="${NAME_DIR}/${NAME}_key.pub"
+  
+      # load the previously stored key hash object into a context object
+      context_handle="unseal.context"
+      _tx "${ME} ${CMD}: Could not load key '${NAME}'" \
+        tpm2_load -Q -C "${PARENT_HANDLE}" -u "${name_key_pub}" -r "${name_key_priv}" -c "${context_handle}" || break
+    elif [[ -n ${HANDLE} ]]; then
+      context_handle="${HANDLE}"
+    fi
+
+    # load secret from keyed hash object
+    if [[ -n ${PIN} ]]; then
+      _tx "${ME} ${CMD}: Could not unseal data" \
+        tpm2_unseal -p "session:session.ctx+hex:${PIN}" -c "${context_handle}" 1>&4 || break
+    else
+      _tx "${ME} ${CMD}: Could not unseal data" \
+        tpm2_unseal -p "session:session.ctx" -c "${context_handle}" 1>&4 || break
+    fi
+  done
+
+  if [[ -f session.ctx ]]; then
+    tpm2_flushcontext -Q session.ctx 2> /dev/null > /dev/null
+    _ex "${ME} ${CMD}: Could not remove session context" \
+      shred -f -z -u session.ctx || return 1
+  fi
+  
+  if [[ -n ${NAME} ]]; then
+    if [[ -f ${context_handle} ]]; then
+      _ex "${ME} ${CMD}: Could not remove context handle" \
+        shred -f -z -u "${context_handle}" || return 1
+    fi
+  fi
+
+  _ex "${ME} ${CMD}: Could not leave temporary ramfs directory" \
+    cd - > /dev/null || return 1
+
+  _ex "${ME} ${CMD}: Could not remove temporary ramfs directory" \
+    rmdir "${tempdir}" || return 1
+
+  if [[ $ERR == true ]]; then
+    return 1
+  fi
+}
+
+_check_input_and_state "$@"
+ret=${?}
+
+if [[ ${ret} == 2 ]]; then
+  _print_error "${ME}" finished with timeout
+  exit 2
+elif [[ ${ret} == 1 ]]; then
+  _print_error "${ME}" finished with error
+  exit 1
+fi
+
+exit 0
+

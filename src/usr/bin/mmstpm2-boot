@@ -1,0 +1,804 @@
+#!/bin/bash
+
+set -E
+set -o functrace
+
+function handle_error
+{
+  local retval=$?
+  local line=${last_lineno:-$1}
+  echo "Failed at $line: $BASH_COMMAND with error code $retval"
+  exit $retval
+}
+
+trap 'handle_error $LINENO ${BASH_LINENO[@]}' ERR
+
+# Path's
+MMSTPM2_KEYS="/etc/mmstpm2/keys"
+MMSTPM2_BOOT="/boot/efi"
+MMSTPM2_EFI="/EFI/mmstpm2"
+MMSTPM2_EFI_DIR="${MMSTPM2_BOOT}${MMSTPM2_EFI}"
+
+# Configuration
+declare -A KERNEL_CMDLINE_MAP
+. "/usr/share/mmstpm2/boot.conf"
+if [ -f "/etc/mmstpm2/boot.conf" ]; then
+  . "/etc/mmstpm2/boot.conf"
+fi
+
+function rand8str()
+{
+  local n8="${1}"
+  local kernel=""
+  local openssl=""
+  local tpm=""
+  local xored=""
+
+  for _ in $(seq 1 ${n8}); do
+    kernel="$( xxd -l 8 -p /dev/random )"
+    openssl="$( openssl rand -hex 8 )"
+    tpm="$( tpm2_getrandom --hex 8 )"
+    xored="${xored}$( printf '%016x\n' "$((0x${kernel} ^ 0x${openssl} ^ 0x${tpm}))" )"
+  done
+  
+  echo "${xored}"
+}
+
+
+function rand8file()
+{
+  local n8="${1}"
+  local file="${2}"
+
+  local getrand=$(rand8str "${n8}")
+
+  echo "${getrand}" | xxd -r -p - "${file}"
+}
+
+function rand8base64()
+{
+  local n8="${1}"
+  local file="${2}"
+
+  local getrand=$(rand8str "${n8}")
+
+  echo "${getrand}" | base64 -w 0
+}
+
+check_active ()
+{
+  msg="${1}"
+
+  # the existence of the EFI/mmstpm2 folder specifies if mmstpm2 is enabled or not
+  # every bootloader needs such mechanism. usefull for example when going back to grub or similar.
+  if [ ! -d "${MMSTPM2_EFI_DIR}" ]; then
+    echo 'mmstpm2-boot inactive'
+    exit 0
+  fi
+
+  echo "mmstpm2-boot active (${msg})"
+}
+
+setup_systemd_boot ()
+{
+  trap - ERR
+
+  if [ ! -d "/boot/efi/EFI/Linux" ]; then
+    mkdir -p "/boot/efi/EFI/Linux"
+  fi
+  if [ ! -d "/boot/efi/loader" ]; then
+    mkdir -p "/boot/efi/loader"
+  fi
+  if [ ! -f "/boot/efi/loader/loader.conf" ]; then
+    echo -ne "timeout 4\nauto-entries 0\nconsole-mode 0\neditor no\n" > "/boot/efi/loader/loader.conf"
+  fi
+
+  #identify block device and partition number from EFI partition
+  partition=$(df "${MMSTPM2_BOOT}" | tail -n 1 | awk '{print $1}')
+  partition_offset=$(udevadm info --query=all --name="${partition}" | grep ID_PART_ENTRY_OFFSET | sed -e 's/.*=//g')
+  block_device=$(lsblk -pndo pkname "${partition}")
+  block_device_partition_number=$(gdisk -l "${block_device}" | grep -i ef00 | awk '{print $1 " " $2}' | grep "${partition_offset}" | awk '{print $1}')
+
+  if [ -f "${MMSTPM2_EFI_DIR}/systemd-bootx64.efi" ]; then
+    rm "${MMSTPM2_EFI_DIR}/systemd-bootx64.efi"
+  fi
+
+  sbsign --key "${MMSTPM2_KEYS}/db.key" --cert "${MMSTPM2_KEYS}/db.crt" --output "${MMSTPM2_EFI_DIR}/systemd-bootx64.efi" "/usr/lib/systemd/boot/efi/systemd-bootx64.efi" > /dev/null 2> /dev/null
+  if ! sbverify --cert "${MMSTPM2_KEYS}/db.crt" "${MMSTPM2_EFI_DIR}/systemd-bootx64.efi" > /dev/null; then
+    echo "Error: Could not sign efi bootloader systemd-bootx64.efi"
+    exit 3
+  fi
+
+  hasBootEntry=$(efibootmgr -v | grep "MMSTPM2 Bootloader" | grep -ci "\\\\efi\\\\mmstpm2\\\\systemd-bootx64.efi")
+  if [ ! "$hasBootEntry" == "1" ]; then
+    efibootmgr --quiet --disk "${block_device}" --part "${block_device_partition_number}" --create --label "MMSTPM2 Bootloader" --loader "/EFI/mmstpm2/systemd-bootx64.efi"
+  fi
+
+  hasBootEntry=$(efibootmgr -v | grep "MMSTPM2 Bootloader" | grep -ci "\\\\efi\\\\mmstpm2\\\\systemd-bootx64.efi")
+  if [ "$hasBootEntry" == "1" ]; then
+    entryId=$(efibootmgr -v | grep "MMSTPM2 Bootloader" | grep -i "\\\\efi\\\\mmstpm2\\\\systemd-bootx64.efi" | sed -e 's/^Boot\([0-9]\+\)\(.*\)$/\1/')
+
+    isDefaultEntry=$(efibootmgr -v | grep -c "^BootOrder: ${entryId}")
+    if [ ! "$isDefaultEntry" == "1" ]; then
+      updatedBootOrder=$(efibootmgr -v | grep '^BootOrder: ' | sed -e 's/^BootOrder: //' | sed -e 's/$/,/' | sed -e "s/${entryId},//" | sed -e 's/,$//' | sed -e "s/^/${entryId},/" | sed -e 's/,$//')
+      efibootmgr -q -o "$updatedBootOrder"
+    fi
+
+    isDefaultEntry=$(efibootmgr -v | grep -c "^BootOrder: ${entryId}")
+    if [ ! "$isDefaultEntry" == "1" ]; then
+      echo 'Could not modify UEFI boot menu order'
+      exit 3
+    fi
+
+    isEntryActive=$(efibootmgr -v | grep -c "^Boot${entryId}\*")
+    if [ ! "$isEntryActive" == "1" ]; then
+      efibootmgr -q -b "${entryId}" -a
+    fi
+
+    isEntryActive=$(efibootmgr -v | grep -c "^Boot${entryId}\*")
+    if [ ! "$isEntryActive" == "1" ]; then
+      echo 'Could not activate UEFI boot menu entry'
+      exit 3
+    fi
+  else
+    echo 'Could not add UEFI boot menu entry'
+    exit 3
+  fi
+
+  # in newer versions disable systemd-boot auto updates
+  systemctl disable systemd-boot-update.service 2> /dev/null > /dev/null || true
+
+  # TODO: add apt install hook which updates and signs systemd-boot if updated version is available
+
+  trap 'handle_error $LINENO ${BASH_LINENO[@]}' ERR
+}
+
+activate ()
+{
+  if [ ! -d "${MMSTPM2_EFI_DIR}" ]; then
+    mkdir -p "${MMSTPM2_EFI_DIR}"
+  fi
+
+  setup_systemd_boot
+
+  echo 'mmstpm2-boot active'
+
+  traverse_boot "update" ""
+
+  # TODO: add systemd shutdown script to set mmstpm2-boot as default if another
+  # boot loader has been installed. Add option do delete all non mmstpm2-boot
+  # files.
+}
+
+deactivate ()
+{
+  trap - ERR
+
+  entryId=""
+  hasBootEntry=$(efibootmgr -v | grep "MMSTPM2 Bootloader" | grep -ci "\\\\efi\\\\mmstpm2\\\\systemd-bootx64.efi")
+  if [ "$hasBootEntry" == "1" ]; then
+    entryId=$(efibootmgr -v | grep "MMSTPM2 Bootloader" | grep -i "\\\\efi\\\\mmstpm2\\\\systemd-bootx64.efi" | sed -e 's/^Boot\([0-9]\+\)\(.*\)$/\1/')
+    efibootmgr -q -b "${entryId}" -A
+  fi
+  isEntryActive=$(efibootmgr -v | grep -c "^Boot${entryId}\*")
+
+  if [ -d "${MMSTPM2_EFI_DIR}" ]; then
+    cd "${MMSTPM2_EFI_DIR}" || exit
+    rm ./* 2> /dev/null || true
+    cd - > /dev/null || exit
+    rmdir "${MMSTPM2_EFI_DIR}"
+  fi
+
+  if [ -d "/boot/efi/EFI/Linux" ]; then
+    cd "/boot/efi/EFI/Linux" || exit
+    rm mmstpm2-*.efi 2> /dev/null
+    cd - > /dev/null || exit
+  fi
+
+  if [ ! "$isEntryActive" == "1" ]; then
+    echo 'mmstpm2-boot inactive'
+  else
+    echo 'mmstpm2-boot inactive, but the UEFI boot menu entry could not be disabled'
+    exit 3
+  fi
+
+  trap 'handle_error $LINENO ${BASH_LINENO[@]}' ERR
+}
+
+remove ()
+{
+  version="${1}"
+
+  check_active "remove ${version}"
+
+  traverse_boot "del" "${version}"
+}
+
+update ()
+{
+  version="${1}"
+
+  check_active "add ${version}"
+
+  traverse_boot "add" "${version}"
+}
+
+update_all ()
+{
+  check_active "update all"
+
+  traverse_boot "update" ""
+}
+
+create_efi_blob ()
+{
+  position="${1}"
+  default="${2}"
+  version="${3}"
+  linux="${4}"
+  initrd="${5}"
+  rebuild="${6}"
+
+  if [ "x${default}" = "x" ] && [ "$position" -eq 1 ]; then
+    echo -n "Found (default): ${linux}, ${initrd}"
+  elif [ "x${default}" = "xmmstpm2-${version}.efi" ]; then
+    echo -n "Found (default): ${linux}, ${initrd}"
+  else
+    echo -n "Found          : ${linux}, ${initrd}"
+  fi
+
+  tempbootdir=$(mktemp -d -p /dev/shm)
+  chmod 700 "${tempbootdir}"
+  cd "${tempbootdir}" || exit
+
+  kernel_cmdline="${DEFAULT_KERNEL_CMDLINE}"
+
+  if [ "$position" -eq 1 ]; then
+    if [ ! "x${LATEST_KERNEL_CMDLINE}" = "x" ]; then
+      kernel_cmdline="${LATEST_KERNEL_CMDLINE}"
+    fi
+  fi
+
+  if [ ${KERNEL_CMDLINE_MAP[${version}]+_} ]; then
+      kernel_cmdline="${KERNEL_CMDLINE_MAP[${version}]}"
+  fi
+
+  echo "${kernel_cmdline}" | head -c 65530 > "${tempbootdir}/cmdline"
+
+  # @TODO Useless cat 
+  cat /usr/lib/os-release | sed -e "s/^PRETTY_NAME=.*$/PRETTY_NAME=\"${BOOT_ENTRY_PREFIX} ${version}\"/" | head -c 65530 > "${tempbootdir}/os-release"
+
+  equal_cmdline="false"
+  equal_pretty_name="false"
+  if [ -f "/boot/efi/EFI/Linux/mmstpm2-${version}.efi" ]; then
+    objcopy -j .osrel -O binary "/boot/efi/EFI/Linux/mmstpm2-${version}.efi" os-release.previous
+    objcopy -j .cmdline -O binary "/boot/efi/EFI/Linux/mmstpm2-${version}.efi" cmdline.previous
+
+    cmp --silent cmdline cmdline.previous && equal_cmdline="true" || equal_cmdline="false"
+    cmp --silent os-release os-release.previous && equal_pretty_name="true" || equal_pretty_name="false"
+
+    if [ -f "os-release.previous" ]; then
+      shred -f -z -u "os-release.previous"
+    fi
+    if [ -f "cmdline.previous" ]; then
+      shred -f -z -u "cmdline.previous"
+    fi
+  fi
+
+  if [ "x${equal_cmdline}" = "xfalse" ] || [ "x${equal_pretty_name}" = "xfalse" ] || [ "x${rebuild}" = "xtrue" ]; then
+    echo " (rebuild)"
+    if [ -f "/boot/efi/EFI/Linux/mmstpm2-${version}.efi" ]; then
+      rm "/boot/efi/EFI/Linux/mmstpm2-${version}.efi"
+    fi
+
+    maxkernelsize=16777216
+    actualsize="$( wc -c < "${linux}" )"
+    if [ ${actualsize} -ge ${maxkernelsize} ]; then
+        echo Error: kernel "${linux}" exceeds "${minimumsize}" bytes
+    fi
+
+    objcopy \
+        --add-section .osrel="${tempbootdir}/os-release" --change-section-vma .osrel=0x20000 \
+        --add-section .cmdline="${tempbootdir}/cmdline" --change-section-vma .cmdline=0x30000 \
+        --add-section .linux="${linux}" --change-section-vma .linux=0x2000000 \
+        --add-section .initrd="${initrd}" --change-section-vma .initrd=0x3800000 \
+        /usr/lib/systemd/boot/efi/linuxx64.efi.stub "${tempbootdir}/efi"
+
+    sbsign --key "${MMSTPM2_KEYS}/db.key" --cert "${MMSTPM2_KEYS}/db.crt" --output "/boot/efi/EFI/Linux/mmstpm2-${version}.efi" "${tempbootdir}/efi" > /dev/null 2> /dev/null
+    if ! sbverify --cert "${MMSTPM2_KEYS}/db.crt" "/boot/efi/EFI/Linux/mmstpm2-${version}.efi" > /dev/null; then
+      echo "Error: Could not sign efi blob mmstpm2-${version}.efi"
+    fi
+  else
+    echo
+  fi
+
+  if [ -f "efi" ]; then
+    shred -f -z -u "efi"
+  fi
+
+  shred -f -z -u cmdline os-release
+  cd - > /dev/null || exit
+  rmdir "${tempbootdir}"
+}
+
+get_installed_kernel_list( )
+{
+  # TODO: *kernel* or kernel*, *vmlinuz* or vmlinuz*
+  find /{,boot} \
+    -maxdepth 1 \
+    -type f \
+    -name '*kernel*' \
+    -or -name '*vmlinuz*' \
+    -and -not -type l | sort -Vr
+}
+
+get_installed_efi_blobs( )
+{
+  find /boot/efi/EFI/Linux \
+    -maxdepth 1 \
+    -type f \
+    -name 'mmstpm2-*.efi' \
+    -and -not -type l
+}
+
+file_is_not_garbage ()
+{
+  if test -f "$1" ; then
+    case "$1" in
+      *.dpkg-*) return 1 ;; # debian dpkg
+      *.rpmsave|*.rpmnew) return 1 ;;
+      README*|*/README*)  return 1 ;; # documentation
+      *.sig) return 1 ;; # signatures
+      *.old) return 1 ;; # backup file
+      *.efi.signed) return 1 ;; # other efi signed kernel
+    esac
+  else
+    return 1
+  fi
+  return 0
+}
+
+traverse_boot ()
+{
+  hook_action="${1}"
+  hook_version="${2}"
+
+  if [ "x${hook_action}" = "xdel" ]; then
+    cd "/boot/efi/EFI/Linux" || exit
+    if [ -f "mmstpm2-${hook_version}.efi" ]; then
+      rm "mmstpm2-${hook_version}.efi"
+    else
+      echo "Already removed: ${hook_version}"
+    fi
+    cd - > /dev/null || exit
+  fi
+
+  default=""
+  if [ -f /sys/firmware/efi/efivars/LoaderEntryDefault-4a67b082-0a4c-41cf-b6c7-440b29bb8c4f ]; then
+    default="$(dd if=/sys/firmware/efi/efivars/LoaderEntryDefault-4a67b082-0a4c-41cf-b6c7-440b29bb8c4f bs=1 skip=4 status=none | iconv -f UTF-16LE -t UTF-8 | tr -d '\000')"
+    if [ ! -f "/boot/efi/EFI/Linux/$default" ]; then
+      default=""
+    fi
+  fi
+
+  # Pass 1 find all efi blobs which would or will be created. Then all other of our efi blobs
+  # will be delete, so that pass 2 can be most probably executed successfully.
+  counter=0
+  do_not_remove="mmstpm2-$( uname -r ).efi"
+  while IFS='' read -r linux; do
+    if ! file_is_not_garbage "$linux"; then
+      continue
+    fi
+
+    if [ "$( echo "$linux" | grep -c ' ')" != 0 ]; then
+      continue
+    fi
+
+    basename=$(basename "$linux")
+    dirname=$(dirname "$linux")
+    # @TODO Fix SC2001
+    version=$(echo "$basename" | sed -e "s,^[^0-9]*-,,g")
+
+    initrd=""
+    for i in "initrd.img-${version}" "initrd-${version}.img" "initrd-${version}.gz" \
+        "initrd-${version}" "initramfs-${version}.img" \
+        "initramfs-genkernel-${version}" \
+        "initramfs-genkernel-${GENKERNEL_ARCH}-${version}"; do
+      if test -e "${dirname}/${i}" ; then
+        initrd="${dirname}/${i}"
+        break
+      fi
+    done
+
+    if [ ! -f "${initrd}" ]; then
+      continue
+    fi
+
+    if [ "x${SKIP_UNSIGNED_KERNELS}" = "xtrue" ]; then
+      if ! sbverify --cert "${MMSTPM2_KEYS}/canonical-master-public.pem" "${linux}" 2> /dev/null > /dev/null; then
+        continue
+      fi
+    fi
+
+    if [ ! "x${MAX_KERNEL_ENTRIES}" = "x" ]; then
+      if [ $((counter + 1)) -gt ${MAX_KERNEL_ENTRIES} ]; then
+        break
+      fi
+    fi
+
+    counter=$((counter + 1))
+
+    do_not_remove="${do_not_remove} mmstpm2-${version}.efi"
+
+  done < <(get_installed_kernel_list)
+
+  # Delete all other mmstpm2 efi blobs
+  do_remove=""
+  while IFS='' read -r efiblob; do
+    if ! file_is_not_garbage "$efiblob"; then
+      continue
+    fi
+    efiblob=$(basename "${efiblob}")
+    if ! echo "$do_not_remove" | grep -q "${efiblob}"; then
+      do_remove="${do_remove} ${efiblob}"
+    fi
+  done < <(get_installed_efi_blobs)
+  for efiblob in $do_remove; do
+      rm "/boot/efi/EFI/Linux/${efiblob}"
+  done
+
+  # Pass 2 create all efi blobs in the now refreshed directory.
+  counter=0
+  while IFS='' read -r linux; do
+    if ! file_is_not_garbage "$linux"; then
+      continue
+    fi
+
+    if [ "$( echo "$linux" | grep -c ' ')" != 0 ]; then
+      echo "Skipped        : ${linux}, contains spaces in filename"
+      continue
+    fi
+
+    basename=$(basename "$linux")
+    dirname=$(dirname "$linux")
+    # @TODO Fix SC2001
+    version=$(echo "$basename" | sed -e "s,^[^0-9]*-,,g")
+
+    initrd=""
+    for i in "initrd.img-${version}" "initrd-${version}.img" "initrd-${version}.gz" \
+        "initrd-${version}" "initramfs-${version}.img" \
+        "initramfs-genkernel-${version}" \
+        "initramfs-genkernel-${GENKERNEL_ARCH}-${version}"; do
+      if test -e "${dirname}/${i}" ; then
+        initrd="${dirname}/${i}"
+        break
+      fi
+    done
+
+    if [ ! -f "${initrd}" ]; then
+      echo "Skipped        : ${dirname}/${basename}, no initramfs found"
+      continue
+    fi
+
+    if [ "x${SKIP_UNSIGNED_KERNELS}" = "xtrue" ]; then
+      if ! sbverify --cert "${MMSTPM2_KEYS}/canonical-master-public.pem" "${linux}" 2> /dev/null > /dev/null; then
+        echo "Skipped        : ${dirname}/${basename}, unsigned"
+        continue
+      fi
+    fi
+
+    if [ ! "x${MAX_KERNEL_ENTRIES}" = "x" ]; then
+      if [ $((counter + 1)) -gt ${MAX_KERNEL_ENTRIES} ]; then
+        break
+      fi
+    fi
+
+    counter=$((counter + 1))
+
+    rebuild="false"
+    if [ "x${hook_action}" = "xadd" ] && [ "x${hook_version}" = "x${version}" ]; then
+      rebuild="true"
+    fi
+    if [ "x${hook_action}" = "xupdate" ]; then
+      rebuild="true"
+    fi
+
+    create_efi_blob "${counter}" "${default}" "${version}" "${linux}" "${initrd}" "${rebuild}"
+
+  done < <(get_installed_kernel_list)
+
+  if [ $counter -eq 0 ]; then
+    echo 'WARNING: No kernel found. System will not boot correctly.'
+  fi
+
+  echo 'Done'
+}
+
+install ()
+{
+  secureboot_mode="clearmode"
+  mokutil --sb-state | grep 'Platform is in Setup Mode' || (echo 'Platform is not in Setup Mode' ; exit 3)
+
+  if [ "$( efi-readvar | grep -c 'Variable PK has no entries')" = 0 ]; then
+    echo 'Secure Boot Database PK is not empty'
+    exit 3
+  fi
+
+  if [ "$( efi-readvar | grep -c 'Variable KEK has no entries')" = 0 ]; then
+    secureboot_mode="setupmode"
+  fi
+
+  echo "Assuming Secure Boot mode: ${secureboot_mode}"
+
+  if [ -d "${MMSTPM2_EFI_DIR}" ]; then
+    echo "mmstpm2-boot active. Please run 'mmstpm2-boot --deactivate' first."
+    exit 0
+  fi
+
+  if [ "x${secureboot_mode}" = "xsetupmode" ]; then
+    if [ "$( efi-readvar | grep -c 'Variable KEK has no entries')" != 0 ]; then
+      echo 'Secure Boot Database KEK should not be empty'
+      exit 3
+    fi
+    if [ "$( efi-readvar | grep -c 'Variable db has no entries')" != 0 ]; then
+      echo 'Secure Boot Database db should not be empty'
+      exit 3
+    fi
+    if [ "$( efi-readvar | grep -c 'Variable dbx has no entries')" != 0 ]; then
+      echo 'Secure Boot Database dbx should not be empty'
+      exit 3
+    fi
+
+    # clear kek database
+    # Try at least two times in case of buggy BIOS or efitools
+    efi-updatevar -d 0 KEK || true
+    while true; do
+      efi-updatevar -d 0 KEK
+     #@TODO SC2181
+      [ "$?" != 0 ] || break
+    done
+
+    if [ "$( efi-readvar | grep -c 'Variable KEK has no entries')" = 0 ]; then
+      echo 'Secure Boot Database KEK could not be cleared'
+      exit 3
+    fi
+  elif [ "x${secureboot_mode}" = "xclearmode" ]; then
+    if [ "$( efi-readvar | grep -c 'Variable KEK has no entries')" = 0 ]; then
+      echo 'Secure Boot Database KEK is not empty'
+      exit 3
+    fi
+    if [ "$( efi-readvar | grep -c 'Variable db has no entries')" = 0 ]; then
+      echo 'Secure Boot Database db is not empty'
+      exit 3
+    fi
+    if [ "$( efi-readvar | grep -c 'Variable dbx has no entries')" = 0 ]; then
+      echo 'Secure Boot Database dbx is not empty'
+      exit 3
+    fi
+  fi
+
+  cd "${MMSTPM2_KEYS}" || exit
+  shred -f -z -u db.* 2> /dev/null > /dev/null || true
+
+  # create password file required for db.key access
+  getrand=$(rand8base64 2)
+  echo "${getrand}" > "${MMSTPM2_KEYS}/db.pwd"
+
+  chown root:root "${MMSTPM2_KEYS}/db.pwd"
+  chmod 0600 "${MMSTPM2_KEYS}/db.pwd"
+
+  cd - > /dev/null || exit
+
+  tempdirname=$(mktemp -d -p /dev/shm)
+  chmod 700 "${tempdirname}"
+  cd "${tempdirname}" || exit
+
+  openssl req -new -x509 -newkey rsa:2048 -subj "/CN=MMSTPM2 Platform Key/" -keyout PK.key \
+    -out PK.crt -days 3650 -nodes -sha256 2> /dev/null
+  openssl req -new -x509 -newkey rsa:2048 -subj "/CN=MMSTPM2 Key Exchange Key/" -keyout KEK.key \
+    -out KEK.crt -days 3650 -nodes -sha256 2> /dev/null
+  openssl genpkey -provider tpm2 -algorithm RSA -pkeyopt bits:2048 -pkeyopt \
+    "user-auth:$(cat "${MMSTPM2_KEYS}/db.pwd")" -pkeyopt digest:sha256 -out db.key
+  openssl req -provider tpm2 -provider default -key db.key -new -x509 -subj "/CN=MMSTPM2 Database Key/" \
+    -passin "pass:$(cat "${MMSTPM2_KEYS}/db.pwd")" -out db.crt -days 3650 -sha256
+
+  openssl x509 -in PK.crt -out PK.cer -outform DER
+  openssl x509 -in KEK.crt -out KEK.cer -outform DER
+  openssl x509 -in db.crt -out db.cer -outform DER
+
+  guid=$(uuidgen --random)
+
+  cert-to-efi-sig-list -g "${guid}" PK.crt PK.esl
+  cert-to-efi-sig-list -g "${guid}" KEK.crt KEK.esl
+  cert-to-efi-sig-list -g "${guid}" db.crt db.esl
+
+  rm -f noPK.esl
+  touch noPK.esl
+
+  sign-efi-sig-list -t "$(date -u --date='1 second' +'%Y-%m-%d %H:%M:%S')" \
+    -k PK.key -c PK.crt PK PK.esl PK.auth
+  sign-efi-sig-list -t "$(date -u --date='1 second' +'%Y-%m-%d %H:%M:%S')" \
+    -k PK.key -c PK.crt PK noPK.esl noPK.auth
+  sign-efi-sig-list -t "$(date -u --date='1 second' +'%Y-%m-%d %H:%M:%S')" \
+    -k PK.key -c PK.crt KEK KEK.esl KEK.auth
+  sign-efi-sig-list -t "$(date -u --date='1 second' +'%Y-%m-%d %H:%M:%S')" \
+    -k KEK.key -c KEK.crt db db.esl db.auth
+
+  cp db.key db.cer db.crt noPK.auth PK.key PK.crt PK.cer PK.auth KEK.key KEK.crt KEK.cer KEK.auth "${MMSTPM2_KEYS}"
+  chown root:root ${MMSTPM2_KEYS}/*.key ${MMSTPM2_KEYS}/*.cer ${MMSTPM2_KEYS}/*.crt ${MMSTPM2_KEYS}/*.auth
+  chmod 0600 ${MMSTPM2_KEYS}/*.key ${MMSTPM2_KEYS}/*.cer ${MMSTPM2_KEYS}/*.crt ${MMSTPM2_KEYS}/*.auth
+
+  if [ "x${secureboot_mode}" = "xclearmode" ]; then
+    sbsiglist --owner 77fa9abd-0359-4d32-bd60-28f4e78f784b --type x509 --output MS_Win_db.esl "${MMSTPM2_KEYS}/MicWinProPCA2011_2011-10-19.crt"
+    sbsiglist --owner 77fa9abd-0359-4d32-bd60-28f4e78f784b --type x509 --output MS_UEFI_db.esl "${MMSTPM2_KEYS}/MicCorUEFCA2011_2011-06-27.crt"
+    cat MS_Win_db.esl MS_UEFI_db.esl > MS_db.esl
+    sign-efi-sig-list -t "$(date -u --date='1 second' +'%Y-%m-%d %H:%M:%S')" \
+      -a -g 77fa9abd-0359-4d32-bd60-28f4e78f784b -k KEK.key -c KEK.crt db MS_db.esl add_MS_db.auth
+
+    efi-updatevar -f add_MS_db.auth db
+    efi-updatevar -f "${MMSTPM2_KEYS}/dbxupdate_x64.bin" -k KEK.key dbx
+  fi
+
+  chattr -i /sys/firmware/efi/efivars/db-d719b2cb-3d3a-4596-a3bc-dad00e67656f
+  efi-updatevar -a -f db.auth db
+  efi-updatevar -f KEK.auth KEK
+  efi-updatevar -f PK.auth PK
+  chattr +i /sys/firmware/efi/efivars/db-d719b2cb-3d3a-4596-a3bc-dad00e67656f
+
+  shred -f -z -u ./*.auth ./*.cer ./*.crt ./*.esl ./*.key
+  cd - > /dev/null || exit
+  rmdir "${tempdirname}"
+
+  # configure framework.conf of dkms to add the sign helper script
+  dkmsconf="/etc/dkms/framework.conf"
+  if [ ! -f "${dkmsconf}" ]; then
+    echo "DKMS framework config ${dkmsconf} not found. Exit"
+    exit 4
+  elif [ "$(grep -E '^\s*sign_tool\s*=\s*"?/usr/share/mmstpm2/sign_helper.sh"?\s*$' "${dkmsconf}")" ]; then
+    echo "DKMS framework already configured."
+    # @TODO SC2143: Use grep -q instead of comparing output with [ -n .. ]
+  elif [ "$(grep -E '^\s*sign_tool\s*=.*$' "${dkmsconf}")" ]; then
+    echo "DKMS framework configured differently. Exit"
+    exit 4
+  else
+    echo 'sign_tool="/usr/share/mmstpm2/sign_helper.sh"' >> "${dkmsconf}"
+    echo "Configured DKMS framework."
+  fi
+
+  # enable bootloader
+  if [ ! -d "${MMSTPM2_EFI_DIR}" ]; then
+    mkdir -p "${MMSTPM2_EFI_DIR}"
+  fi
+
+  setup_systemd_boot
+
+  # update initrd's
+  update-initramfs -k all -u
+
+  # TODO: rebuild all dkms
+}
+
+test_state()
+{
+  echo 'Check if kernel shows secureboot in dmesg'
+  dmesg | grep -i 'secure' || (echo 'SECUREBOOT NOT FOUND IN DMESG' ; exit 3)
+
+  echo 'Check if kernel is in EFI Secure Boot mode kernel lockdown'
+  dmesg | grep -i 'Kernel is locked down from EFI Secure Boot mode' || (echo 'KERNEL IS NOT IN SECUREBOOT LOCKDOWN MODE' ; exit 3)
+
+  echo 'Check if TPM was found during boot'
+  dmesg | grep -i 'TPM' || (echo 'TPM NOT FOUND' ; exit 3)
+
+  echo 'TPM2 Selftest'
+  tpm2_selftest || (echo 'TPM Selftest Failed' ; exit 3)
+
+  echo 'Check Secure Boot State'
+  mokutil --sb-state | grep 'SecureBoot enabled' || (echo 'SECUREBOOT NOT ENABLED' ; exit 3)
+
+  echo 'Test if TPM finds SecureBoot enabled'
+  numKeys=$(tpm2_eventlog /sys/kernel/security/tpm0/binary_bios_measurements 2> /dev/null | grep -A 32 -m 1 "PCRIndex: 7" | grep -B 64 -m 1 "\- EventNum:" | grep -z "UnicodeName: SecureBoot"  | grep -c "VariableData: \"01\"")
+  if [ "$numKeys" != "1" ]; then
+    echo "FAIL, SecureBoot disabled or in Setup Mode"
+    exit 3
+  fi
+
+  echo 'Test if only one db entry was used while booting'
+  numKeys=$(tpm2_eventlog /sys/kernel/security/tpm0/binary_bios_measurements 2> /dev/null | grep -c EV_EFI_VARIABLE_AUTHORITY)
+  if [ "$numKeys" != "1" ]; then
+    echo "FAIL, found ${numKeys} keys from which have been bootet from"
+    exit 3
+  fi
+
+  echo 'Test if db.cer was used while booting'
+  if ! tpm2_eventlog /sys/kernel/security/tpm0/binary_bios_measurements 2> /dev/null \
+    | grep -A 64 -m 1 "EventType: EV_EFI_VARIABLE_AUTHORITY" \
+    | grep -B 64 -m 1 "\- EventNum:" | grep -m 1 "VariableData: " \
+    | grep -q "$(cat /etc/mmstpm2/keys/db.cer | od -A n -v -t x1 | tr -d ' \n')"; then
+    #@TODO Don't rape cats
+    echo 'FAIL, it seems that another key was used for booting'
+    exit 3
+  fi  
+
+  echo 'Test if db.cer size is similar to the one in TPM'
+  fileSize=$(stat --printf="%s" /etc/mmstpm2/keys/db.cer)
+  tpmSize=$(tpm2_eventlog /sys/kernel/security/tpm0/binary_bios_measurements 2> /dev/null | grep -A 64 -m 1 "EventType: EV_EFI_VARIABLE_AUTHORITY" | grep -B 64 -m 1 "\- EventNum:" | grep -m 1 "VariableDataLength: " | awk '{print $2}')
+  diff=$((fileSize - tpmSize));
+  if [ $diff -lt 0 ]; then
+    diff=$((-diff))
+  fi
+  if [ $diff -gt 64 ]; then
+    echo "FAIL, the measured and the file key size differ greater then 64: $diff"
+    exit 3
+  fi
+
+  echo 'Test if db.cer is a certificate'
+  file /etc/mmstpm2/keys/db.cer | grep -q 'Certificate' || (echo 'DB.CER IS NOT A CERTIFICATE' ; exit 3)
+
+  hashesInDbList=$(efi-readvar -v db | grep -c '^[[:space:]]\+Hash:[0-9a-fA-F]\+[[:space:]]*$' || true)
+  if [ "$hashesInDbList" -gt 0 ]; then
+    echo
+    echo "INFO: Your secureboot db database contains hashes"
+  fi
+
+  echo
+  echo 'Secure Boot state OK'
+}
+
+show_help ()
+{
+  echo ${0} '- SecureBoot boot loader'
+  echo
+  echo 'Options:'
+  echo '  --activate'
+  echo '  --deactivate'
+  echo '  --install'
+  echo '  --update [optional version]'
+  echo '  --remove <version>'
+  echo '  --test'
+}
+
+argument=""
+if [ $# -gt 2 ]; then
+  show_help
+  exit 1
+fi
+
+if [ $# -eq 2 ]; then
+  argument="${2}"
+fi
+
+case "${1}" in
+  --activate)
+    activate
+    ;;
+  --deactivate)
+    deactivate
+    ;;
+  --test)
+    test_state
+    ;;
+  --install)
+    install
+    ;;
+  --remove)
+    if [ "x${argument}" = "x" ]; then
+      show_help
+      exit 1
+    fi
+    remove "${argument}"
+    ;;
+  --update)
+    if [ "x${argument}" = "x" ]; then
+      update_all
+    else
+      update "${argument}"
+    fi
+    ;;
+  *)
+    show_help
+    exit 1
+    ;;
+esac
+
+exit 0
+
