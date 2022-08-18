@@ -131,6 +131,7 @@ All generated keys, passwords or serialized keys are stored in '/var/lib/sectpmc
 sudo bash
 
 # Point of no return, you need to complete at least until the following reboot command
+# Skip this three lines if already done (recovery situation)
 apt remove --allow-remove-essential "grub*" "shim*"
 dpkg -i sectpmctl_1.0.0-1_amd64.deb
 apt install -f
@@ -149,6 +150,7 @@ echo 'KBUILD_SIGN_PIN="$(cat "/etc/mmstpm2/keys/db.pwd")" tpmsbsign --provider t
 chown root:root /usr/bin/sbsign
 chmod 755 /usr/bin/sbsign
 
+# Skip migration of /boot if already done (recovery situation)
 # TODO: Migrate /boot into root /, delete /boot partition, expand EFI partition
 
 mmstpm2-boot --install
