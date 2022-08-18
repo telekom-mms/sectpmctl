@@ -612,21 +612,16 @@ install ()
   cert-to-efi-sig-list -g "${guid}" KEK.crt KEK.esl
   cert-to-efi-sig-list -g "${guid}" db.crt db.esl
 
-  rm -f noPK.esl
-  touch noPK.esl
-
   sign-efi-sig-list -t "$(date -u --date='1 second' +'%Y-%m-%d %H:%M:%S')" \
     -k PK.key -c PK.crt PK PK.esl PK.auth
-  sign-efi-sig-list -t "$(date -u --date='1 second' +'%Y-%m-%d %H:%M:%S')" \
-    -k PK.key -c PK.crt PK noPK.esl noPK.auth
   sign-efi-sig-list -t "$(date -u --date='1 second' +'%Y-%m-%d %H:%M:%S')" \
     -k PK.key -c PK.crt KEK KEK.esl KEK.auth
   sign-efi-sig-list -t "$(date -u --date='1 second' +'%Y-%m-%d %H:%M:%S')" \
     -k KEK.key -c KEK.crt db db.esl db.auth
 
-  cp db.key db.cer db.crt noPK.auth PK.key PK.crt PK.cer PK.auth KEK.key KEK.crt KEK.cer KEK.auth "${MMSTPM2_KEYS}"
-  chown root:root ${MMSTPM2_KEYS}/*.key ${MMSTPM2_KEYS}/*.cer ${MMSTPM2_KEYS}/*.crt ${MMSTPM2_KEYS}/*.auth
-  chmod 0600 ${MMSTPM2_KEYS}/*.key ${MMSTPM2_KEYS}/*.cer ${MMSTPM2_KEYS}/*.crt ${MMSTPM2_KEYS}/*.auth
+  cp db.key db.cer db.crt "${MMSTPM2_KEYS}"
+  chown root:root ${MMSTPM2_KEYS}/*.key ${MMSTPM2_KEYS}/*.cer ${MMSTPM2_KEYS}/*.crt
+  chmod 0600 ${MMSTPM2_KEYS}/*.key ${MMSTPM2_KEYS}/*.cer ${MMSTPM2_KEYS}/*.crt
 
   if [ "x${secureboot_mode}" = "xclearmode" ]; then
     sbsiglist --owner 77fa9abd-0359-4d32-bd60-28f4e78f784b --type x509 --output MS_Win_db.esl "${MMSTPM2_KEYS}/MicWinProPCA2011_2011-10-19.crt"
