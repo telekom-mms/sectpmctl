@@ -7,7 +7,9 @@ install:
 	install -m 0755 src/usr/sbin/mmstpm2 $(DESTDIR)/usr/sbin
 	install -d $(DESTDIR)/usr/share/mmstpm2
 	install -m 0644 src/usr/share/mmstpm2/boot.conf $(DESTDIR)/usr/share/mmstpm2
-	install -m 0755 src/usr/share/mmstpm2/sign_helper.sh $(DESTDIR)/usr/share/mmstpm2
+	install -m 0755 src/usr/share/mmstpm2/dkms_sign_helper.sh $(DESTDIR)/usr/share/mmstpm2
+	install -m 0755 src/usr/share/mmstpm2/kmodsign.sh $(DESTDIR)/usr/share/mmstpm2
+	install -m 0755 src/usr/share/mmstpm2/sbsign.sh $(DESTDIR)/usr/share/mmstpm2
 	install -m 0700 -d $(DESTDIR)/etc/mmstpm2/keys
 	install -m 0644 src/etc/mmstpm2/keys/canonical-master-public.pem $(DESTDIR)/etc/mmstpm2/keys
 	install -m 0644 src/etc/mmstpm2/keys/dbxupdate_x64.bin $(DESTDIR)/etc/mmstpm2/keys

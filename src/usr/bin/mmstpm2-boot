@@ -103,8 +103,8 @@ setup_systemd_boot ()
     rm "${MMSTPM2_EFI_DIR}/systemd-bootx64.efi"
   fi
 
-  sbsign --key "${MMSTPM2_KEYS}/db.key" --cert "${MMSTPM2_KEYS}/db.crt" --output "${MMSTPM2_EFI_DIR}/systemd-bootx64.efi" "/usr/lib/systemd/boot/efi/systemd-bootx64.efi" > /dev/null 2> /dev/null
-  if ! sbverify --cert "${MMSTPM2_KEYS}/db.crt" "${MMSTPM2_EFI_DIR}/systemd-bootx64.efi" > /dev/null; then
+  /usr/share/mmstpm2/sbsign.sh --key "${MMSTPM2_KEYS}/db.key" --cert "${MMSTPM2_KEYS}/db.crt" --output "${MMSTPM2_EFI_DIR}/systemd-bootx64.efi" "/usr/lib/systemd/boot/efi/systemd-bootx64.efi" > /dev/null 2> /dev/null
+  if ! sbverify --cert "${MMSTPM2_KEYS}/db.crt" "${MMSTPM2_EFI_DIR}/systemd-bootx64.efi" 2> /dev/null > /dev/null; then
     echo "Error: Could not sign efi bootloader systemd-bootx64.efi"
     exit 3
   fi
@@ -304,8 +304,8 @@ create_efi_blob ()
         --add-section .initrd="${initrd}" --change-section-vma .initrd=0x3800000 \
         /usr/lib/systemd/boot/efi/linuxx64.efi.stub "${tempbootdir}/efi"
 
-    sbsign --key "${MMSTPM2_KEYS}/db.key" --cert "${MMSTPM2_KEYS}/db.crt" --output "/boot/efi/EFI/Linux/mmstpm2-${version}.efi" "${tempbootdir}/efi" > /dev/null 2> /dev/null
-    if ! sbverify --cert "${MMSTPM2_KEYS}/db.crt" "/boot/efi/EFI/Linux/mmstpm2-${version}.efi" > /dev/null; then
+    /usr/share/mmstpm2/sbsign.sh --key "${MMSTPM2_KEYS}/db.key" --cert "${MMSTPM2_KEYS}/db.crt" --output "/boot/efi/EFI/Linux/mmstpm2-${version}.efi" "${tempbootdir}/efi" > /dev/null 2> /dev/null
+    if ! sbverify --cert "${MMSTPM2_KEYS}/db.crt" "/boot/efi/EFI/Linux/mmstpm2-${version}.efi" 2> /dev/null > /dev/null; then
       echo "Error: Could not sign efi blob mmstpm2-${version}.efi"
     fi
   else
@@ -649,14 +649,14 @@ install ()
   if [ ! -f "${dkmsconf}" ]; then
     echo "DKMS framework config ${dkmsconf} not found. Exit"
     exit 4
-  elif [ "$(grep -E '^\s*sign_tool\s*=\s*"?/usr/share/mmstpm2/sign_helper.sh"?\s*$' "${dkmsconf}")" ]; then
+  elif [ "$(grep -E '^\s*sign_tool\s*=\s*"?/usr/share/mmstpm2/dkms_sign_helper.sh"?\s*$' "${dkmsconf}")" ]; then
     echo "DKMS framework already configured."
     # @TODO SC2143: Use grep -q instead of comparing output with [ -n .. ]
   elif [ "$(grep -E '^\s*sign_tool\s*=.*$' "${dkmsconf}")" ]; then
     echo "DKMS framework configured differently. Exit"
     exit 4
   else
-    echo 'sign_tool="/usr/share/mmstpm2/sign_helper.sh"' >> "${dkmsconf}"
+    echo 'sign_tool="/usr/share/mmstpm2/dkms_sign_helper.sh"' >> "${dkmsconf}"
     echo "Configured DKMS framework."
   fi
 

@@ -138,18 +138,6 @@ apt install -f
 
 mmstpm2 provisioning
 
-# TODO: hotfix for testing changes of sbsigntool
-rm /usr/bin/kmodsign
-echo '#!/bin/sh' > /usr/bin/kmodsign
-echo 'KBUILD_SIGN_PIN="$(cat "/etc/mmstpm2/keys/db.pwd")" tpmkmodsign -P tpm2 -P default -Q "?provider=tpm2,tpm2.digest!=yes" sha256 "${2}" "${3}" "${4}" ${5}' >> /usr/bin/kmodsign
-chown root:root /usr/bin/kmodsign
-chmod 755 /usr/bin/kmodsign
-rm /usr/bin/sbsign
-echo '#!/bin/sh' > /usr/bin/sbsign
-echo 'KBUILD_SIGN_PIN="$(cat "/etc/mmstpm2/keys/db.pwd")" tpmsbsign --provider tpm2 --provider default "$@"' >> /usr/bin/sbsign
-chown root:root /usr/bin/sbsign
-chmod 755 /usr/bin/sbsign
-
 # Skip migration of /boot if already done (recovery situation)
 # TODO: Migrate /boot into root /, delete /boot partition, expand EFI partition
 
