@@ -489,7 +489,7 @@ generate_unseal_script() {
   # KEYSCRIPT FOR TRANSPARENT ENCRYPTION ON BOOT
   if [[ "${EXTEND}" == "true" ]]; then
 cat > "${KEY_SCRIPT}" <<__EOT
-#! /bin/sh -
+#! /bin/bash -
 
 exec 3>&1 1>&2
 
@@ -943,6 +943,7 @@ esac
 
 copy_exec ${SECTPMCTL_KEYS}/tpm_owner_noda.pub /sectpmctl.pub
 
+copy_exec /bin/bash /bin
 copy_exec /usr/bin/grep /usr/bin
 copy_exec /usr/bin/${PCR_BANK}sum /usr/bin
 copy_exec /usr/bin/shred /usr/bin
