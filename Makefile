@@ -21,11 +21,11 @@ install:
 	install -m 0755 src/usr/lib/sectpmctl/scripts/sectpmctl-tpm $(DESTDIR)/usr/lib/sectpmctl/scripts
 	install -d $(DESTDIR)/etc/sectpmctl
 	install -d $(DESTDIR)/etc/kernel/postinst.d
-	install -m 0755 src/etc/kernel/postinst.d/zz-update-mmstpm2-boot $(DESTDIR)/etc/kernel/postinst.d
+	install -m 0755 src/etc/kernel/postinst.d/zz-update-sectpmctl-boot $(DESTDIR)/etc/kernel/postinst.d
 	install -d $(DESTDIR)/etc/kernel/postrm.d
-	ln -s ../postinst.d/zz-update-mmstpm2-boot $(DESTDIR)/etc/kernel/postrm.d/zz-update-mmstpm2-boot
+	ln -s ../postinst.d/zz-update-sectpmctl-boot $(DESTDIR)/etc/kernel/postrm.d/zz-update-sectpmctl-boot
 	install -d $(DESTDIR)/etc/initramfs/post-update.d
-	ln -s ../../kernel/postinst.d/zz-update-mmstpm2-boot $(DESTDIR)/etc/initramfs/post-update.d/zz-update-mmstpm2-boot
+	ln -s ../../kernel/postinst.d/zz-update-sectpmctl-boot $(DESTDIR)/etc/initramfs/post-update.d/zz-update-sectpmctl-boot
 
 package_build: package_clean package_dist
 	debuild -i

@@ -3,7 +3,7 @@
 # copyright
 
 # path to stored named key hash objects
-NAMED_OBJECTS="/var/lib/mmstpm2/objects"
+NAMED_OBJECTS="/var/lib/sectpmctl/objects"
 
 __get_handles() {
   if [[ $UID == 0 ]]; then

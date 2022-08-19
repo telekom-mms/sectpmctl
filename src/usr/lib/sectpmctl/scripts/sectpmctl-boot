@@ -19,7 +19,7 @@ trap 'handle_error $LINENO ${BASH_LINENO[@]}' ERR
 
 # Path's
 SECTPMCTL_KEYS="/var/lib/sectpmctl/keys"
-VENDOR_KEY="/usr/lib/sectpmctl/keys"
+VENDOR_KEYS="/usr/lib/sectpmctl/keys"
 SECTPMCTL_BOOT="/boot/efi"
 SECTPMCTL_EFI="/EFI/sectpmctl"
 SECTPMCTL_EFI_DIR="${SECTPMCTL_BOOT}${SECTPMCTL_EFI}"
