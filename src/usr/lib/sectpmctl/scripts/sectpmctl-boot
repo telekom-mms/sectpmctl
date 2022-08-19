@@ -19,6 +19,7 @@ trap 'handle_error $LINENO ${BASH_LINENO[@]}' ERR
 
 # Path's
 SECTPMCTL_KEYS="/var/lib/sectpmctl/keys"
+VENDOR_KEY="/usr/lib/sectpmctl/keys"
 SECTPMCTL_BOOT="/boot/efi"
 SECTPMCTL_EFI="/EFI/sectpmctl"
 SECTPMCTL_EFI_DIR="${SECTPMCTL_BOOT}${SECTPMCTL_EFI}"
@@ -422,7 +423,7 @@ traverse_boot ()
     fi
 
     if [ "x${SKIP_UNSIGNED_KERNELS}" = "xtrue" ]; then
-      if ! sbverify --cert "${SECTPMCTL_KEYS}/canonical-master-public.pem" "${linux}" 2> /dev/null > /dev/null; then
+      if ! sbverify --cert "${VENDOR_KEYS}/canonical-master-public.pem" "${linux}" 2> /dev/null > /dev/null; then
         continue
       fi
     fi
@@ -488,7 +489,7 @@ traverse_boot ()
     fi
 
     if [ "x${SKIP_UNSIGNED_KERNELS}" = "xtrue" ]; then
-      if ! sbverify --cert "${SECTPMCTL_KEYS}/canonical-master-public.pem" "${linux}" 2> /dev/null > /dev/null; then
+      if ! sbverify --cert "${VENDOR_KEYS}/canonical-master-public.pem" "${linux}" 2> /dev/null > /dev/null; then
         echo "Skipped        : ${dirname}/${basename}, unsigned"
         continue
       fi
@@ -635,14 +636,14 @@ install ()
   chmod 0600 ${SECTPMCTL_KEYS}/*.obj ${SECTPMCTL_KEYS}/*.cer ${SECTPMCTL_KEYS}/*.crt
 
   if [ "x${secureboot_mode}" = "xclearmode" ]; then
-    sbsiglist --owner 77fa9abd-0359-4d32-bd60-28f4e78f784b --type x509 --output MS_Win_db.esl "${SECTPMCTL_KEYS}/MicWinProPCA2011_2011-10-19.crt"
-    sbsiglist --owner 77fa9abd-0359-4d32-bd60-28f4e78f784b --type x509 --output MS_UEFI_db.esl "${SECTPMCTL_KEYS}/MicCorUEFCA2011_2011-06-27.crt"
+    sbsiglist --owner 77fa9abd-0359-4d32-bd60-28f4e78f784b --type x509 --output MS_Win_db.esl "${VENDOR_KEYS}/MicWinProPCA2011_2011-10-19.crt"
+    sbsiglist --owner 77fa9abd-0359-4d32-bd60-28f4e78f784b --type x509 --output MS_UEFI_db.esl "${VENDOR_KEYS}/MicCorUEFCA2011_2011-06-27.crt"
     cat MS_Win_db.esl MS_UEFI_db.esl > MS_db.esl
     sign-efi-sig-list -t "$(date -u --date='1 second' +'%Y-%m-%d %H:%M:%S')" \
       -a -g 77fa9abd-0359-4d32-bd60-28f4e78f784b -k KEK.key -c KEK.crt db MS_db.esl add_MS_db.auth
 
     efi-updatevar -f add_MS_db.auth db
-    efi-updatevar -f "${SECTPMCTL_KEYS}/dbxupdate_x64.bin" -k KEK.key dbx
+    efi-updatevar -f "${VENDOR_KEYS}/dbxupdate_x64.bin" -k KEK.key dbx
   fi
 
   chattr -i /sys/firmware/efi/efivars/db-d719b2cb-3d3a-4596-a3bc-dad00e67656f
