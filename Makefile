@@ -1,20 +1,25 @@
 all: 
 
 install:
-	install -d $(DESTDIR)/usr/bin
-	install -m 0755 src/usr/bin/mmstpm2-boot $(DESTDIR)/usr/bin
 	install -d $(DESTDIR)/usr/sbin
-	install -m 0755 src/usr/sbin/mmstpm2 $(DESTDIR)/usr/sbin
-	install -d $(DESTDIR)/usr/share/mmstpm2
-	install -m 0644 src/usr/share/mmstpm2/boot.conf $(DESTDIR)/usr/share/mmstpm2
-	install -m 0755 src/usr/share/mmstpm2/dkms_sign_helper.sh $(DESTDIR)/usr/share/mmstpm2
-	install -m 0755 src/usr/share/mmstpm2/kmodsign.sh $(DESTDIR)/usr/share/mmstpm2
-	install -m 0755 src/usr/share/mmstpm2/sbsign.sh $(DESTDIR)/usr/share/mmstpm2
-	install -m 0700 -d $(DESTDIR)/etc/mmstpm2/keys
-	install -m 0644 src/etc/mmstpm2/keys/canonical-master-public.pem $(DESTDIR)/etc/mmstpm2/keys
-	install -m 0644 src/etc/mmstpm2/keys/dbxupdate_x64.bin $(DESTDIR)/etc/mmstpm2/keys
-	install -m 0644 src/etc/mmstpm2/keys/MicCorUEFCA2011_2011-06-27.crt $(DESTDIR)/etc/mmstpm2/keys
-	install -m 0644 src/etc/mmstpm2/keys/MicWinProPCA2011_2011-10-19.crt $(DESTDIR)/etc/mmstpm2/keys
+	install -m 0755 src/usr/sbin/sectpmctl $(DESTDIR)/usr/sbin
+	install -d $(DESTDIR)/usr/share/bash-completion/completions
+	install -m 0755 src/usr/share/bash-completion/completions/_sectpmctl $(DESTDIR)/usr/share/bash-completion/completions
+	install -d $(DESTDIR)/usr/lib/sectpmctl
+	install -m 0755 src/usr/lib/sectpmctl/boot.conf
+	install -d $(DESTDIR)/usr/lib/sectpmctl/keys
+	install -m 0644 src/usr/lib/sectpmctl/keys/canonical-master-public.pem $(DESTDIR)/usr/lib/sectpmctl/keys
+	install -m 0644 src/usr/lib/sectpmctl/keys/dbxupdate_x64.bin $(DESTDIR)/usr/lib/sectpmctl/keys
+	install -m 0644 src/usr/lib/sectpmctl/keys/MicCorUEFCA2011_2011-06-27.crt $(DESTDIR)/usr/lib/sectpmctl/keys
+	install -m 0644 src/usr/lib/sectpmctl/keys/MicWinProPCA2011_2011-10-19.crt $(DESTDIR)/usr/lib/sectpmctl/keys
+	install -d $(DESTDIR)/usr/lib/sectpmctl/scripts
+	install -m 0755 src/usr/lib/sectpmctl/scripts/dkms_sign_helper.sh $(DESTDIR)/usr/lib/sectpmctl/scripts
+	install -m 0755 src/usr/lib/sectpmctl/scripts/kmodsign.sh $(DESTDIR)/usr/lib/sectpmctl/scripts
+	install -m 0755 src/usr/lib/sectpmctl/scripts/sbsign.sh $(DESTDIR)/usr/lib/sectpmctl/scripts
+	install -m 0755 src/usr/lib/sectpmctl/scripts/sectpmctl-boot $(DESTDIR)/usr/lib/sectpmctl/scripts
+	install -m 0755 src/usr/lib/sectpmctl/scripts/sectpmctl-key $(DESTDIR)/usr/lib/sectpmctl/scripts
+	install -m 0755 src/usr/lib/sectpmctl/scripts/sectpmctl-tpm $(DESTDIR)/usr/lib/sectpmctl/scripts
+	install -d $(DESTDIR)/etc/sectpmctl
 	install -d $(DESTDIR)/etc/kernel/postinst.d
 	install -m 0755 src/etc/kernel/postinst.d/zz-update-mmstpm2-boot $(DESTDIR)/etc/kernel/postinst.d
 	install -d $(DESTDIR)/etc/kernel/postrm.d

@@ -1,0 +1,362 @@
+# sectpmctl(1) completion                                  -*- shell-script -*-
+
+# copyright
+
+# path to stored named key hash objects
+NAMED_OBJECTS="/var/lib/mmstpm2/objects"
+
+__get_handles() {
+  if [[ $UID == 0 ]]; then
+    tpm2_getcap handles-persistent 2>/dev/null | { while read -r a b; do [[ $a == '-' ]] && echo " $b"; done }
+  else
+    if sudo -n true 2>/dev/null; then
+      sudo tpm2_getcap handles-persistent 2>/dev/null | { while read -r a b; do [[ $a == '-' ]] && echo " $b"; done }
+    fi
+  fi
+}
+
+__get_names() {
+  dirExists=1
+  if [[ $UID == 0 ]]; then
+    test -d "${NAMED_OBJECTS}"
+    dirExists=$?
+  else
+    if sudo -n true 2>/dev/null; then
+      sudo test -d "${NAMED_OBJECTS}"
+      dirExists=$?
+    fi
+  fi
+  if [[ $dirExists ]]; then
+    if [[ $UID == 0 ]]; then
+      ls "${NAMED_OBJECTS}" | sed 's/_key.priv$//g' | sed 's/_key.pub$//g' | sort -u
+    else
+      if sudo -n true 2>/dev/null; then
+        sudo ls "${NAMED_OBJECTS}" | sed 's/_key.priv$//g' | sed 's/_key.pub$//g' | sort -u
+      fi
+    fi
+  fi
+}
+
+_sectpmctl_boot()
+{
+  local cur prev cmd install_opts provisioning_opts
+
+  COMPREPLY=()
+  cur="${COMP_WORDS[COMP_CWORD]}"
+  prev="${COMP_WORDS[COMP_CWORD-1]}"
+  cmd="${COMP_WORDS[2]}"
+
+  main_opts="activate deactivate help install remove test update"
+  remove_update_opts="--kernel"
+
+  case "${cmd}" in
+    activate | deactivate | help | install | test)
+      return 0
+      ;;
+    remove | update)
+      case "${prev}" in
+        --kernel)
+          COMPREPLY=()
+          return 0
+          ;;
+        *)
+          ;;
+      esac
+      COMPREPLY=($( compgen -W "${remove_update_opts}" -- ${cur} ))
+      return 0
+      ;;
+    *)
+      ;;
+  esac
+
+  COMPREPLY=($( compgen -W "${main_opts}" -- ${cur} ))
+}
+
+_sectpmctl_key()
+{
+  local cur prev cmd main_opts seal_opts unseal_opts changepin_opts remove_opts
+
+  COMPREPLY=()
+  cur="${COMP_WORDS[COMP_CWORD]}"
+  prev="${COMP_WORDS[COMP_CWORD-1]}"
+  cmd="${COMP_WORDS[2]}"
+
+  main_opts="changepin enterlockout extend help leavelockout remove seal unseal"
+  seal_opts="--handle --key-file --name --name-dir --noda --pcr-extend --pcr-preseed --pin --pin-hex --pin-file"
+  unseal_opts="--handle --name --name-dir --noda --pcr-extend --pcr-preseed --pin --pin-hex --pin-file"
+  changepin_opts="--handle --noda --oldpin --oldpin-hex --oldpin-file --pin --pin-hex --pin-file"
+  remove_opts="--handle --name --name-dir"
+  extend_opts="--file --random --string"
+
+  case "${cmd}" in
+    changepin | remove | seal | unseal)
+      case "${prev}" in
+        --handle)
+          COMPREPLY=($( compgen -W "$( __get_handles )" -- ${cur} ))
+          return 0
+          ;;
+        *)
+          ;;
+      esac
+      ;;
+    *)
+      ;;
+  esac
+
+  case "${cmd}" in
+    remove | seal | unseal)
+      case "${prev}" in
+        --name)
+          local IFS=$'\n'
+          COMPREPLY=($( compgen -W "$( __get_names )" -- ${cur} ))
+          local escaped_single_qoute="'\''"
+          local i=0
+          for entry in ${COMPREPLY[*]}
+          do
+            if [[ "${cur:0:1}" == "'" ]] 
+            then
+              COMPREPLY[$i]="${entry//\'/${escaped_single_qoute}}" 
+            elif [[ "${cur:0:1}" == "\"" ]] 
+            then
+              entry="${entry//\\/\\\\}" 
+              COMPREPLY[$i]="${entry//\"/\\\"}" 
+            else 
+              entry="${entry//\\/\\\\}" 
+              entry="${entry//\'/\'}" 
+              entry="${entry//\"/\\\"}" 
+              COMPREPLY[$i]="${entry// /\\ }"
+            fi
+            (( i++ ))
+          done
+          return 0
+          ;;
+        --name-dir)
+          case "${cur}" in
+            -)
+              COMPREPLY=()
+              return 0
+              ;;
+            *)
+              COMPREPLY=($( compgen -d ${cur} ))
+              return 0
+              ;;
+          esac
+          ;;
+        *)
+          ;;
+      esac
+      ;;
+    *)
+      ;;
+  esac
+
+  case "${cmd}" in
+    changepin | seal | unseal)
+      case "${prev}" in
+        --pin | --pin-hex)
+          COMPREPLY=()
+          return 0
+          ;;
+        --pin-file)
+          case "${cur}" in
+            -)
+              COMPREPLY=()
+              return 0
+              ;;
+            *)
+              COMPREPLY=($( compgen -f ${cur} ))
+              return 0
+              ;;
+          esac
+          ;;
+        *)
+          ;;
+      esac
+      ;;
+    *)
+      ;;
+  esac
+
+  case "${cmd}" in
+    enterlockout | help | leavelockout)
+      return 0
+      ;;
+    changepin)
+      case "${prev}" in
+        --oldpin | --oldpin-hex)
+          COMPREPLY=()
+          return 0
+          ;;
+        --oldpin-file)
+          case "${cur}" in
+            -)
+              COMPREPLY=()
+              return 0
+              ;;
+            *)
+              COMPREPLY=($( compgen -f ${cur} ))
+              return 0
+              ;;
+          esac
+          ;;
+        *)
+          ;;
+      esac
+      COMPREPLY=($( compgen -W "${changepin_opts}" -- ${cur} ))
+      return 0
+      ;;
+    extend)
+      case "${prev}" in
+        --file)
+          case "${cur}" in
+            -)
+              COMPREPLY=()
+              return 0
+              ;;
+            *)
+              COMPREPLY=($( compgen -f ${cur} ))
+              return 0
+              ;;
+          esac
+          ;;
+        --string)
+          COMPREPLY=()
+          return 0
+          ;;
+        *)
+          ;;
+      esac
+      COMPREPLY=($( compgen -W "${extend_opts}" -- ${cur} ))
+      return 0
+      ;;
+    remove)
+      COMPREPLY=($( compgen -W "${remove_opts}" -- ${cur} ))
+      return 0
+      ;;
+    seal)
+      case "${prev}" in
+        --key-file)
+          case "${cur}" in
+            -)
+              COMPREPLY=()
+              return 0
+              ;;
+            *)
+              COMPREPLY=($( compgen -f ${cur} ))
+              return 0
+              ;;
+          esac
+          ;;
+        *)
+          ;;
+      esac
+      COMPREPLY=($( compgen -W "${seal_opts}" -- ${cur} ))
+      return 0
+      ;;
+    unseal)
+      COMPREPLY=($( compgen -W "${unseal_opts}" -- ${cur} ))
+      return 0
+      ;;
+    *)
+      ;;
+  esac
+
+  COMPREPLY=($( compgen -W "${main_opts}" -- ${cur} ))
+}
+
+_sectpmctl_tpm()
+{
+  local cur prev cmd install_opts provisioning_opts
+
+  COMPREPLY=()
+  cur="${COMP_WORDS[COMP_CWORD]}"
+  prev="${COMP_WORDS[COMP_CWORD-1]}"
+  cmd="${COMP_WORDS[2]}"
+
+  main_opts="check help install provisioning"
+  install_opts="--dont-createkey --dont-extend --dont-setlukskey --key --pcr-preseed --recoveryfile --recoverygrouplength --recoverygroups --recoveryscripthelper --setrecoverykey"
+  provisioning_opts="--lockout-auth"
+
+  case "${cmd}" in
+    check | help)
+      return 0
+      ;;
+    install)
+      case "${prev}" in
+        --recoverygroups | --recoverygrouplength)
+          COMPREPLY=()
+          return 0
+          ;;
+        --key | --recoveryfile | --recoveryscripthelper)
+          case "${cur}" in
+            -)
+              COMPREPLY=()
+              return 0
+              ;;
+            *)
+              COMPREPLY=($( compgen -f ${cur} ))
+              return 0
+              ;;
+          esac
+          ;;
+        *)
+          ;;
+      esac
+      COMPREPLY=($( compgen -W "${install_opts}" -- ${cur} ))
+      return 0
+      ;;
+    provisioning)
+      case "${prev}" in
+        --lockout-auth)
+          COMPREPLY=()
+          return 0
+          ;;
+        *)
+          ;;
+      esac
+      COMPREPLY=($( compgen -W "${provisioning_opts}" -- ${cur} ))
+      return 0
+      ;;
+    *)
+      ;;
+  esac
+
+  COMPREPLY=($( compgen -W "${main_opts}" -- ${cur} ))
+}
+
+_sectpmctl()
+{
+  local cur
+
+  COMPREPLY=()
+  cur="${COMP_WORDS[1]}"
+
+  main_opts="boot help key tpm version"
+
+  case "${cur}" in
+    boot)
+      _sectpmctl_boot
+      return 0
+      ;;
+    key)
+      _sectpmctl_key
+      return 0
+      ;;
+    tpm)
+      _sectpmctl_tpm
+      return 0
+      ;;
+    help | version)
+      _sectpmctl_tpm
+      return 0
+      ;;
+    *)
+      ;;
+  esac
+
+  COMPREPLY=($( compgen -W "${main_opts}" -- ${cur} ))
+} &&
+  complete -F _sectpmctl sectpmctl
+
+# ex: filetype=sh
+
