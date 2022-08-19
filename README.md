@@ -2,7 +2,7 @@
 
 We want to secure the Ubuntu 22.04 installation with LUKS and TPM2. Please read this README carefully before installation.
 
-We also assue a default encrypted installation of Ubuntu 22.04 desktop to a single harddisk. Otherwise an installation is
+We also assue a normal installation of Ubuntu 22.04 desktop with erasing the disk and with LVM and encryption. Otherwise an installation is
 possible, but currently undocumented.
 
 In this initial version no password is requested while booting. That means that you should supply a BIOS start password. It is planed to
