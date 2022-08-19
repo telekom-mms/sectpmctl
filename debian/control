@@ -12,12 +12,12 @@ Depends: ${misc:Depends}, efibootmgr, efitools, sbsigntool, tpmsbsigntool, binut
 Provides: grub, grub2, grub2-common, grub-common, grub-efi, grub-efi-amd64, grub-efi-amd64-bin, grub-efi-amd64-signed, grub-pc, grub-pc-bin, lilo, os-prober, shim, shim-signed
 Conflicts: grub, grub2, grub2-common, grub-common, grub-efi, grub-efi-amd64, grub-efi-amd64-bin, grub-efi-amd64-signed, grub-pc, grub-pc-bin, lilo, os-prober, shim, shim-signed
 Replaces: grub, grub2, grub2-common, grub-common, grub-efi, grub-efi-amd64, grub-efi-amd64-bin, grub-efi-amd64-signed, grub-pc, grub-pc-bin, lilo, os-prober, shim, shim-signed
-Description: sectpmctl - Secure Boot and TPM backed LUKS full disc encryption
+Description: sectpmctl - Secure Boot and TPM2 backed LUKS full disc encryption
  The default of most Linux distributions is to use a password and eventually
  a recovery key to decrypt the encrypted root partition of a drive. sectpmctl
- stores the LUKS key inside the TPM and only releases it if the system is in
+ stores the LUKS key inside the TPM2 and only releases it if the system is in
  a defined state when booting. To not have to fight with the so called PCR
- brittleness of the TPM on boot and system measurements, it implements
+ brittleness of the TPM2 on boot and system measurements, it implements
  Secure Boot with decentralized keys to keep the system in the required
- state. This results in zero administrative overhead for the TPM in case of
+ state. This results in zero administrative overhead for the TPM2 in case of
  system updates.
