@@ -2,6 +2,9 @@
 
 We want to secure the Ubuntu 22.04 installation with LUKS and TPM2. Please read this README carefully before installation.
 
+We also assue a default encrypted installation of Ubuntu 22.04 desktop to a single harddisk. Otherwise an installation is
+possible, but currently undocumented.
+
 In this initial version no password is requested while booting. That means that you should supply a BIOS start password. It is planed to
 release an update shortly which implements a TPM + password option. In that case a BIOS start password is not neccessary. Without either
 a BIOS start password or TPM + password, the device would boot up to the login screen and someone could try to read out the memory or
@@ -22,7 +25,7 @@ It is recommended to only have one LUKS slot in use, which is mostly slot 0. sec
 ## Build and install tpmsbsigntool
 
 ```
-sudo apt install debhelper-compat gcc-multilib binutils-dev libssl-dev openssl pkg-config \
+sudo apt install git git-buildpackage debhelper-compat gcc-multilib binutils-dev libssl-dev openssl pkg-config \
   automake uuid-dev help2man gnu-efi tpm2-openssl
 
 git clone https://github.com/T-Systems-MMS/tpmsbsigntool.git
@@ -39,7 +42,7 @@ sudo apt install -f
 
 ```
 sudo apt install debhelper efibootmgr efitools sbsigntool binutils mokutil dkms systemd udev \
-  util-linux gdisk openssl uuid-runtime tpm2-tools
+  util-linux gdisk openssl uuid-runtime tpm2-tools fdisk fatresize
 
 git clone https://github.com/T-Systems-MMS/sectpmctl.git
 
@@ -132,20 +135,78 @@ All generated keys, passwords or serialized keys are stored in '/var/lib/sectpmc
 ```
 sudo bash
 
+
 # Point of no return, you need to complete at least until the following reboot command
-# Skip this three lines if already done (recovery situation)
 apt remove --allow-remove-essential "grub*" "shim*"
 dpkg -i sectpmctl_1.0.0-1_amd64.deb
 apt install -f
 
 mmstpm2 provisioning
 
-# Skip migration of /boot if already done (recovery situation)
-# TODO: Migrate /boot into root /, delete /boot partition, expand EFI partition
+
+# Cleanup leftovers from grub, shim and windows stuff from efibootmgr
+entryId=""
+entryId=$(efibootmgr -v | grep -i "Windows Boot Manager" | sed -e 's/^Boot\([0-9]\+\)\(.*\)$/\1/')
+if [[ "x${entryId}" != "x" ]]; then
+  efibootmgr -q -b "${entryId}" -B
+fi
+entryId=""
+entryId=$(efibootmgr -v | grep -i "ubuntu" | sed -e 's/^Boot\([0-9]\+\)\(.*\)$/\1/')
+if [[ "x${entryId}" != "x" ]]; then
+  efibootmgr -q -b "${entryId}" -B
+fi
+while [[ $(efibootmgr | grep -c -m 1 "MMSTPM2 Bootloader") -gt 0 ]]
+do
+  entryId=$(efibootmgr -v | grep -m 1 -i "MMSTPM2 Bootloader" | sed -e 's/^Boot\([0-9]\+\)\(.*\)$/\1/')
+  efibootmgr -q -b "${entryId}" -B
+done
+
+
+# Now migrate boot partition to root, the following partition table is assumed, change all referenced
+# according to your device and/or partition names and numbers:
+# /dev/vda1 (EFI-System, vfat, partition type 1)
+# /dev/vda2 (boot partition, ext4)
+# /dev/vda3 (encrypted root partition)
+
+umount /boot/efi
+umount /boot
+mkdir /oldboot
+mount /dev/vda2 /oldboot
+cp -rp /oldboot/* /boot/
+umount /oldboot
+rmdir /oldboot
+
+dd if=/dev/zero of=/dev/vda1 bs=1M
+dd if=/dev/zero of=/dev/vda2 bs=1M
+fdisk /dev/vda
+  # delete partition 2
+  # delete partition 1
+  # create parttion 1
+    # startsector same as startsector of old vda1
+    # lastsector same as lastsector of old vda2
+    # remove signature: YES
+  # change type of partition 1
+    # type nr: 1 (EFI-System)
+  # write and quit
+
+mkfs.vfat /dev/vda1
+blkid -s UUID -o value /dev/vda1
+  # note the UUID of /dev/vda1, something like: 00A5-1112
+vi /etc/fstab
+  # remove /boot entry from fstab
+  # change UUID of /boot/efi to the UUID thich blkid listed
+mount /boot/efi
+
+
+# Continue installation of bootloader
 
 mmstpm2-boot --install
 
+# After this reboot your current LUKS password is still required
 reboot
+
+
+# Continue installation of TPM
 
 sudo bash
 
@@ -161,7 +222,7 @@ mmstpm2 install --setrecoverykey
 The 'mmstpm2 install' command will print out the recovery key. It is highly recommended to store this key in a safe location. Without this key you can loose
 all your data when the TPM breaks or when accessing your hard disk in another machine. You have been warned!
 
-After a reboot the LUKS partition should decrypt automatically the the installation is complete.
+After a reboot the LUKS partition should decrypt automatically and the installation is complete.
 
 You can then do some boot loader configuration by editing '/etc/sectpmctl/boot.conf'. Remember to update the boot loader afterwards by executing
 
