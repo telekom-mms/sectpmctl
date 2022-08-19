@@ -5,13 +5,13 @@ set -e
 exec </dev/null >&2
 
 # Path's
-MMSTPM2_KEYS="/etc/mmstpm2/keys"
-MMSTPM2_BOOT="/boot/efi"
-MMSTPM2_EFI="/EFI/mmstpm2"
-MMSTPM2_EFI_DIR="${MMSTPM2_BOOT}${MMSTPM2_EFI}"
+SECTPMCTL_KEYS="/var/lib/sectpmctl/keys"
+SECTPMCTL_BOOT="/boot/efi"
+SECTPMCTL_EFI="/EFI/sectpmctl"
+SECTPMCTL_EFI_DIR="${SECTPMCTL_BOOT}${SECTPMCTL_EFI}"
 
-if [ ! -d "${MMSTPM2_EFI_DIR}" ]; then
-  echo 'mmstpm2-boot inactive'
+if [ ! -d "${SECTPMCTL_EFI_DIR}" ]; then
+  echo 'sectpmctl boot inactive'
   exit 0
 fi
 
@@ -25,7 +25,7 @@ case "${command}" in
     mode="${mode%\'}"
     case ":${mode}" in
       :|:configure)
-        mmstpm2-boot --update "${version}"
+        sectpmctl boot update --kernel "${version}"
   	;;
     esac
     ;;
@@ -35,7 +35,7 @@ case "${command}" in
     mode="${mode%\'}"
     case ":${mode}" in
       :|:remove)
-        mmstpm2-boot --remove "${version}"
+        sectpmctl boot remove --kernel "${version}"
   	;;
     esac
     ;;
@@ -47,7 +47,7 @@ case "${command}" in
       linux-image-*)
         ;;
       *)
-        mmstpm2-boot --update "${version}"
+        sectpmctl boot update --kernel "${version}"
         ;;
     esac
     ;;

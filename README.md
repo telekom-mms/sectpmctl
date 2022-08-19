@@ -102,10 +102,10 @@ Be warned that if you put already some keys into the TPM, they will be lost by t
 Be also warned that when a TPM lockout password is set and you try to clear the TPM with software commands entering a wrong lockout password, there
 will be a time penalty until you can try again. The above three ways to clear should allow to clear the TPM even when you entered a wrong lockout password.
 
-The following command "mmstpm2 provisioning" should run successfully with a cleared TPM and the output should look like this:
+The following command "sectpmctl tpm provisioning" should run successfully with a cleared TPM and the output should look like this:
 
 ```
-user@laptop:~# mmstpm2 provisioning
+user@laptop:~# sectpmctl tpm provisioning
 START PROVISIONING
 ## TPM CLEAR
 ## SET DICTIONARY LOCKOUT SETTINGS
@@ -141,7 +141,7 @@ apt remove --allow-remove-essential "grub*" "shim*"
 dpkg -i sectpmctl_1.0.0-1_amd64.deb
 apt install -f
 
-mmstpm2 provisioning
+sectpmctl tpm provisioning
 
 
 # Cleanup leftovers from grub, shim and windows stuff from efibootmgr
@@ -155,9 +155,9 @@ entryId=$(efibootmgr -v | grep -i "ubuntu" | sed -e 's/^Boot\([0-9]\+\)\(.*\)$/\
 if [[ "x${entryId}" != "x" ]]; then
   efibootmgr -q -b "${entryId}" -B
 fi
-while [[ $(efibootmgr | grep -c -m 1 "MMSTPM2 Bootloader") -gt 0 ]]
+while [[ $(efibootmgr | grep -c -m 1 "SECTPMCTL Bootloader") -gt 0 ]]
 do
-  entryId=$(efibootmgr -v | grep -m 1 -i "MMSTPM2 Bootloader" | sed -e 's/^Boot\([0-9]\+\)\(.*\)$/\1/')
+  entryId=$(efibootmgr -v | grep -m 1 -i "SECTPMCTL Bootloader" | sed -e 's/^Boot\([0-9]\+\)\(.*\)$/\1/')
   efibootmgr -q -b "${entryId}" -B
 done
 
@@ -200,7 +200,7 @@ mount /boot/efi
 
 # Continue installation of bootloader
 
-mmstpm2-boot --install
+sectpmctl boot install
 
 # After this reboot your current LUKS password is still required
 reboot
@@ -211,15 +211,15 @@ reboot
 sudo bash
 
 # Now your machine has its own set of Secure Boot keys, test it
-mmstpm2-boot --test
+sectpmctl boot test
 
 # Install the LUKS TPM key. Enter your current LUKS key when asked.
-mmstpm2 install --setrecoverykey
+sectpmctl tpm install --setrecoverykey
 
 # STORE THE PRINTED RECOVERY KEY NOW!!!
 ```
 
-The 'mmstpm2 install' command will print out the recovery key. It is highly recommended to store this key in a safe location. Without this key you can loose
+The 'sectpmctl tpm install' command will print out the recovery key. It is highly recommended to store this key in a safe location. Without this key you can loose
 all your data when the TPM breaks or when accessing your hard disk in another machine. You have been warned!
 
 After a reboot the LUKS partition should decrypt automatically and the installation is complete.
@@ -227,7 +227,7 @@ After a reboot the LUKS partition should decrypt automatically and the installat
 You can then do some boot loader configuration by editing '/etc/sectpmctl/boot.conf'. Remember to update the boot loader afterwards by executing
 
 ```
-sudo mmstpm2-boot --update
+sudo sectpmctl boot update
 ```
 
 followed by a reboot. You can also use the bootctl command for basic tasks like listing the bootable kernels:
@@ -291,7 +291,7 @@ In case of a changed Secure Boot database, sectpmctl will not unlock anymore. In
 Secure Boot database, then clear the TPM and finally repeat all steps from the installation. It is possible to do it more fine grained which will be documented in a later
 release.
 
-You can then omit the '--setrecoverykey' option in the 'mmstpm2 install' command to keep your current recovery key.
+You can then omit the '--setrecoverykey' option in the 'sectpmctl tpm install' command to keep your current recovery key.
 
 ## Disclaimer
 

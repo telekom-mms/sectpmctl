@@ -1,8 +1,10 @@
 #!/bin/bash
 
-# sectpmctl key - A tool to store encrypted secrets in TPM2 key hash objects
+# SECTPMCTL
+# AUTHORS: Heike Pesch <heike.pesch@t-systems.com>
+#          Richard Robert Reitz <richard-robert.reitz@t-systems.com>
 
-# copyright
+# sectpmctl key - A tool to store encrypted secrets in TPM2 key hash objects
 
 # reserve stdout only for validated output
 exec 4>&1
@@ -37,16 +39,16 @@ PCRLIST_PRESEED_MANY="${PCR_BANK}:${PCR_BIOS},8,9,${PCR_VAR}14"
 PCRLIST_PRIMARY_MANY="${PCR_BANK}:${PCR_SECUREBOOT},8,9,${PCR_VAR}14"
 
 # path to keys
-KEY_PATH="/etc/mmstpm2/keys"
+KEY_PATH="/var/lib/sectpmctl/keys"
 
 # path to stored named key hash objects
-NAMED_OBJECTS="/var/lib/mmstpm2/objects"
+NAMED_OBJECTS="/var/lib/sectpmctl/objects"
 
-# SRK public keys set by 'sectpmctl provisioning'
+# SRK public keys set by 'sectpmctl tpm provisioning'
 O_SRK_PUB="${KEY_PATH}/tpm_owner.pub"
 O_SRK_PUB_NODA="${KEY_PATH}/tpm_owner_noda.pub"
 
-# pcr values stored by by 'sectpmctl install'
+# pcr values stored by by 'sectpmctl tpm install'
 PROVISIONED_PCR7_VALUE="${KEY_PATH}/pcr7.dat"
 PROVISIONED_PCR11_VALUE="${KEY_PATH}/pcr11.dat"
 PROVISIONED_ZERO_VALUE="${KEY_PATH}/pcrNull.dat"
@@ -240,13 +242,13 @@ _check_state() {
 
   p1="$( tpm2_getcap handles-persistent | tr '[:upper:]' '[:lower:]' | grep -c "^\- ${HANDLE_O_SRK}$" )" || p1=""
   if [[ "${p1}" != "1" || ! -f "${O_SRK_PUB}" ]]; then
-    _print_error "${ME}: Owner DA SRK not found, run 'sectpmctl provisioning' first"
+    _print_error "${ME}: Owner DA SRK not found, run 'sectpmctl tpm provisioning' first"
     return 1
   fi
 
   p1="$( tpm2_getcap handles-persistent | tr '[:upper:]' '[:lower:]' | grep -c "^\- ${HANDLE_O_SRK_NODA}$" )" || p1=""
   if [[ "${p1}" != "1" || ! -f "${O_SRK_PUB_NODA}" ]]; then
-    _print_error "${ME}: Owner NODA SRK not found, run 'sectpmctl provisioning' first"
+    _print_error "${ME}: Owner NODA SRK not found, run 'sectpmctl tpm provisioning' first"
     return 1
   fi
 }
@@ -867,7 +869,7 @@ _enterlockout() {
     tpm2_getcap properties-variable )" || _xt $? || return 1
   if [[ "$( grep -c "TPM2_PT_MAX_AUTH_FAIL: 0x20" <<< "$p1" )" == "1" ]]; then
     p1="$( _tx "${ME} ${CMD}: Could not get lockout authValue" \
-      cat /etc/mmstpm2/keys/lockout.pwd )" || _xt $? || return 1
+      cat /var/lib/sectpmctl/keys/lockout.pwd )" || _xt $? || return 1
     _tx "${ME} ${CMD}: Could not reset lockout counter for testing" \
       tpm2_dictionarylockout -Q -c --setup-parameters -p "${p1}" || return 1
     _tx "${ME} ${CMD}: Could not set lowered lockout settings for testing" \
@@ -917,7 +919,7 @@ _leavelockout() {
     tpm2_getcap properties-variable )" || _xt $? || return 1
   if [[ "$( grep -c "TPM2_PT_MAX_AUTH_FAIL: 0x8" <<< "$p1" )" == "1" ]]; then
     p1="$( _tx "${ME} ${CMD}: Could not get lockout authValue" \
-      cat /etc/mmstpm2/keys/lockout.pwd )" || _xt $? || return 1
+      cat /var/lib/sectpmctl/keys/lockout.pwd )" || _xt $? || return 1
     _tx "${ME} ${CMD}: Could not reset lockout counter for testing" \
       tpm2_dictionarylockout -Q -c --setup-parameters -p "${p1}" || return 1
     _tx "${ME} ${CMD}: Could not set lowered lockout settings for testing" \
@@ -1055,7 +1057,7 @@ _seal() {
 
   for _ in {1..1}; do
     # we will provide the PCR values ourself
-    _ex "${ME} ${CMD}: Stored zero PCR value not found ${PROVISIONED_ZERO_VALUE@Q}, run 'sectpmctl install'" \
+    _ex "${ME} ${CMD}: Stored zero PCR value not found ${PROVISIONED_ZERO_VALUE@Q}, run 'sectpmctl tpm install'" \
       test -f "${PROVISIONED_ZERO_VALUE}" || break
 
     # combine all pcr values into pcr_values.dat
@@ -1064,7 +1066,7 @@ _seal() {
       _tx "${ME} ${CMD}: Could not read PCR 0" \
         tpm2_pcrread -Q -o pcr_values.dat "${PCR_BANK}:${PCR_BIOS}" || break
     else
-      _ex "${ME} ${CMD}: Stored PCR 7 value not found ${PROVISIONED_PCR7_VALUE@Q}, run 'sectpmctl install'" \
+      _ex "${ME} ${CMD}: Stored PCR 7 value not found ${PROVISIONED_PCR7_VALUE@Q}, run 'sectpmctl tpm install'" \
         test -f "${PROVISIONED_PCR7_VALUE}" || break
       
       _ex "${ME} ${CMD}: Could not copy PCR 7 to PCR value list" \
@@ -1077,7 +1079,7 @@ _seal() {
       cat "${PROVISIONED_ZERO_VALUE}" >> pcr_values.dat || break
     # pcr 11 depends on PCR_EXTEND true
     if [[ ${PCR_EXTEND} == true ]]; then
-      _ex "${ME} ${CMD}: Stored PCR 11 value not found ${PROVISIONED_PCR11_VALUE@Q}, run 'sectpmctl install'" \
+      _ex "${ME} ${CMD}: Stored PCR 11 value not found ${PROVISIONED_PCR11_VALUE@Q}, run 'sectpmctl tpm install'" \
         test -f "${PROVISIONED_PCR11_VALUE}" || break
       
       _ex "${ME} ${CMD}: Could not copy PCR 11 to PCR value list" \

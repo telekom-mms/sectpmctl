@@ -1,11 +1,11 @@
 #!/bin/bash
 
-# sectpmctl - A tool to ...
-
-# copyright
+# SECTPMCTL
+# AUTHORS: Heike Pesch <heike.pesch@t-systems.com>
+#          Richard Robert Reitz <richard-robert.reitz@t-systems.com>
 
 # version and name
-SECKEYCTL_VERSION="1.0"
+SECKEYCTL_VERSION="1.0.0"
 ME=$(basename "${0}")
 
 # path to keys
