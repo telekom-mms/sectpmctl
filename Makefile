@@ -20,8 +20,8 @@ install:
 	install -m 0755 src/usr/lib/sectpmctl/scripts/sectpmctl-key $(DESTDIR)/usr/lib/sectpmctl/scripts
 	install -m 0755 src/usr/lib/sectpmctl/scripts/sectpmctl-tpm $(DESTDIR)/usr/lib/sectpmctl/scripts
 	install -d $(DESTDIR)/usr/share/sectpmctl
-	install -m 0755 LICENSE $(DESTDIR)/usr/share/sectpmctl/LICENSE
-	install -m 0755 README.md $(DESTDIR)/usr/share/sectpmctl/README.md
+	install -m 0644 LICENSE $(DESTDIR)/usr/share/sectpmctl/LICENSE
+	install -m 0644 README.md $(DESTDIR)/usr/share/sectpmctl/README.md
 	install -d $(DESTDIR)/etc/sectpmctl
 	install -d $(DESTDIR)/etc/kernel/postinst.d
 	install -m 0755 src/etc/kernel/postinst.d/zz-update-sectpmctl-boot $(DESTDIR)/etc/kernel/postinst.d
