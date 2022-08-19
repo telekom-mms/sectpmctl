@@ -186,7 +186,7 @@ hooks are called to automatically sign the kernel and/or kernel modules in a ver
 
 ### User space updates
 
-No user space application except boot loaders should be able tp cause any problem anytime. It is better to not install any other bootloader. The UEFI
+No user space application except boot loaders should be able to cause any problem anytime. It is better to not install any other bootloader. The UEFI
 specification allows for many boot loaders being installed in parallel. No other bootloader will overwrite sectpmctl but most probably change the boot order.
 In such case you can enter the boot menu of your BIOS (often the F12 key or such) and select sectpmctl again as boot entry. You can do it also permanently by
 using the efibootmgr command although it could be a bit of a fiddle.

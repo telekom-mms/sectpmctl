@@ -1,0 +1,57 @@
+#!/bin/sh
+
+set -e
+
+exec </dev/null >&2
+
+# Path's
+MMSTPM2_KEYS="/etc/mmstpm2/keys"
+MMSTPM2_BOOT="/boot/efi"
+MMSTPM2_EFI="/EFI/mmstpm2"
+MMSTPM2_EFI_DIR="${MMSTPM2_BOOT}${MMSTPM2_EFI}"
+
+if [ ! -d "${MMSTPM2_EFI_DIR}" ]; then
+  echo 'mmstpm2-boot inactive'
+  exit 0
+fi
+
+command="${0}"
+version="${1}"
+
+case "${command}" in
+  */kernel/postinst.d/*)
+    set -- $DEB_MAINT_PARAMS
+    mode="${1#\'}"
+    mode="${mode%\'}"
+    case ":${mode}" in
+      :|:configure)
+        mmstpm2-boot --update "${version}"
+  	;;
+    esac
+    ;;
+  */kernel/postrm.d/*)
+    set -- $DEB_MAINT_PARAMS
+    mode="${1#\'}"
+    mode="${mode%\'}"
+    case ":${mode}" in
+      :|:remove)
+        mmstpm2-boot --remove "${version}"
+  	;;
+    esac
+    ;;
+  */initramfs/post-update.d/*)
+    eval set -- "${DPKG_MAINTSCRIPT_PACKAGE}"
+    mode="${1#\'}"
+    mode="${mode%\'}"
+    case "${mode}" in
+      linux-image-*)
+        ;;
+      *)
+        mmstpm2-boot --update "${version}"
+        ;;
+    esac
+    ;;
+esac
+
+exit 0
+

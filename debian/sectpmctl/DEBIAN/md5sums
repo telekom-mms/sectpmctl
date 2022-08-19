@@ -1,0 +1,9 @@
+bca87b0a1078c37eb2795bf5db4f7c89  usr/bin/mmstpm2-boot
+75201f8e803fc037d99585a436b4de8b  usr/sbin/mmstpm2
+00a545bd7bf7d2661cbbcc370772d8c5  usr/share/doc/sectpmctl/changelog.Debian.gz
+bda9b028b7d66e85ccce14b7ba914e88  usr/share/doc/sectpmctl/copyright
+7165ea2730137da3da903f5fad6e9981  usr/share/lintian/overrides/sectpmctl
+2e7e9e9eba03580e6ceca0c4b5f5e758  usr/share/mmstpm2/boot.conf
+33895235df69b66fec9a2a4663ebdaa7  usr/share/mmstpm2/dkms_sign_helper.sh
+4ad2bb6b1fe4251d742be04c8b0f155d  usr/share/mmstpm2/kmodsign.sh
+9f3c1a8a9be8fefc64294fcf862a16cd  usr/share/mmstpm2/sbsign.sh
