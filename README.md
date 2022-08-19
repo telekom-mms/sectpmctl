@@ -17,6 +17,8 @@ Dual booting Windows is not recommended and has never been tested with sectpmctl
 database which will prevent the successfull unlocking of the LUKS key. In such case you need the recovery key and need to redo the sectpmctl
 installation, see 'Recovery' for more information.
 
+It is recommended to only have one LUKS slot in use, which is mostly slot 0. sectpmctl will additionally use slot 5 to store the TPM key.
+
 ## Build and install tpmsbsigntool
 
 ```
@@ -145,10 +147,12 @@ mmstpm2-boot --install
 
 reboot
 
+sudo bash
+
 # Now your machine has its own set of Secure Boot keys, test it
 mmstpm2-boot --test
 
-# Install the LUKS TPM key
+# Install the LUKS TPM key. Enter your current LUKS key when asked.
 mmstpm2 install --setrecoverykey
 
 # STORE THE PRINTED RECOVERY KEY NOW!!!
@@ -216,6 +220,9 @@ You then need to supply a key and certificate which are stored in '/var/lib/sect
 - db.crt (certificate)
 
 Depending on the tool you either need the CER or the CRT format as certificate.
+
+Please read the helper scripts before manual using as they have specific needs for rewriting parameters. Hopefully the patches of tpmsbsigntool can be merged
+upstream in sbsigntool in the future.
 
 ## Recovery
 

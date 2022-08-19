@@ -19,6 +19,9 @@ MMSTPM2_BOOT="/boot/efi"
 MMSTPM2_EFI="/EFI/mmstpm2"
 MMSTPM2_EFI_DIR="${MMSTPM2_BOOT}${MMSTPM2_EFI}"
 
+# TPM NODA handle
+PERSISTANT_OWNER_SRK_NODA="0x81000101"
+
 # Configuration
 declare -A KERNEL_CMDLINE_MAP
 . "/usr/share/mmstpm2/boot.conf"
@@ -103,7 +106,7 @@ setup_systemd_boot ()
     rm "${MMSTPM2_EFI_DIR}/systemd-bootx64.efi"
   fi
 
-  /usr/share/mmstpm2/sbsign.sh --key "${MMSTPM2_KEYS}/db.key" --cert "${MMSTPM2_KEYS}/db.crt" --output "${MMSTPM2_EFI_DIR}/systemd-bootx64.efi" "/usr/lib/systemd/boot/efi/systemd-bootx64.efi" > /dev/null 2> /dev/null
+  /usr/share/mmstpm2/sbsign.sh --key "${MMSTPM2_KEYS}/db.obj" --cert "${MMSTPM2_KEYS}/db.crt" --output "${MMSTPM2_EFI_DIR}/systemd-bootx64.efi" "/usr/lib/systemd/boot/efi/systemd-bootx64.efi" > /dev/null 2> /dev/null
   if ! sbverify --cert "${MMSTPM2_KEYS}/db.crt" "${MMSTPM2_EFI_DIR}/systemd-bootx64.efi" 2> /dev/null > /dev/null; then
     echo "Error: Could not sign efi bootloader systemd-bootx64.efi"
     exit 3
@@ -304,7 +307,7 @@ create_efi_blob ()
         --add-section .initrd="${initrd}" --change-section-vma .initrd=0x3800000 \
         /usr/lib/systemd/boot/efi/linuxx64.efi.stub "${tempbootdir}/efi"
 
-    /usr/share/mmstpm2/sbsign.sh --key "${MMSTPM2_KEYS}/db.key" --cert "${MMSTPM2_KEYS}/db.crt" --output "/boot/efi/EFI/Linux/mmstpm2-${version}.efi" "${tempbootdir}/efi" > /dev/null 2> /dev/null
+    /usr/share/mmstpm2/sbsign.sh --key "${MMSTPM2_KEYS}/db.obj" --cert "${MMSTPM2_KEYS}/db.crt" --output "/boot/efi/EFI/Linux/mmstpm2-${version}.efi" "${tempbootdir}/efi" > /dev/null 2> /dev/null
     if ! sbverify --cert "${MMSTPM2_KEYS}/db.crt" "/boot/efi/EFI/Linux/mmstpm2-${version}.efi" 2> /dev/null > /dev/null; then
       echo "Error: Could not sign efi blob mmstpm2-${version}.efi"
     fi
@@ -580,7 +583,7 @@ install ()
   cd "${MMSTPM2_KEYS}" || exit
   shred -f -z -u db.* 2> /dev/null > /dev/null || true
 
-  # create password file required for db.key access
+  # create password file required for db key access
   getrand=$(rand8base64 2)
   echo "${getrand}" > "${MMSTPM2_KEYS}/db.pwd"
 
@@ -595,11 +598,15 @@ install ()
 
   openssl req -new -x509 -newkey rsa:2048 -subj "/CN=MMSTPM2 Platform Key/" -keyout PK.key \
     -out PK.crt -days 3650 -nodes -sha256 2> /dev/null
+  
   openssl req -new -x509 -newkey rsa:2048 -subj "/CN=MMSTPM2 Key Exchange Key/" -keyout KEK.key \
     -out KEK.crt -days 3650 -nodes -sha256 2> /dev/null
-  openssl genpkey -provider tpm2 -algorithm RSA -pkeyopt bits:2048 -pkeyopt \
-    "user-auth:$(cat "${MMSTPM2_KEYS}/db.pwd")" -pkeyopt digest:sha256 -out db.key
-  openssl req -provider tpm2 -provider default -key db.key -new -x509 -subj "/CN=MMSTPM2 Database Key/" \
+  
+  tpm2_create -Q -C "${PERSISTANT_OWNER_SRK_NODA}" -c db.ctx -g sha256 -a \
+    "fixedtpm|fixedparent|sensitivedataorigin|userwithauth|decrypt|sign|noda" -p "str:$(cat "${MMSTPM2_KEYS}/db.pwd")" \
+    -u db.pub -r db.priv
+  tpm2_evictcontrol -Q -C o -c db.ctx -o db.obj
+  openssl req -provider tpm2 -provider default -new -x509 -subj "/CN=MMSTPM2 Database Key/" -key object:db.obj?pass \
     -passin "pass:$(cat "${MMSTPM2_KEYS}/db.pwd")" -out db.crt -days 3650 -sha256
 
   openssl x509 -in PK.crt -out PK.cer -outform DER
@@ -619,9 +626,9 @@ install ()
   sign-efi-sig-list -t "$(date -u --date='1 second' +'%Y-%m-%d %H:%M:%S')" \
     -k KEK.key -c KEK.crt db db.esl db.auth
 
-  cp db.key db.cer db.crt "${MMSTPM2_KEYS}"
-  chown root:root ${MMSTPM2_KEYS}/*.key ${MMSTPM2_KEYS}/*.cer ${MMSTPM2_KEYS}/*.crt
-  chmod 0600 ${MMSTPM2_KEYS}/*.key ${MMSTPM2_KEYS}/*.cer ${MMSTPM2_KEYS}/*.crt
+  cp db.obj db.cer db.crt "${MMSTPM2_KEYS}"
+  chown root:root ${MMSTPM2_KEYS}/*.obj ${MMSTPM2_KEYS}/*.cer ${MMSTPM2_KEYS}/*.crt
+  chmod 0600 ${MMSTPM2_KEYS}/*.obj ${MMSTPM2_KEYS}/*.cer ${MMSTPM2_KEYS}/*.crt
 
   if [ "x${secureboot_mode}" = "xclearmode" ]; then
     sbsiglist --owner 77fa9abd-0359-4d32-bd60-28f4e78f784b --type x509 --output MS_Win_db.esl "${MMSTPM2_KEYS}/MicWinProPCA2011_2011-10-19.crt"
@@ -640,7 +647,7 @@ install ()
   efi-updatevar -f PK.auth PK
   chattr +i /sys/firmware/efi/efivars/db-d719b2cb-3d3a-4596-a3bc-dad00e67656f
 
-  shred -f -z -u ./*.auth ./*.cer ./*.crt ./*.esl ./*.key
+  shred -f -z -u ./*.auth ./*.cer ./*.crt ./*.esl ./*.key ./*.priv ./*.pub ./*.ctx ./*.obj
   cd - > /dev/null || exit
   rmdir "${tempdirname}"
 
