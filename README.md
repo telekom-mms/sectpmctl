@@ -42,7 +42,7 @@ sudo apt install -f
 
 ```
 sudo apt install debhelper efibootmgr efitools sbsigntool binutils mokutil dkms systemd udev \
-  util-linux gdisk openssl uuid-runtime tpm2-tools fdisk fatresize
+  util-linux gdisk openssl uuid-runtime tpm2-tools fdisk
 
 git clone https://github.com/T-Systems-MMS/sectpmctl.git
 
