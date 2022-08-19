@@ -777,11 +777,11 @@ generate_tpm2_policy() {
   tpm2_pcrextend -Q 11:${PCR_BANK}=$(tpm2_getrandom --hex ${HASH_LENGTH})
 
   # Create empty dat for PCR 8, 9 and 14
-  if [[ -f "${MMSTPM2_KEYS}/pcr_zero.dat" ]]; then
-    rm -f "${MMSTPM2_KEYS}/pcr_zero.dat"
+  if [[ -f "${MMSTPM2_KEYS}/pcrNull.dat" ]]; then
+    rm -f "${MMSTPM2_KEYS}/pcrNull.dat"
   fi
-  dd if=/dev/zero of="${MMSTPM2_KEYS}/pcr_zero.dat" bs=1 count="${HASH_LENGTH}" conv=excl,fsync
-  chmod 600 "${MMSTPM2_KEYS}/pcr_zero.dat"
+  dd if=/dev/zero of="${MMSTPM2_KEYS}/pcrNull.dat" bs=1 count="${HASH_LENGTH}" conv=excl,fsync
+  chmod 600 "${MMSTPM2_KEYS}/pcrNull.dat"
 
   echo "CREATING PCR VALUES"
   if (( PCR_VALUES_TO_USE == 7 )); then
@@ -804,13 +804,13 @@ generate_tpm2_policy() {
   fi
   # Calculate expected value for PCR 11
   cryptsetup luksDump ${CRYPT_PARTITION} | openssl dgst -${PCR_BANK} -binary -out pcr11luks.dat -
-  cat "${MMSTPM2_KEYS}/pcr_zero.dat" pcr11luks.dat > pcr11combined.dat
+  cat "${MMSTPM2_KEYS}/pcrNull.dat" pcr11luks.dat > pcr11combined.dat
   openssl dgst -${PCR_BANK} -binary -out pcr11.dat pcr11combined.dat
   cp pcr11.dat "${MMSTPM2_KEYS}/pcr11.dat"
   chmod 600 "${MMSTPM2_KEYS}/pcr11.dat"
 
   # Combine primary PCR, 8, 9, 11, 14 into pcrvalues.dat
-  cat pcrprimary.dat "${MMSTPM2_KEYS}/pcr_zero.dat" "${MMSTPM2_KEYS}/pcr_zero.dat" pcr11.dat "${MMSTPM2_KEYS}/pcr_zero.dat" > pcrvalues.dat
+  cat pcrprimary.dat "${MMSTPM2_KEYS}/pcrNull.dat" "${MMSTPM2_KEYS}/pcrNull.dat" pcr11.dat "${MMSTPM2_KEYS}/pcrNull.dat" > pcrvalues.dat
   
   echo "CREATE TPM PCR POLICY TRIAL SESSION FOR SEALING"
   tpm2_startauthsession -Q \

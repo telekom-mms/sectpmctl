@@ -1,5 +1,0 @@
-/etc/kernel/postinst.d/zz-update-mmstpm2-boot
-/etc/mmstpm2/keys/MicCorUEFCA2011_2011-06-27.crt
-/etc/mmstpm2/keys/MicWinProPCA2011_2011-10-19.crt
-/etc/mmstpm2/keys/canonical-master-public.pem
-/etc/mmstpm2/keys/dbxupdate_x64.bin

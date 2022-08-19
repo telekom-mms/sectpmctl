@@ -49,7 +49,7 @@ O_SRK_PUB_NODA="${KEY_PATH}/tpm_owner_noda.pub"
 # pcr values stored by by 'sectpmctl install'
 PROVISIONED_PCR7_VALUE="${KEY_PATH}/pcr7.dat"
 PROVISIONED_PCR11_VALUE="${KEY_PATH}/pcr11.dat"
-PROVISIONED_ZERO_VALUE="${KEY_PATH}/pcr_zero.dat"
+PROVISIONED_ZERO_VALUE="${KEY_PATH}/pcrNull.dat"
 
 # input data
 CMD=""
