@@ -1,0 +1,13 @@
+#!/bin/sh -e
+
+case "$1" in
+  'configure')
+    install -d -m 0600 /var/lib/sectpmctl/objects
+    install -d -m 0600 /var/lib/sectpmctl/keys
+    install -d /var/lib/sectpmctl/scripts
+    install -d /etc/sectpmctl
+    install -m 0755 /usr/lib/sectpmctl/boot.conf /etc/sectpmctl/boot.conf
+    ;;
+esac
+
+#DEBHELPER#

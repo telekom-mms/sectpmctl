@@ -1,8 +1,7 @@
 Format: https://www.debian.org/doc/packaging-manuals/copyright-format/1.0/
-Upstream-Name: mms-tpm2boot
-Source: <https://mirror.t-systems.com>
+Upstream-Name: sectpmctl
+Source: <https://t-systems-mms.com>
 
 Files: *
-Copyright: 2021 T-Systems MMS <info@t-systems.com>
-License: proprietary
- All rights reserved
+Copyright: 2022 T-Systems MMS <info@t-systems.com>
+License: GPLv2

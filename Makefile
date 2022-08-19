@@ -26,10 +26,6 @@ install:
 	ln -s ../postinst.d/zz-update-mmstpm2-boot $(DESTDIR)/etc/kernel/postrm.d/zz-update-mmstpm2-boot
 	install -d $(DESTDIR)/etc/initramfs/post-update.d
 	ln -s ../../kernel/postinst.d/zz-update-mmstpm2-boot $(DESTDIR)/etc/initramfs/post-update.d/zz-update-mmstpm2-boot
-	# @TODO put in postinstall
-	#/var/lib/sectpmctl/scripts/unsealtpmluks.sh"
-	# install -d -m 0600 $(DESTDIR)/var/lib/sectpmctl/objects
-	# install -d -m 0600 $(DESTDIR)/var/lib/sectpmctl/keys
 
 package_build: package_clean package_dist
 	debuild -i

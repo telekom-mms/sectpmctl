@@ -1,5 +1,9 @@
 #!/bin/bash
 
+# SECTPMCTL
+# AUTHORS: Heike Pesch <heike.pesch@t-systems.com>
+#          Richard Robert Reitz <richard-robert.reitz@t-systems.com>
+
 # Path's
 SECTPMCTL_KEYS="/var/lib/sectpmctl/keys"
 

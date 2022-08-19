@@ -1,8 +1,10 @@
 #!/bin/bash
 
-# sectpmctl key - A tool to store encrypted secrets in TPM2 key hash objects
+# SECTPMCTL
+# AUTHORS: Heike Pesch <heike.pesch@t-systems.com>
+#          Richard Robert Reitz <richard-robert.reitz@t-systems.com>
 
-# copyright
+# sectpmctl key - A tool to store encrypted secrets in TPM2 key hash objects
 
 # reserve stdout only for validated output
 exec 4>&1
