@@ -1,4 +1,4 @@
-#!/bin/sh
+#!/bin/bash
 
 # Path's
 MMSTPM2_KEYS="/etc/mmstpm2/keys"
