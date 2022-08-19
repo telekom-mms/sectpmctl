@@ -1,7 +1,7 @@
 #!/bin/bash
 
 # Path's
-MMSTPM2_KEYS="/etc/mmstpm2/keys"
+SECTPMCTL_KEYS="/var/lib/sectpmctl/keys"
 
-/usr/share/mmstpm2/kmodsign.sh sha256 "${MMSTPM2_KEYS}/db.obj" "${MMSTPM2_KEYS}/db.cer" "$2"
+/usr/lib/sectpmctl/scripts/kmodsign.sh sha256 "${SECTPMCTL_KEYS}/db.obj" "${SECTPMCTL_KEYS}/db.cer" "$2"
 

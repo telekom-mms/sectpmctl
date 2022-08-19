@@ -14,19 +14,19 @@ function handle_error
 trap 'handle_error $LINENO ${BASH_LINENO[@]}' ERR
 
 # Path's
-MMSTPM2_KEYS="/etc/mmstpm2/keys"
-MMSTPM2_BOOT="/boot/efi"
-MMSTPM2_EFI="/EFI/mmstpm2"
-MMSTPM2_EFI_DIR="${MMSTPM2_BOOT}${MMSTPM2_EFI}"
+SECTPMCTL_KEYS="/var/lib/sectpmctl/keys"
+SECTPMCTL_BOOT="/boot/efi"
+SECTPMCTL_EFI="/EFI/sectpmctl"
+SECTPMCTL_EFI_DIR="${SECTPMCTL_BOOT}${SECTPMCTL_EFI}"
 
 # TPM NODA handle
 PERSISTANT_OWNER_SRK_NODA="0x81000101"
 
 # Configuration
 declare -A KERNEL_CMDLINE_MAP
-. "/usr/share/mmstpm2/boot.conf"
-if [ -f "/etc/mmstpm2/boot.conf" ]; then
-  . "/etc/mmstpm2/boot.conf"
+. "/usr/lib/sectpmctl/boot.conf"
+if [ -f "/etc/sectpmctl/boot.conf" ]; then
+  . "/etc/sectpmctl/boot.conf"
 fi
 
 function rand8str()
@@ -72,14 +72,14 @@ check_active ()
 {
   msg="${1}"
 
-  # the existence of the EFI/mmstpm2 folder specifies if mmstpm2 is enabled or not
+  # the existence of the EFI/sectpmctl folder specifies if sectpmctl is enabled or not
   # every bootloader needs such mechanism. usefull for example when going back to grub or similar.
-  if [ ! -d "${MMSTPM2_EFI_DIR}" ]; then
-    echo 'mmstpm2-boot inactive'
+  if [ ! -d "${SECTPMCTL_EFI_DIR}" ]; then
+    echo 'sectpmctl-boot inactive'
     exit 0
   fi
 
-  echo "mmstpm2-boot active (${msg})"
+  echo "sectpmctl-boot active (${msg})"
 }
 
 setup_systemd_boot ()
@@ -97,29 +97,29 @@ setup_systemd_boot ()
   fi
 
   #identify block device and partition number from EFI partition
-  partition=$(df "${MMSTPM2_BOOT}" | tail -n 1 | awk '{print $1}')
+  partition=$(df "${SECTPMCTL_BOOT}" | tail -n 1 | awk '{print $1}')
   partition_offset=$(udevadm info --query=all --name="${partition}" | grep ID_PART_ENTRY_OFFSET | sed -e 's/.*=//g')
   block_device=$(lsblk -pndo pkname "${partition}")
   block_device_partition_number=$(gdisk -l "${block_device}" | grep -i ef00 | awk '{print $1 " " $2}' | grep "${partition_offset}" | awk '{print $1}')
 
-  if [ -f "${MMSTPM2_EFI_DIR}/systemd-bootx64.efi" ]; then
-    rm "${MMSTPM2_EFI_DIR}/systemd-bootx64.efi"
+  if [ -f "${SECTPMCTL_EFI_DIR}/systemd-bootx64.efi" ]; then
+    rm "${SECTPMCTL_EFI_DIR}/systemd-bootx64.efi"
   fi
 
-  /usr/share/mmstpm2/sbsign.sh --key "${MMSTPM2_KEYS}/db.obj" --cert "${MMSTPM2_KEYS}/db.crt" --output "${MMSTPM2_EFI_DIR}/systemd-bootx64.efi" "/usr/lib/systemd/boot/efi/systemd-bootx64.efi" > /dev/null 2> /dev/null
-  if ! sbverify --cert "${MMSTPM2_KEYS}/db.crt" "${MMSTPM2_EFI_DIR}/systemd-bootx64.efi" 2> /dev/null > /dev/null; then
+  /usr/lib/sectpmctl/scripts/sbsign.sh --key "${SECTPMCTL_KEYS}/db.obj" --cert "${SECTPMCTL_KEYS}/db.crt" --output "${SECTPMCTL_EFI_DIR}/systemd-bootx64.efi" "/usr/lib/systemd/boot/efi/systemd-bootx64.efi" > /dev/null 2> /dev/null
+  if ! sbverify --cert "${SECTPMCTL_KEYS}/db.crt" "${SECTPMCTL_EFI_DIR}/systemd-bootx64.efi" 2> /dev/null > /dev/null; then
     echo "Error: Could not sign efi bootloader systemd-bootx64.efi"
     exit 3
   fi
 
-  hasBootEntry=$(efibootmgr -v | grep "MMSTPM2 Bootloader" | grep -ci "\\\\efi\\\\mmstpm2\\\\systemd-bootx64.efi")
+  hasBootEntry=$(efibootmgr -v | grep "SECTPMCTL Bootloader" | grep -ci "\\\\efi\\\\sectpmctl\\\\systemd-bootx64.efi")
   if [ ! "$hasBootEntry" == "1" ]; then
-    efibootmgr --quiet --disk "${block_device}" --part "${block_device_partition_number}" --create --label "MMSTPM2 Bootloader" --loader "/EFI/mmstpm2/systemd-bootx64.efi"
+    efibootmgr --quiet --disk "${block_device}" --part "${block_device_partition_number}" --create --label "SECTPMCTL Bootloader" --loader "/EFI/sectpmctl/systemd-bootx64.efi"
   fi
 
-  hasBootEntry=$(efibootmgr -v | grep "MMSTPM2 Bootloader" | grep -ci "\\\\efi\\\\mmstpm2\\\\systemd-bootx64.efi")
+  hasBootEntry=$(efibootmgr -v | grep "SECTPMCTL Bootloader" | grep -ci "\\\\efi\\\\sectpmctl\\\\systemd-bootx64.efi")
   if [ "$hasBootEntry" == "1" ]; then
-    entryId=$(efibootmgr -v | grep "MMSTPM2 Bootloader" | grep -i "\\\\efi\\\\mmstpm2\\\\systemd-bootx64.efi" | sed -e 's/^Boot\([0-9]\+\)\(.*\)$/\1/')
+    entryId=$(efibootmgr -v | grep "SECTPMCTL Bootloader" | grep -i "\\\\efi\\\\sectpmctl\\\\systemd-bootx64.efi" | sed -e 's/^Boot\([0-9]\+\)\(.*\)$/\1/')
 
     isDefaultEntry=$(efibootmgr -v | grep -c "^BootOrder: ${entryId}")
     if [ ! "$isDefaultEntry" == "1" ]; then
@@ -158,18 +158,18 @@ setup_systemd_boot ()
 
 activate ()
 {
-  if [ ! -d "${MMSTPM2_EFI_DIR}" ]; then
-    mkdir -p "${MMSTPM2_EFI_DIR}"
+  if [ ! -d "${SECTPMCTL_EFI_DIR}" ]; then
+    mkdir -p "${SECTPMCTL_EFI_DIR}"
   fi
 
   setup_systemd_boot
 
-  echo 'mmstpm2-boot active'
+  echo 'sectpmctl-boot active'
 
   traverse_boot "update" ""
 
-  # TODO: add systemd shutdown script to set mmstpm2-boot as default if another
-  # boot loader has been installed. Add option do delete all non mmstpm2-boot
+  # TODO: add systemd shutdown script to set sectpmctl-boot as default if another
+  # boot loader has been installed. Add option do delete all non sectpmctl-boot
   # files.
 }
 
@@ -178,30 +178,30 @@ deactivate ()
   trap - ERR
 
   entryId=""
-  hasBootEntry=$(efibootmgr -v | grep "MMSTPM2 Bootloader" | grep -ci "\\\\efi\\\\mmstpm2\\\\systemd-bootx64.efi")
+  hasBootEntry=$(efibootmgr -v | grep "SECTPMCTL Bootloader" | grep -ci "\\\\efi\\\\sectpmctl\\\\systemd-bootx64.efi")
   if [ "$hasBootEntry" == "1" ]; then
-    entryId=$(efibootmgr -v | grep "MMSTPM2 Bootloader" | grep -i "\\\\efi\\\\mmstpm2\\\\systemd-bootx64.efi" | sed -e 's/^Boot\([0-9]\+\)\(.*\)$/\1/')
+    entryId=$(efibootmgr -v | grep "SECTPMCTL Bootloader" | grep -i "\\\\efi\\\\sectpmctl\\\\systemd-bootx64.efi" | sed -e 's/^Boot\([0-9]\+\)\(.*\)$/\1/')
     efibootmgr -q -b "${entryId}" -A
   fi
   isEntryActive=$(efibootmgr -v | grep -c "^Boot${entryId}\*")
 
-  if [ -d "${MMSTPM2_EFI_DIR}" ]; then
-    cd "${MMSTPM2_EFI_DIR}" || exit
+  if [ -d "${SECTPMCTL_EFI_DIR}" ]; then
+    cd "${SECTPMCTL_EFI_DIR}" || exit
     rm ./* 2> /dev/null || true
     cd - > /dev/null || exit
-    rmdir "${MMSTPM2_EFI_DIR}"
+    rmdir "${SECTPMCTL_EFI_DIR}"
   fi
 
   if [ -d "/boot/efi/EFI/Linux" ]; then
     cd "/boot/efi/EFI/Linux" || exit
-    rm mmstpm2-*.efi 2> /dev/null
+    rm sectpmctl-*.efi 2> /dev/null
     cd - > /dev/null || exit
   fi
 
   if [ ! "$isEntryActive" == "1" ]; then
-    echo 'mmstpm2-boot inactive'
+    echo 'sectpmctl-boot inactive'
   else
-    echo 'mmstpm2-boot inactive, but the UEFI boot menu entry could not be disabled'
+    echo 'sectpmctl-boot inactive, but the UEFI boot menu entry could not be disabled'
     exit 3
   fi
 
@@ -244,7 +244,7 @@ create_efi_blob ()
 
   if [ "x${default}" = "x" ] && [ "$position" -eq 1 ]; then
     echo -n "Found (default): ${linux}, ${initrd}"
-  elif [ "x${default}" = "xmmstpm2-${version}.efi" ]; then
+  elif [ "x${default}" = "xsectpmctl-${version}.efi" ]; then
     echo -n "Found (default): ${linux}, ${initrd}"
   else
     echo -n "Found          : ${linux}, ${initrd}"
@@ -273,9 +273,9 @@ create_efi_blob ()
 
   equal_cmdline="false"
   equal_pretty_name="false"
-  if [ -f "/boot/efi/EFI/Linux/mmstpm2-${version}.efi" ]; then
-    objcopy -j .osrel -O binary "/boot/efi/EFI/Linux/mmstpm2-${version}.efi" os-release.previous
-    objcopy -j .cmdline -O binary "/boot/efi/EFI/Linux/mmstpm2-${version}.efi" cmdline.previous
+  if [ -f "/boot/efi/EFI/Linux/sectpmctl-${version}.efi" ]; then
+    objcopy -j .osrel -O binary "/boot/efi/EFI/Linux/sectpmctl-${version}.efi" os-release.previous
+    objcopy -j .cmdline -O binary "/boot/efi/EFI/Linux/sectpmctl-${version}.efi" cmdline.previous
 
     cmp --silent cmdline cmdline.previous && equal_cmdline="true" || equal_cmdline="false"
     cmp --silent os-release os-release.previous && equal_pretty_name="true" || equal_pretty_name="false"
@@ -290,8 +290,8 @@ create_efi_blob ()
 
   if [ "x${equal_cmdline}" = "xfalse" ] || [ "x${equal_pretty_name}" = "xfalse" ] || [ "x${rebuild}" = "xtrue" ]; then
     echo " (rebuild)"
-    if [ -f "/boot/efi/EFI/Linux/mmstpm2-${version}.efi" ]; then
-      rm "/boot/efi/EFI/Linux/mmstpm2-${version}.efi"
+    if [ -f "/boot/efi/EFI/Linux/sectpmctl-${version}.efi" ]; then
+      rm "/boot/efi/EFI/Linux/sectpmctl-${version}.efi"
     fi
 
     maxkernelsize=16777216
@@ -307,9 +307,9 @@ create_efi_blob ()
         --add-section .initrd="${initrd}" --change-section-vma .initrd=0x3800000 \
         /usr/lib/systemd/boot/efi/linuxx64.efi.stub "${tempbootdir}/efi"
 
-    /usr/share/mmstpm2/sbsign.sh --key "${MMSTPM2_KEYS}/db.obj" --cert "${MMSTPM2_KEYS}/db.crt" --output "/boot/efi/EFI/Linux/mmstpm2-${version}.efi" "${tempbootdir}/efi" > /dev/null 2> /dev/null
-    if ! sbverify --cert "${MMSTPM2_KEYS}/db.crt" "/boot/efi/EFI/Linux/mmstpm2-${version}.efi" 2> /dev/null > /dev/null; then
-      echo "Error: Could not sign efi blob mmstpm2-${version}.efi"
+    /usr/lib/sectpmctl/scripts/sbsign.sh --key "${SECTPMCTL_KEYS}/db.obj" --cert "${SECTPMCTL_KEYS}/db.crt" --output "/boot/efi/EFI/Linux/sectpmctl-${version}.efi" "${tempbootdir}/efi" > /dev/null 2> /dev/null
+    if ! sbverify --cert "${SECTPMCTL_KEYS}/db.crt" "/boot/efi/EFI/Linux/sectpmctl-${version}.efi" 2> /dev/null > /dev/null; then
+      echo "Error: Could not sign efi blob sectpmctl-${version}.efi"
     fi
   else
     echo
@@ -340,7 +340,7 @@ get_installed_efi_blobs( )
   find /boot/efi/EFI/Linux \
     -maxdepth 1 \
     -type f \
-    -name 'mmstpm2-*.efi' \
+    -name 'sectpmctl-*.efi' \
     -and -not -type l
 }
 
@@ -368,8 +368,8 @@ traverse_boot ()
 
   if [ "x${hook_action}" = "xdel" ]; then
     cd "/boot/efi/EFI/Linux" || exit
-    if [ -f "mmstpm2-${hook_version}.efi" ]; then
-      rm "mmstpm2-${hook_version}.efi"
+    if [ -f "sectpmctl-${hook_version}.efi" ]; then
+      rm "sectpmctl-${hook_version}.efi"
     else
       echo "Already removed: ${hook_version}"
     fi
@@ -387,7 +387,7 @@ traverse_boot ()
   # Pass 1 find all efi blobs which would or will be created. Then all other of our efi blobs
   # will be delete, so that pass 2 can be most probably executed successfully.
   counter=0
-  do_not_remove="mmstpm2-$( uname -r ).efi"
+  do_not_remove="sectpmctl-$( uname -r ).efi"
   while IFS='' read -r linux; do
     if ! file_is_not_garbage "$linux"; then
       continue
@@ -418,7 +418,7 @@ traverse_boot ()
     fi
 
     if [ "x${SKIP_UNSIGNED_KERNELS}" = "xtrue" ]; then
-      if ! sbverify --cert "${MMSTPM2_KEYS}/canonical-master-public.pem" "${linux}" 2> /dev/null > /dev/null; then
+      if ! sbverify --cert "${SECTPMCTL_KEYS}/canonical-master-public.pem" "${linux}" 2> /dev/null > /dev/null; then
         continue
       fi
     fi
@@ -431,11 +431,11 @@ traverse_boot ()
 
     counter=$((counter + 1))
 
-    do_not_remove="${do_not_remove} mmstpm2-${version}.efi"
+    do_not_remove="${do_not_remove} sectpmctl-${version}.efi"
 
   done < <(get_installed_kernel_list)
 
-  # Delete all other mmstpm2 efi blobs
+  # Delete all other sectpmctl efi blobs
   do_remove=""
   while IFS='' read -r efiblob; do
     if ! file_is_not_garbage "$efiblob"; then
@@ -484,7 +484,7 @@ traverse_boot ()
     fi
 
     if [ "x${SKIP_UNSIGNED_KERNELS}" = "xtrue" ]; then
-      if ! sbverify --cert "${MMSTPM2_KEYS}/canonical-master-public.pem" "${linux}" 2> /dev/null > /dev/null; then
+      if ! sbverify --cert "${SECTPMCTL_KEYS}/canonical-master-public.pem" "${linux}" 2> /dev/null > /dev/null; then
         echo "Skipped        : ${dirname}/${basename}, unsigned"
         continue
       fi
@@ -533,8 +533,8 @@ install ()
 
   echo "Assuming Secure Boot mode: ${secureboot_mode}"
 
-  if [ -d "${MMSTPM2_EFI_DIR}" ]; then
-    echo "mmstpm2-boot active. Please run 'mmstpm2-boot --deactivate' first."
+  if [ -d "${SECTPMCTL_EFI_DIR}" ]; then
+    echo "sectpmctl-boot active. Please run 'sectpmctl boot deactivate' first."
     exit 0
   fi
 
@@ -580,15 +580,15 @@ install ()
     fi
   fi
 
-  cd "${MMSTPM2_KEYS}" || exit
+  cd "${SECTPMCTL_KEYS}" || exit
   shred -f -z -u db.* 2> /dev/null > /dev/null || true
 
   # create password file required for db key access
   getrand=$(rand8base64 2)
-  echo "${getrand}" > "${MMSTPM2_KEYS}/db.pwd"
+  echo "${getrand}" > "${SECTPMCTL_KEYS}/db.pwd"
 
-  chown root:root "${MMSTPM2_KEYS}/db.pwd"
-  chmod 0600 "${MMSTPM2_KEYS}/db.pwd"
+  chown root:root "${SECTPMCTL_KEYS}/db.pwd"
+  chmod 0600 "${SECTPMCTL_KEYS}/db.pwd"
 
   cd - > /dev/null || exit
 
@@ -596,18 +596,18 @@ install ()
   chmod 700 "${tempdirname}"
   cd "${tempdirname}" || exit
 
-  openssl req -new -x509 -newkey rsa:2048 -subj "/CN=MMSTPM2 Platform Key/" -keyout PK.key \
+  openssl req -new -x509 -newkey rsa:2048 -subj "/CN=SECTPMCTL Platform Key/" -keyout PK.key \
     -out PK.crt -days 3650 -nodes -sha256 2> /dev/null
   
-  openssl req -new -x509 -newkey rsa:2048 -subj "/CN=MMSTPM2 Key Exchange Key/" -keyout KEK.key \
+  openssl req -new -x509 -newkey rsa:2048 -subj "/CN=SECTPMCTL Key Exchange Key/" -keyout KEK.key \
     -out KEK.crt -days 3650 -nodes -sha256 2> /dev/null
   
   tpm2_create -Q -C "${PERSISTANT_OWNER_SRK_NODA}" -c db.ctx -g sha256 -a \
-    "fixedtpm|fixedparent|sensitivedataorigin|userwithauth|decrypt|sign|noda" -p "str:$(cat "${MMSTPM2_KEYS}/db.pwd")" \
+    "fixedtpm|fixedparent|sensitivedataorigin|userwithauth|decrypt|sign|noda" -p "str:$(cat "${SECTPMCTL_KEYS}/db.pwd")" \
     -u db.pub -r db.priv
   tpm2_evictcontrol -Q -C o -c db.ctx -o db.obj
-  openssl req -provider tpm2 -provider default -new -x509 -subj "/CN=MMSTPM2 Database Key/" -key object:db.obj?pass \
-    -passin "pass:$(cat "${MMSTPM2_KEYS}/db.pwd")" -out db.crt -days 3650 -sha256
+  openssl req -provider tpm2 -provider default -new -x509 -subj "/CN=SECTPMCTL Database Key/" -key object:db.obj?pass \
+    -passin "pass:$(cat "${SECTPMCTL_KEYS}/db.pwd")" -out db.crt -days 3650 -sha256
 
   openssl x509 -in PK.crt -out PK.cer -outform DER
   openssl x509 -in KEK.crt -out KEK.cer -outform DER
@@ -626,19 +626,19 @@ install ()
   sign-efi-sig-list -t "$(date -u --date='1 second' +'%Y-%m-%d %H:%M:%S')" \
     -k KEK.key -c KEK.crt db db.esl db.auth
 
-  cp db.obj db.cer db.crt "${MMSTPM2_KEYS}"
-  chown root:root ${MMSTPM2_KEYS}/*.obj ${MMSTPM2_KEYS}/*.cer ${MMSTPM2_KEYS}/*.crt
-  chmod 0600 ${MMSTPM2_KEYS}/*.obj ${MMSTPM2_KEYS}/*.cer ${MMSTPM2_KEYS}/*.crt
+  cp db.obj db.cer db.crt "${SECTPMCTL_KEYS}"
+  chown root:root ${SECTPMCTL_KEYS}/*.obj ${SECTPMCTL_KEYS}/*.cer ${SECTPMCTL_KEYS}/*.crt
+  chmod 0600 ${SECTPMCTL_KEYS}/*.obj ${SECTPMCTL_KEYS}/*.cer ${SECTPMCTL_KEYS}/*.crt
 
   if [ "x${secureboot_mode}" = "xclearmode" ]; then
-    sbsiglist --owner 77fa9abd-0359-4d32-bd60-28f4e78f784b --type x509 --output MS_Win_db.esl "${MMSTPM2_KEYS}/MicWinProPCA2011_2011-10-19.crt"
-    sbsiglist --owner 77fa9abd-0359-4d32-bd60-28f4e78f784b --type x509 --output MS_UEFI_db.esl "${MMSTPM2_KEYS}/MicCorUEFCA2011_2011-06-27.crt"
+    sbsiglist --owner 77fa9abd-0359-4d32-bd60-28f4e78f784b --type x509 --output MS_Win_db.esl "${SECTPMCTL_KEYS}/MicWinProPCA2011_2011-10-19.crt"
+    sbsiglist --owner 77fa9abd-0359-4d32-bd60-28f4e78f784b --type x509 --output MS_UEFI_db.esl "${SECTPMCTL_KEYS}/MicCorUEFCA2011_2011-06-27.crt"
     cat MS_Win_db.esl MS_UEFI_db.esl > MS_db.esl
     sign-efi-sig-list -t "$(date -u --date='1 second' +'%Y-%m-%d %H:%M:%S')" \
       -a -g 77fa9abd-0359-4d32-bd60-28f4e78f784b -k KEK.key -c KEK.crt db MS_db.esl add_MS_db.auth
 
     efi-updatevar -f add_MS_db.auth db
-    efi-updatevar -f "${MMSTPM2_KEYS}/dbxupdate_x64.bin" -k KEK.key dbx
+    efi-updatevar -f "${SECTPMCTL_KEYS}/dbxupdate_x64.bin" -k KEK.key dbx
   fi
 
   chattr -i /sys/firmware/efi/efivars/db-d719b2cb-3d3a-4596-a3bc-dad00e67656f
@@ -656,20 +656,20 @@ install ()
   if [ ! -f "${dkmsconf}" ]; then
     echo "DKMS framework config ${dkmsconf} not found. Exit"
     exit 4
-  elif [ "$(grep -E '^\s*sign_tool\s*=\s*"?/usr/share/mmstpm2/dkms_sign_helper.sh"?\s*$' "${dkmsconf}")" ]; then
+  elif [ "$(grep -E '^\s*sign_tool\s*=\s*"?/usr/lib/sectpmctl/scripts/dkms_sign_helper.sh"?\s*$' "${dkmsconf}")" ]; then
     echo "DKMS framework already configured."
     # @TODO SC2143: Use grep -q instead of comparing output with [ -n .. ]
   elif [ "$(grep -E '^\s*sign_tool\s*=.*$' "${dkmsconf}")" ]; then
     echo "DKMS framework configured differently. Exit"
     exit 4
   else
-    echo 'sign_tool="/usr/share/mmstpm2/dkms_sign_helper.sh"' >> "${dkmsconf}"
+    echo 'sign_tool="/usr/lib/sectpmctl/scripts/dkms_sign_helper.sh"' >> "${dkmsconf}"
     echo "Configured DKMS framework."
   fi
 
   # enable bootloader
-  if [ ! -d "${MMSTPM2_EFI_DIR}" ]; then
-    mkdir -p "${MMSTPM2_EFI_DIR}"
+  if [ ! -d "${SECTPMCTL_EFI_DIR}" ]; then
+    mkdir -p "${SECTPMCTL_EFI_DIR}"
   fi
 
   setup_systemd_boot
@@ -715,14 +715,14 @@ test_state()
   if ! tpm2_eventlog /sys/kernel/security/tpm0/binary_bios_measurements 2> /dev/null \
     | grep -A 64 -m 1 "EventType: EV_EFI_VARIABLE_AUTHORITY" \
     | grep -B 64 -m 1 "\- EventNum:" | grep -m 1 "VariableData: " \
-    | grep -q "$(cat /etc/mmstpm2/keys/db.cer | od -A n -v -t x1 | tr -d ' \n')"; then
+    | grep -q "$(cat /var/lib/sectpmctl/keys/db.cer | od -A n -v -t x1 | tr -d ' \n')"; then
     #@TODO Don't rape cats
     echo 'FAIL, it seems that another key was used for booting'
     exit 3
   fi  
 
   echo 'Test if db.cer size is similar to the one in TPM'
-  fileSize=$(stat --printf="%s" /etc/mmstpm2/keys/db.cer)
+  fileSize=$(stat --printf="%s" /var/lib/sectpmctl/keys/db.cer)
   tpmSize=$(tpm2_eventlog /sys/kernel/security/tpm0/binary_bios_measurements 2> /dev/null | grep -A 64 -m 1 "EventType: EV_EFI_VARIABLE_AUTHORITY" | grep -B 64 -m 1 "\- EventNum:" | grep -m 1 "VariableDataLength: " | awk '{print $2}')
   diff=$((fileSize - tpmSize));
   if [ $diff -lt 0 ]; then
@@ -734,7 +734,7 @@ test_state()
   fi
 
   echo 'Test if db.cer is a certificate'
-  file /etc/mmstpm2/keys/db.cer | grep -q 'Certificate' || (echo 'DB.CER IS NOT A CERTIFICATE' ; exit 3)
+  file /var/lib/sectpmctl/keys/db.cer | grep -q 'Certificate' || (echo 'DB.CER IS NOT A CERTIFICATE' ; exit 3)
 
   hashesInDbList=$(efi-readvar -v db | grep -c '^[[:space:]]\+Hash:[0-9a-fA-F]\+[[:space:]]*$' || true)
   if [ "$hashesInDbList" -gt 0 ]; then

@@ -6,7 +6,7 @@ install:
 	install -d $(DESTDIR)/usr/share/bash-completion/completions
 	install -m 0755 src/usr/share/bash-completion/completions/_sectpmctl $(DESTDIR)/usr/share/bash-completion/completions
 	install -d $(DESTDIR)/usr/lib/sectpmctl
-	install -m 0755 src/usr/lib/sectpmctl/boot.conf
+	install -m 0755 src/usr/lib/sectpmctl/boot.conf $(DESTDIR)/usr/lib/sectpmctl
 	install -d $(DESTDIR)/usr/lib/sectpmctl/keys
 	install -m 0644 src/usr/lib/sectpmctl/keys/canonical-master-public.pem $(DESTDIR)/usr/lib/sectpmctl/keys
 	install -m 0644 src/usr/lib/sectpmctl/keys/dbxupdate_x64.bin $(DESTDIR)/usr/lib/sectpmctl/keys
@@ -26,6 +26,10 @@ install:
 	ln -s ../postinst.d/zz-update-mmstpm2-boot $(DESTDIR)/etc/kernel/postrm.d/zz-update-mmstpm2-boot
 	install -d $(DESTDIR)/etc/initramfs/post-update.d
 	ln -s ../../kernel/postinst.d/zz-update-mmstpm2-boot $(DESTDIR)/etc/initramfs/post-update.d/zz-update-mmstpm2-boot
+	# @TODO put in postinstall
+	#/var/lib/sectpmctl/scripts/unsealtpmluks.sh"
+	# install -d -m 0600 $(DESTDIR)/var/lib/sectpmctl/objects
+	# install -d -m 0600 $(DESTDIR)/var/lib/sectpmctl/keys
 
 package_build: package_clean package_dist
 	debuild -i
