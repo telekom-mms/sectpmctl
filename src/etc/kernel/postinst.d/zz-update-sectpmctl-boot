@@ -25,7 +25,7 @@ case "${command}" in
     mode="${mode%\'}"
     case ":${mode}" in
       :|:configure)
-        sectpmctl boot --update "${version}"
+        sectpmctl boot update --kernel "${version}"
   	;;
     esac
     ;;
@@ -35,7 +35,7 @@ case "${command}" in
     mode="${mode%\'}"
     case ":${mode}" in
       :|:remove)
-        sectpmctl boot --remove "${version}"
+        sectpmctl boot remove --kernel "${version}"
   	;;
     esac
     ;;
@@ -47,7 +47,7 @@ case "${command}" in
       linux-image-*)
         ;;
       *)
-        sectpmctl boot --update "${version}"
+        sectpmctl boot update --kernel "${version}"
         ;;
     esac
     ;;

@@ -200,7 +200,7 @@ mount /boot/efi
 
 # Continue installation of bootloader
 
-sectpmctl boot --install
+sectpmctl boot install
 
 # After this reboot your current LUKS password is still required
 reboot
@@ -211,7 +211,7 @@ reboot
 sudo bash
 
 # Now your machine has its own set of Secure Boot keys, test it
-sectpmctl boot --test
+sectpmctl boot test
 
 # Install the LUKS TPM key. Enter your current LUKS key when asked.
 sectpmctl tpm install --setrecoverykey
@@ -227,7 +227,7 @@ After a reboot the LUKS partition should decrypt automatically and the installat
 You can then do some boot loader configuration by editing '/etc/sectpmctl/boot.conf'. Remember to update the boot loader afterwards by executing
 
 ```
-sudo sectpmctl boot --update
+sudo sectpmctl boot update
 ```
 
 followed by a reboot. You can also use the bootctl command for basic tasks like listing the bootable kernels:

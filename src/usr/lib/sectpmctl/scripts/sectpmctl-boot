@@ -80,11 +80,11 @@ check_active ()
   # the existence of the EFI/sectpmctl folder specifies if sectpmctl is enabled or not
   # every bootloader needs such mechanism. usefull for example when going back to grub or similar.
   if [ ! -d "${SECTPMCTL_EFI_DIR}" ]; then
-    echo 'sectpmctl-boot inactive'
+    echo 'sectpmctl boot inactive'
     exit 0
   fi
 
-  echo "sectpmctl-boot active (${msg})"
+  echo "sectpmctl boot active (${msg})"
 }
 
 setup_systemd_boot ()
@@ -169,12 +169,12 @@ activate ()
 
   setup_systemd_boot
 
-  echo 'sectpmctl-boot active'
+  echo 'sectpmctl boot active'
 
   traverse_boot "update" ""
 
-  # TODO: add systemd shutdown script to set sectpmctl-boot as default if another
-  # boot loader has been installed. Add option do delete all non sectpmctl-boot
+  # TODO: add systemd shutdown script to set sectpmctl boot as default if another
+  # boot loader has been installed. Add option do delete all non sectpmctl boot
   # files.
 }
 
@@ -204,9 +204,9 @@ deactivate ()
   fi
 
   if [ ! "$isEntryActive" == "1" ]; then
-    echo 'sectpmctl-boot inactive'
+    echo 'sectpmctl boot inactive'
   else
-    echo 'sectpmctl-boot inactive, but the UEFI boot menu entry could not be disabled'
+    echo 'sectpmctl boot inactive, but the UEFI boot menu entry could not be disabled'
     exit 3
   fi
 
@@ -539,7 +539,7 @@ install ()
   echo "Assuming Secure Boot mode: ${secureboot_mode}"
 
   if [ -d "${SECTPMCTL_EFI_DIR}" ]; then
-    echo "sectpmctl-boot active. Please run 'sectpmctl boot deactivate' first."
+    echo "sectpmctl boot active. Please run 'sectpmctl boot deactivate' first."
     exit 0
   fi
 
@@ -756,45 +756,54 @@ show_help ()
   echo ${0} '- SecureBoot boot loader'
   echo
   echo 'Options:'
-  echo '  --activate'
-  echo '  --deactivate'
-  echo '  --install'
-  echo '  --update [optional version]'
-  echo '  --remove <version>'
-  echo '  --test'
+  echo '  activate'
+  echo '  deactivate'
+  echo '  install'
+  echo '  update [--kernel optional version]'
+  echo '  remove <--kernel version>'
+  echo '  test'
 }
 
 argument=""
-if [ $# -gt 2 ]; then
-  show_help
-  exit 1
-fi
 
-if [ $# -eq 2 ]; then
-  argument="${2}"
+if [ $# -ge 2 ]; then
+  case "${2}" in
+    --kernel)
+      if [ $# -eq 3 ]; then
+        argument="${3}"
+      else
+        show_help
+        exit 1
+      fi
+      ;;
+    *)
+      show_help
+      exit 1
+      ;;
+  esac
 fi
 
 case "${1}" in
-  --activate)
+  activate)
     activate
     ;;
-  --deactivate)
+  deactivate)
     deactivate
     ;;
-  --test)
+  test)
     test_state
     ;;
-  --install)
+  install)
     install
     ;;
-  --remove)
+  remove)
     if [ "x${argument}" = "x" ]; then
       show_help
       exit 1
     fi
     remove "${argument}"
     ;;
-  --update)
+  update)
     if [ "x${argument}" = "x" ]; then
       update_all
     else
