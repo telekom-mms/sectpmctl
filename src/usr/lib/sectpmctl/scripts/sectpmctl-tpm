@@ -272,11 +272,9 @@ _check_input() {
   export SECTPMCTL_KEYS="/var/lib/sectpmctl/keys"
   export INITIAL="false"
   export SEAL="false"
-  export UNSEAL="false"
   export CHANGEPIN="false"
   export CHECK="false"
   export EXTEND="true"
-  export UNSEAL="false"
   export PCR_BANK="sha256"
   # PCR 8,9,11 and 14 are always added
   export PCR_VALUES_TO_USE="7"
@@ -362,9 +360,6 @@ _check_input() {
       check)
         export CHECK="true"
         ;;
-      unseal)
-        export UNSEAL="true"
-        ;;
       provisioning)
         export DO_PROVISIONING="true"
         ;;
@@ -442,13 +437,6 @@ _check_input() {
 
   [[ "${CHECK}" == "true" ]] \
     && check_tpm2_secureboot
-
-  [[ "${UNSEAL}" == "true" ]] \
-    && unseal_current_tpm2_key \
-      "${PCR_BANK}" \
-      "${PCR_VALUES_TO_USE}" \
-      "${PERSISTANT_HANDLE_TO_USE}" \
-      "${SECTPMCTL_KEYS}"
 
   [[ "${DO_PROVISIONING}" == "true" ]] \
     && do_provisioning \
@@ -538,63 +526,13 @@ do_provisioning() {
   rmdir "${tempdir}"
 }
 
-unseal_current_tpm2_key() {
-  PCR_BANK="${1}"
-  PCR_VALUES_TO_USE="${PCR_BANK}:${2},8,9,11,14"
-  PERSISTANT_HANDLE_TO_USE="${3}"
-  SECTPMCTL_KEYS="${4}"
-
-  CREATE_PRIMARY_HASH="sha256"
-  if [[ $(tpm2_getcap algorithms | grep -c 'sha384:') == 1 ]]; then
-    CREATE_PRIMARY_HASH="sha384"
-  fi
-
-  TEMPDIR=""
-  TEMPDIR="$(mktemp -d -p /tmp)"
-  chmod 700 "${TEMPDIR}"
-
-  mount -t tmpfs "${TEMPDIR##*/}" "${TEMPDIR}"
-
-  cd "${TEMPDIR}" || exit 1
-
-  tpm2_startauthsession -Q \
-    --policy-session \
-    --session=session.ctx \
-    --key-context="${SECTPMCTL_KEYS}/tpm_owner_noda.pub"
-  config="$(tpm2_sessionconfig session.ctx)"
-  if [[ $(echo "$config" | grep -c '[ |]encrypt') != 1 ]] || [[ $(echo "$config" | grep -c '[ |]decrypt') != 1 ]]; then
-    echo COULD NOT ENCRYPT SESSION
-    echo
-    exit 1
-  fi
-
-  tpm2_policypcr -Q \
-    --session=session.ctx \
-    --pcr-list="${PCR_VALUES_TO_USE}" \
-    --policy=pcr.policy
-
-  tpm2_unseal -Q \
-    --auth=session:session.ctx \
-    --object-context="${PERSISTANT_HANDLE_TO_USE}"
-
-  tpm2_flushcontext -Q \
-    session.ctx
-
-  shred -f -z -u session.ctx pcr.policy
-
-  cd - > /dev/null
-  umount "${TEMPDIR}"
-  rmdir "${TEMPDIR}"
-}
-
 generate_unseal_script() {
   PCR_BANK="${1}"
-  PCR_VALUES_TO_USE="${PCR_BANK}:${2},8,9,11,14"
-  PERSISTANT_HANDLE_TO_USE="${3}"
-  KEY_SCRIPT="${4}"
-  CRYPT_PARTITION="${5}"
-  EXTEND="${6}"
-  SECTPMCTL_KEYS="${7}"
+  PERSISTANT_HANDLE_TO_USE="${2}"
+  KEY_SCRIPT="${3}"
+  CRYPT_PARTITION="${4}"
+  EXTEND="${5}"
+  SECTPMCTL_KEYS="${6}"
 
   CREATE_PRIMARY_HASH="sha256"
   if [[ $(tpm2_getcap algorithms | grep -c 'sha384:') == 1 ]]; then
@@ -624,50 +562,23 @@ if [ "\$CRYPTTAB_TRIED" = 0 ]; then
         echo
         echo sectpmctl
         echo
-        tpm2_pcrextend 11:${PCR_BANK}=\$(cryptsetup luksDump "${CRYPT_PARTITION}" | ${PCR_BANK}sum | awk '{print \$1;}')
-        tpm2_startauthsession --policy-session --session=session.ctx --key-context=${SECTPMCTL_KEYS}/tpm_owner_noda.pub
+
+        sectpmctl key extend --string "\$(cryptsetup luksDump "${CRYPT_PARTITION}" | ${PCR_BANK}sum | awk '{print \$1;}')"
+
+        sectpmctl key unseal --handle "${PERSISTANT_HANDLE_TO_USE}" --noda --pcr-extend 1>&3 3>&-
         retVal=\$?
-        if [ \$retVal -ne 0 ]; then
-                echo NOT THE EXPECTED TPM MODULE
-                echo
-                exit 1
-        fi
-        config="\$(tpm2_sessionconfig session.ctx)"
-        if [[ \$(echo "\$config" | grep -c '[ |]encrypt') != 1 ]] || [[ \$(echo "\$config" | grep -c '[ |]decrypt') != 1 ]]; then
-                echo COULD NOT ENCRYPT SESSION
-                echo
-                exit 1
-        fi
-        tpm2_policypcr -Q --session=session.ctx --pcr-list="${PCR_VALUES_TO_USE}" --policy=pcr.policy
-        echo tpm2_unseal --auth=session:session.ctx --object-context="${PERSISTANT_HANDLE_TO_USE}"
-        bash
-        tpm2_unseal --auth=session:session.ctx --object-context="${PERSISTANT_HANDLE_TO_USE}" 1>&3 3>&-
-        retVal=\$?
-        tpm2_pcrextend 11:${PCR_BANK}=\$(tpm2_getrandom --hex ${HASH_LENGTH})
-        tpm2_flushcontext session.ctx
-        tpm2_startauthsession --policy-session --session=session_test.ctx --key-context=${SECTPMCTL_KEYS}/tpm_owner_noda.pub
-        retVal=\$?
-        if [ \$retVal -ne 0 ]; then
-                echo NOT THE EXPECTED TPM MODULE
-                echo
-                exit 1
-        fi
-        configTest="\$(tpm2_sessionconfig session_test.ctx)"
-        if [[ \$(echo "\$configTest" | grep -c '[ |]encrypt') != 1 ]] || [[ \$(echo "\$configTest" | grep -c '[ |]decrypt') != 1 ]]; then
-                echo COULD NOT ENCRYPT SESSION
-                echo
-                exit 1
-        fi
-        tpm2_policypcr -Q --session=session_test.ctx --pcr-list="${PCR_VALUES_TO_USE}" --policy=pcr_test.policy
-        tpm2_unseal --auth=session:session_test.ctx --object-context="${PERSISTANT_HANDLE_TO_USE}" > /dev/null 2> /dev/null
+
+        sectpmctl key extend --random
+
+        sectpmctl key unseal --handle "${PERSISTANT_HANDLE_TO_USE}" --noda --pcr-extend > /dev/null 2> /dev/null
         retValTest=\$?
-        tpm2_flushcontext session_test.ctx
-        shred -f -z -u session.ctx pcr.policy session_test.ctx pcr_test.policy
+
         if [ \$retVal -ne 0 ]; then
                 echo UNSEAL FAILED
                 echo
                 exit 1
         fi
+        
         if [ \$retValTest -eq 0 ]; then
                 echo KEY COULD NOT BE SECURED. PLEASE REBOOT.
                 echo
@@ -675,6 +586,7 @@ if [ "\$CRYPTTAB_TRIED" = 0 ]; then
                         sleep 9999
                 done
         fi
+
         echo UNSEALED, EXTENDED
         echo
 else
@@ -693,30 +605,19 @@ if [ "\$CRYPTTAB_TRIED" = 0 ]; then
         echo
         echo sectpmctl, only for preseed usage!
         echo
-        tpm2_pcrextend 11:${PCR_BANK}=\$(cryptsetup luksDump "${CRYPT_PARTITION}" | ${PCR_BANK}sum | awk '{print \$1;}')
-        tpm2_startauthsession --policy-session --session=session.ctx --key-context=${SECTPMCTL_KEYS}/tpm_owner_noda.pub
+
+        sectpmctl key extend --string "\$(cryptsetup luksDump "${CRYPT_PARTITION}" | ${PCR_BANK}sum | awk '{print \$1;}')"
+
+        sectpmctl key unseal --handle "${PERSISTANT_HANDLE_TO_USE}" --noda --pcr-extend --pcr-preseed 1>&3 3>&-
         retVal=\$?
-        if [ \$retVal -ne 0 ]; then
-                echo NOT THE EXPECTED TPM MODULE
-                echo
-                exit 1
-        fi
-        if [[ \$(tpm2_sessionconfig session.ctx | grep -c '[ |]encrypt') != 1 ]] || [[ \$(tpm2_sessionconfig session.ctx | grep -c '[ |]decrypt') != 1 ]]; then
-                echo COULD NOT ENCRYPT SESSION
-                echo
-                exit 1
-        fi
-        tpm2_policypcr -Q --session=session.ctx --pcr-list="${PCR_VALUES_TO_USE}" --policy=pcr.policy
-        tpm2_unseal --auth=session:session.ctx --object-context="${PERSISTANT_HANDLE_TO_USE}" 1>&3 3>&-
-        retVal=\$?
-        tpm2_flushcontext session.ctx
-        shred -f -z -u session.ctx pcr.policy
+
         if [ \$retVal -ne 0 ]; then
                 echo UNSEAL FAILED
                 echo
                 exit 1
         fi
-        echo UNSEALED, UNEXTENDED
+
+        echo PRESEED UNSEALED, UNEXTENDED
         echo
 else
         keyscript="/lib/cryptsetup/askpass"
@@ -1002,7 +903,7 @@ generate_tpm2_policy() {
     --object-context=pcr_seal_key.ctx \
     "${TPM2_PERSISTANT_HANDLE_TO_USE}"
 
-  # Remove every single file created here. Unsealing doesn't need any of then.
+  # Remove every single file created here.
   shred -f -z -u *.ctx
   shred -f -z -u *.name
   shred -f -z -u *.policy
@@ -1101,15 +1002,6 @@ copy_exec /usr/bin/tpm2_unseal /usr/bin
 copy_exec /usr/bin/tr /usr/bin
 copy_exec /usr/bin/wc /usr/bin
 
-
-copy_exec /usr/bin/tpm2_pcrread /usr/bin
-copy_exec /usr/bin/vi /usr/bin
-copy_exec /usr/bin/nano /usr/bin
-copy_exec /usr/bin/more /usr/bin
-copy_exec /usr/bin/less /usr/bin
-copy_exec /usr/bin/tail /usr/bin
-copy_exec /usr/bin/head /usr/bin
-
 copy_exec /usr/sbin/sectpmctl /usr/sbin
 
 copy_exec /usr/lib/sectpmctl/scripts/sectpmctl-key /usr/lib/sectpmctl/scripts/sectpmctl-key
@@ -1192,7 +1084,6 @@ initial_tpm2_setup() {
 
   generate_unseal_script \
     "${PCR_BANK}" \
-    "${PCR_VALUES_TO_USE}" \
     "${PERSISTANT_HANDLE_TO_USE}" \
     "${KEY_SCRIPT}" \
     "${CRYPT_PARTITION}" \
