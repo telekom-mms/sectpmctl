@@ -762,7 +762,7 @@ COMMANDS
   deactivate
   help
   install
-  remove <--kernel version >
+  remove <--kernel version>
   update [--kernel <version>]
   test
 
