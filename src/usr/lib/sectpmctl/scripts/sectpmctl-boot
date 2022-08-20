@@ -751,20 +751,116 @@ test_state()
   echo 'Secure Boot state OK'
 }
 
-show_help ()
-{
-  echo ${0} '- SecureBoot boot loader'
-  echo
-  echo 'Options:'
-  echo '  activate'
-  echo '  deactivate'
-  echo '  install'
-  echo '  update [--kernel optional version]'
-  echo '  remove <--kernel version>'
-  echo '  test'
+_usage() {
+  ME=$(basename "$0")
+  #SCRIPTPATH="${FULLPATH%%/$ME}"
+  cat <<__END
+Usage: ${ME/-/ } COMMAND [OPTIONS]
+
+COMMANDS
+  activate
+  deactivate
+  help
+  install
+  remove <--kernel version >
+  update [--kernel <version>]
+  test
+
+
+OPTIONS
+    --kernel <version>
+
+__END
+
 }
 
+_usage_long() {
+  ME=$(basename "$0")
+  #SCRIPTPATH="${FULLPATH%%/$ME}"
+  cat <<__END
+Usage: ${ME/-/ } COMMAND [OPTIONS]
+
+COMMANDS
+  activate
+
+    Activate the sectpmctl bootloader
+
+  deactivate
+
+    Deactivate the sectpmctl bootloader
+
+  help
+
+    Show this help message.
+
+  install
+     
+    Install setpmctl bootloader.
+
+  remove --kernel <version>
+
+    Remove EFI Blob for Kernel <version>.
+
+    In most cases it is not necessary to call the remove
+    command manually.
+
+  update
+
+    Called without option for all available kernels 
+    the EFI Blob will be updated.
+
+    If --kernel <version> is used the update
+    will only be performed for the specified kernel.
+
+
+  test
+    
+    Test if SecureBoot and TPM2 are in expected state.
+
+    It tests if 
+    * kernel shows secureboot in dmesg
+    * kernel is in EFI Secure Boot mode kernel lockdown
+    * TPM2 was found during boot
+    * TPM2 find SecureBoot enabled
+    * Device uniq DB entry was used during booting
+    * db.cer was used while booting
+    * db.cer size is similar to the one in TPM2
+
+    And performs
+    * tpm2_selftest
+    * Check Secure Boot State
+
+
+OPTIONS
+    --kernel <version>
+
+    Used to remove or update specified kernel.
+ 
+EXAMPLES
+
+  Activate the bootloader
+  $ sudo sectpmctl boot activate
+
+  Install the bootloader
+  $ sudo sectpmctl boot install
+
+  Test if device has its own (uniq) set of Secure Boot keys
+  $ sudo sectpmctl boot test
+
+  Update EFI Blobs for all available Kernels
+  $ sudo sectpmctl boot update
+
+  Remove EFI Blob for Kernel
+  $ sudo sectpmctl boot remove --kernel 5.17.0-1015-oem
+
+__END
+
+}
+
+
 argument=""
+
+test $# -eq 0 && _usage && exit 0
 
 if [ $# -ge 2 ]; then
   case "${2}" in
@@ -772,12 +868,12 @@ if [ $# -ge 2 ]; then
       if [ $# -eq 3 ]; then
         argument="${3}"
       else
-        show_help
+        _usage
         exit 1
       fi
       ;;
     *)
-      show_help
+      _usage
       exit 1
       ;;
   esac
@@ -798,7 +894,7 @@ case "${1}" in
     ;;
   remove)
     if [ "x${argument}" = "x" ]; then
-      show_help
+      _usage
       exit 1
     fi
     remove "${argument}"
@@ -810,8 +906,11 @@ case "${1}" in
       update "${argument}"
     fi
     ;;
+  help)
+    _usage_long
+    ;;
   *)
-    show_help
+    echo "${1} is not a valid command."
     exit 1
     ;;
 esac
