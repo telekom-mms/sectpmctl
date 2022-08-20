@@ -617,66 +617,19 @@ cat > "${KEY_SCRIPT}" <<__EOT
 
 exec 3>&1 1>&2
 
-if [ "\$CRYPTTAB_TRIED" = 0 ]; then
-        echo
-        echo sectpmctl
-        echo
-        tpm2_pcrextend 11:${PCR_BANK}=\$(cryptsetup luksDump "${CRYPT_PARTITION}" | ${PCR_BANK}sum | awk '{print \$1;}')
-        tpm2_startauthsession --policy-session --session=session.ctx --key-context=/sectpmctl.pub
-        retVal=\$?
-        if [ \$retVal -ne 0 ]; then
-                echo NOT THE EXPECTED TPM MODULE
-                echo
-                exit 1
-        fi
-        config="\$(tpm2_sessionconfig session.ctx)"
-        if [[ \$(echo "\$config" | grep -c '[ |]encrypt') != 1 ]] || [[ \$(echo "\$config" | grep -c '[ |]decrypt') != 1 ]]; then
-                echo COULD NOT ENCRYPT SESSION
-                echo
-                exit 1
-        fi
-        tpm2_policypcr -Q --session=session.ctx --pcr-list="${PCR_VALUES_TO_USE}" --policy=pcr.policy
-        tpm2_unseal --auth=session:session.ctx --object-context="${PERSISTANT_HANDLE_TO_USE}" 1>&3 3>&-
-        retVal=\$?
-        tpm2_pcrextend 11:${PCR_BANK}=\$(tpm2_getrandom --hex ${HASH_LENGTH})
-        tpm2_flushcontext session.ctx
-        tpm2_startauthsession --policy-session --session=session_test.ctx --key-context=/sectpmctl.pub
-        retVal=\$?
-        if [ \$retVal -ne 0 ]; then
-                echo NOT THE EXPECTED TPM MODULE
-                echo
-                exit 1
-        fi
-        configTest="\$(tpm2_sessionconfig session_test.ctx)"
-        if [[ \$(echo "\$configTest" | grep -c '[ |]encrypt') != 1 ]] || [[ \$(echo "\$configTest" | grep -c '[ |]decrypt') != 1 ]]; then
-                echo COULD NOT ENCRYPT SESSION
-                echo
-                exit 1
-        fi
-        tpm2_policypcr -Q --session=session_test.ctx --pcr-list="${PCR_VALUES_TO_USE}" --policy=pcr_test.policy
-        tpm2_unseal --auth=session:session_test.ctx --object-context="${PERSISTANT_HANDLE_TO_USE}" > /dev/null 2> /dev/null
-        retValTest=\$?
-        tpm2_flushcontext session_test.ctx
-        shred -f -z -u session.ctx pcr.policy session_test.ctx pcr_test.policy
-        if [ \$retVal -ne 0 ]; then
-                echo UNSEAL FAILED
-                echo
-                exit 1
-        fi
-        if [ \$retValTest -eq 0 ]; then
-                echo KEY COULD NOT BE SECURED. PLEASE REBOOT.
-                echo
-                while true; do
-                        sleep 9999
-                done
-        fi
-        echo UNSEALED, EXTENDED
-        echo
-else
+echo pretest
+echo +++++++++++++++++++++++++++++++++
+echo +++++++++++++++++++++++++++++++++
+bash
+echo +++++++++++++++++++++++++++++++++
+echo +++++++++++++++++++++++++++++++++
+echo -n
+echo -n
+echo -n
+
         keyscript="/lib/cryptsetup/askpass"
         keyscriptarg=": "
         exec "\$keyscript" "\$keyscriptarg" 1>&3 3>&-
-fi
 __EOT
   else
 cat > "${KEY_SCRIPT}" <<__EOT
@@ -1064,21 +1017,41 @@ esac
 
 . /usr/share/initramfs-tools/hook-functions
 
+copy_exec /bin/bash /bin
+
 copy_exec ${SECTPMCTL_KEYS}/tpm_owner.pub ${SECTPMCTL_KEYS}
 copy_exec ${SECTPMCTL_KEYS}/tpm_owner_noda.pub ${SECTPMCTL_KEYS}
 
-copy_exec /bin/bash /bin
+copy_exec /usr/bin/awk /usr/bin
+copy_exec /usr/bin/basename /usr/bin
+copy_exec /usr/bin/cat /usr/bin
 copy_exec /usr/bin/grep /usr/bin
-copy_exec /usr/bin/${PCR_BANK}sum /usr/bin
+copy_exec /usr/bin/install /usr/bin
+copy_exec /usr/bin/mktemp /usr/bin
+copy_exec /usr/bin/od /usr/bin
+copy_exec /usr/bin/realpath /usr/bin
+copy_exec /usr/bin/rmdir /usr/bin
+copy_exec /usr/bin/sha256sum /usr/bin
+copy_exec /usr/bin/sha384sum /usr/bin
+copy_exec /usr/bin/sha512sum /usr/bin
 copy_exec /usr/bin/shred /usr/bin
+copy_exec /usr/bin/timeout /usr/bin
 copy_exec /usr/bin/tpm2_flushcontext /usr/bin
+copy_exec /usr/bin/tpm2_getcap /usr/bin
 copy_exec /usr/bin/tpm2_getrandom /usr/bin
+copy_exec /usr/bin/tpm2_load /usr/bin
 copy_exec /usr/bin/tpm2_pcrextend /usr/bin
+copy_exec /usr/bin/tpm2_policyauthvalue /usr/bin
 copy_exec /usr/bin/tpm2_policypcr /usr/bin
 copy_exec /usr/bin/tpm2_sessionconfig /usr/bin
 copy_exec /usr/bin/tpm2_startauthsession /usr/bin
 copy_exec /usr/bin/tpm2_unseal /usr/bin
+copy_exec /usr/bin/tr /usr/bin
+copy_exec /usr/bin/wc /usr/bin
 
+copy_exec /usr/sbin/sectpmctl /usr/sbin
+
+copy_exec /usr/lib/sectpmctl/scripts/sectpmctl-key /usr/lib/sectpmctl/scripts
 copy_exec /usr/lib/x86_64-linux-gnu/libtss2-tcti-device.so.0 /usr/lib/x86_64-linux-gnu
 
 force_load tpm_tis
