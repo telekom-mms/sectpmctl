@@ -56,7 +56,7 @@ COMMANDS
   check
   help
   install
-    [--dont-extend] [--dont-createkey] [--dont-setlukskey] [--key <file>]
+    [--dont-extend] [--key <file>]
     [--preseed-pcr] [[--setrecoverykey][[--recoveryfile <file>]|[--recoveryscripthelper <file>]]]
     [--recoverygroups <num>] [--recoverygrouplength <num>  ]
   provisioning 
@@ -66,8 +66,6 @@ COMMANDS
 OPTIONS
   install 
     --dont-extend
-    --dont-createkey
-    --dont-setlukskey
     --key <file>
     --preseed-pcr
     --recoveryfile <file>
@@ -101,7 +99,7 @@ COMMANDS
   check
   help
   install
-    [--dont-extend] [--dont-createkey] [--dont-setlukskey] [--key <file>]
+    [--dont-extend] [--key <file>]
     [--preseed-pcr] [[--setrecoverykey][[--recoveryfile <file>]|[--recoveryscripthelper <file>]]]
     [--recoverygroups <num>] [--recoverygrouplength <num>  ] [--setrecoverykey]
   provisioning 
@@ -126,20 +124,9 @@ OPTIONS
       Dont extend PCR set in initrd for later use
 
 
-    --dont-createkey
-
-      Don't create secret TPM2 LUKS Key. Read from Keyfile instead.
-      Implies Keyfile is set.
-
-
-    --dont-setlukskey
-
-      Don't store TPM2 Key to LUKS.
-
-
     --key <file>
 
-      Keyfile which can be used to add Key.
+      LUKS Keyfile which can be used to add Key.
       Must be an absolute path. 
       Reads from stdin if this option is not given.
 
@@ -272,11 +259,9 @@ _check_input() {
   export SECTPMCTL_KEYS="/var/lib/sectpmctl/keys"
   export INITIAL="false"
   export SEAL="false"
-  export UNSEAL="false"
   export CHANGEPIN="false"
   export CHECK="false"
   export EXTEND="true"
-  export UNSEAL="false"
   export PCR_BANK="sha256"
   # PCR 8,9,11 and 14 are always added
   export PCR_VALUES_TO_USE="7"
@@ -295,8 +280,6 @@ _check_input() {
   export RECOVERY_KEYSLOT="0"
   export DO_PROVISIONING=""
   export PROVISIONING_LOCKOUT_AUTH=""
-  export CREATE_KEY="true"
-  export SET_LUKS_KEY="true"
   export KNOWN_UNKNOWN=""
 
   ME=$(basename "$0")
@@ -362,9 +345,6 @@ _check_input() {
       check)
         export CHECK="true"
         ;;
-      unseal)
-        export UNSEAL="true"
-        ;;
       provisioning)
         export DO_PROVISIONING="true"
         ;;
@@ -376,12 +356,6 @@ _check_input() {
           echo "${2} is not a valid lockout auth. See example seciton"
           exit 1
         fi
-        ;;
-      --dont-createkey)
-        export CREATE_KEY=""
-        ;;
-      --dont-setlukskey)
-        export SET_LUKS_KEY=""
         ;;
       --help|help|-h)
         _usage_long "${VERSION}"
@@ -398,7 +372,7 @@ _check_input() {
   if [[ "x$KEY_FILE" == "x" ]] && [[ "x$INITIAL" == "xtrue" || "x$SEAL" == "xtrue" ]]; then
     if [[ -t 0 ]]; then
       # stdin is coming from the terminal
-      echo -n "Enter Password: "
+      echo -n "Enter LUKS Password: "
       read -sr line || true
       export KNOWN_UNKNOWN="$line"
     else
@@ -434,21 +408,12 @@ _check_input() {
       "${RECOVERY_GROUPS}" \
       "${RECOVERY_GROUP_LENGTH}" \
       "${RECOVERY_KEYSLOT}" \
-      "${CREATE_KEY}" \
-      "${SET_LUKS_KEY}" \
       "${KNOWN_UNKNOWN}" \
       "${PERSISTANT_OWNER_SRK_NODA}" \
       "${SECTPMCTL_KEYS}"
 
   [[ "${CHECK}" == "true" ]] \
     && check_tpm2_secureboot
-
-  [[ "${UNSEAL}" == "true" ]] \
-    && unseal_current_tpm2_key \
-      "${PCR_BANK}" \
-      "${PCR_VALUES_TO_USE}" \
-      "${PERSISTANT_HANDLE_TO_USE}" \
-      "${SECTPMCTL_KEYS}"
 
   [[ "${DO_PROVISIONING}" == "true" ]] \
     && do_provisioning \
@@ -538,63 +503,13 @@ do_provisioning() {
   rmdir "${tempdir}"
 }
 
-unseal_current_tpm2_key() {
-  PCR_BANK="${1}"
-  PCR_VALUES_TO_USE="${PCR_BANK}:${2},8,9,11,14"
-  PERSISTANT_HANDLE_TO_USE="${3}"
-  SECTPMCTL_KEYS="${4}"
-
-  CREATE_PRIMARY_HASH="sha256"
-  if [[ $(tpm2_getcap algorithms | grep -c 'sha384:') == 1 ]]; then
-    CREATE_PRIMARY_HASH="sha384"
-  fi
-
-  TEMPDIR=""
-  TEMPDIR="$(mktemp -d -p /tmp)"
-  chmod 700 "${TEMPDIR}"
-
-  mount -t tmpfs "${TEMPDIR##*/}" "${TEMPDIR}"
-
-  cd "${TEMPDIR}" || exit 1
-
-  tpm2_startauthsession -Q \
-    --policy-session \
-    --session=session.ctx \
-    --key-context="${SECTPMCTL_KEYS}/tpm_owner_noda.pub"
-  config="$(tpm2_sessionconfig session.ctx)"
-  if [[ $(echo "$config" | grep -c '[ |]encrypt') != 1 ]] || [[ $(echo "$config" | grep -c '[ |]decrypt') != 1 ]]; then
-    echo COULD NOT ENCRYPT SESSION
-    echo
-    exit 1
-  fi
-
-  tpm2_policypcr -Q \
-    --session=session.ctx \
-    --pcr-list="${PCR_VALUES_TO_USE}" \
-    --policy=pcr.policy
-
-  tpm2_unseal -Q \
-    --auth=session:session.ctx \
-    --object-context="${PERSISTANT_HANDLE_TO_USE}"
-
-  tpm2_flushcontext -Q \
-    session.ctx
-
-  shred -f -z -u session.ctx pcr.policy
-
-  cd - > /dev/null
-  umount "${TEMPDIR}"
-  rmdir "${TEMPDIR}"
-}
-
 generate_unseal_script() {
   PCR_BANK="${1}"
-  PCR_VALUES_TO_USE="${PCR_BANK}:${2},8,9,11,14"
-  PERSISTANT_HANDLE_TO_USE="${3}"
-  KEY_SCRIPT="${4}"
-  CRYPT_PARTITION="${5}"
-  EXTEND="${6}"
-  SECTPMCTL_KEYS="${7}"
+  PERSISTANT_HANDLE_TO_USE="${2}"
+  KEY_SCRIPT="${3}"
+  CRYPT_PARTITION="${4}"
+  EXTEND="${5}"
+  SECTPMCTL_KEYS="${6}"
 
   CREATE_PRIMARY_HASH="sha256"
   if [[ $(tpm2_getcap algorithms | grep -c 'sha384:') == 1 ]]; then
@@ -621,48 +536,30 @@ if [ "\$CRYPTTAB_TRIED" = 0 ]; then
         echo
         echo sectpmctl
         echo
-        tpm2_pcrextend 11:${PCR_BANK}=\$(cryptsetup luksDump "${CRYPT_PARTITION}" | ${PCR_BANK}sum | awk '{print \$1;}')
-        tpm2_startauthsession --policy-session --session=session.ctx --key-context=/sectpmctl.pub
+        
+        mkdir /dev/shm > /dev/null 2> /dev/null
+        mount -t tmpfs tmpfs /dev/shm
+
+        cryptsetup luksDump "${CRYPT_PARTITION}" > luks.dat
+        sectpmctl key extend --file luks.dat
+        shred -f -z -u luks.dat
+
+        sectpmctl key unseal --handle "${PERSISTANT_HANDLE_TO_USE}" --noda --pcr-extend 1>&3 3>&-
         retVal=\$?
-        if [ \$retVal -ne 0 ]; then
-                echo NOT THE EXPECTED TPM MODULE
-                echo
-                exit 1
-        fi
-        config="\$(tpm2_sessionconfig session.ctx)"
-        if [[ \$(echo "\$config" | grep -c '[ |]encrypt') != 1 ]] || [[ \$(echo "\$config" | grep -c '[ |]decrypt') != 1 ]]; then
-                echo COULD NOT ENCRYPT SESSION
-                echo
-                exit 1
-        fi
-        tpm2_policypcr -Q --session=session.ctx --pcr-list="${PCR_VALUES_TO_USE}" --policy=pcr.policy
-        tpm2_unseal --auth=session:session.ctx --object-context="${PERSISTANT_HANDLE_TO_USE}" 1>&3 3>&-
-        retVal=\$?
-        tpm2_pcrextend 11:${PCR_BANK}=\$(tpm2_getrandom --hex ${HASH_LENGTH})
-        tpm2_flushcontext session.ctx
-        tpm2_startauthsession --policy-session --session=session_test.ctx --key-context=/sectpmctl.pub
-        retVal=\$?
-        if [ \$retVal -ne 0 ]; then
-                echo NOT THE EXPECTED TPM MODULE
-                echo
-                exit 1
-        fi
-        configTest="\$(tpm2_sessionconfig session_test.ctx)"
-        if [[ \$(echo "\$configTest" | grep -c '[ |]encrypt') != 1 ]] || [[ \$(echo "\$configTest" | grep -c '[ |]decrypt') != 1 ]]; then
-                echo COULD NOT ENCRYPT SESSION
-                echo
-                exit 1
-        fi
-        tpm2_policypcr -Q --session=session_test.ctx --pcr-list="${PCR_VALUES_TO_USE}" --policy=pcr_test.policy
-        tpm2_unseal --auth=session:session_test.ctx --object-context="${PERSISTANT_HANDLE_TO_USE}" > /dev/null 2> /dev/null
+
+        sectpmctl key extend --random
+
+        sectpmctl key unseal --handle "${PERSISTANT_HANDLE_TO_USE}" --noda --pcr-extend > /dev/null 2> /dev/null
         retValTest=\$?
-        tpm2_flushcontext session_test.ctx
-        shred -f -z -u session.ctx pcr.policy session_test.ctx pcr_test.policy
+
+        umount /dev/shm
+        
         if [ \$retVal -ne 0 ]; then
                 echo UNSEAL FAILED
                 echo
                 exit 1
         fi
+        
         if [ \$retValTest -eq 0 ]; then
                 echo KEY COULD NOT BE SECURED. PLEASE REBOOT.
                 echo
@@ -670,6 +567,7 @@ if [ "\$CRYPTTAB_TRIED" = 0 ]; then
                         sleep 9999
                 done
         fi
+
         echo UNSEALED, EXTENDED
         echo
 else
@@ -688,30 +586,26 @@ if [ "\$CRYPTTAB_TRIED" = 0 ]; then
         echo
         echo sectpmctl, only for preseed usage!
         echo
-        tpm2_pcrextend 11:${PCR_BANK}=\$(cryptsetup luksDump "${CRYPT_PARTITION}" | ${PCR_BANK}sum | awk '{print \$1;}')
-        tpm2_startauthsession --policy-session --session=session.ctx --key-context=/sectpmctl.pub
+
+        mkdir /dev/shm > /dev/null 2> /dev/null
+        mount -t tmpfs tmpfs /dev/shm
+
+        cryptsetup luksDump "${CRYPT_PARTITION}" > luks.dat
+        sectpmctl key extend --file luks.dat
+        shred -f -z -u luks.dat
+
+        sectpmctl key unseal --handle "${PERSISTANT_HANDLE_TO_USE}" --noda --pcr-extend --pcr-preseed 1>&3 3>&-
         retVal=\$?
-        if [ \$retVal -ne 0 ]; then
-                echo NOT THE EXPECTED TPM MODULE
-                echo
-                exit 1
-        fi
-        if [[ \$(tpm2_sessionconfig session.ctx | grep -c '[ |]encrypt') != 1 ]] || [[ \$(tpm2_sessionconfig session.ctx | grep -c '[ |]decrypt') != 1 ]]; then
-                echo COULD NOT ENCRYPT SESSION
-                echo
-                exit 1
-        fi
-        tpm2_policypcr -Q --session=session.ctx --pcr-list="${PCR_VALUES_TO_USE}" --policy=pcr.policy
-        tpm2_unseal --auth=session:session.ctx --object-context="${PERSISTANT_HANDLE_TO_USE}" 1>&3 3>&-
-        retVal=\$?
-        tpm2_flushcontext session.ctx
-        shred -f -z -u session.ctx pcr.policy
+
+        umount /dev/shm
+        
         if [ \$retVal -ne 0 ]; then
                 echo UNSEAL FAILED
                 echo
                 exit 1
         fi
-        echo UNSEALED, UNEXTENDED
+
+        echo PRESEED UNSEALED, UNEXTENDED
         echo
 else
         keyscript="/lib/cryptsetup/askpass"
@@ -786,11 +680,9 @@ generate_tpm2_policy() {
   RECOVERY_GROUPS="${10}"
   RECOVERY_GROUP_LENGTH="${11}"
   RECOVERY_KEYSLOT="${12}"
-  CREATE_KEY="${13}"
-  SET_LUKS_KEY="${14}"
-  KNOWN_UNKNOWN="${15}"
-  PERSISTANT_OWNER_SRK_NODA="${16}"
-  SECTPMCTL_KEYS="${17}"
+  KNOWN_UNKNOWN="${13}"
+  PERSISTANT_OWNER_SRK_NODA="${14}"
+  SECTPMCTL_KEYS="${15}"
 
   # calculate length of hash in bytes
   if [[ -f /tmp/hashlength ]]; then
@@ -814,49 +706,54 @@ generate_tpm2_policy() {
   echo "CREATE AND ADD TPM POLICY IN TMPFS DIRECTORY ${TEMPDIR}"
   cd "${TEMPDIR}" || exit 1
 
-  if [[ "x${CREATE_KEY}" == "xtrue" ]]; then
-    echo "CREATE SECRET TPM LUKS KEY"
-    rand8file 16 "${TPM_SECRET_LUKS_KEY}"
-  else
-    TPM_SECRET_LUKS_KEY="${KEY_FILE}"
-  fi
+  echo "CREATE SECRET TPM LUKS KEY"
+  rand8file 16 "${TPM_SECRET_LUKS_KEY}"
 
-  if [[ "x${SET_LUKS_KEY}" == "xtrue" ]]; then
-    if [[ $( cryptsetup luksDump "${CRYPT_PARTITION}" | grep -c "${TPM_KEYSLOT}: luks2") != 0 ]]; then
-      echo "KILL EXISTING TPM LUKS KEY FROM KEYSLOT"
-      if [[ "x${KEY_FILE}" == "x" ]]; then
-        echo -n "${KNOWN_UNKNOWN}" | cryptsetup \
-          luksKillSlot \
-          "${CRYPT_PARTITION}" \
-          "${TPM_KEYSLOT}" || ( echo "COULD NOT KILL KEYSLOT" && exit 2 )
-      else
-        cryptsetup \
-          --key-file="${KEY_FILE}" \
-          luksKillSlot \
-          "${CRYPT_PARTITION}" \
-          "${TPM_KEYSLOT}" || ( echo "COULD NOT KILL KEYSLOT" && exit 2 )
-      fi
-    fi
-
-    echo "ADD NEW GENERATED SECRET TPM LUKS KEY"
+  if [[ $( cryptsetup luksDump "${CRYPT_PARTITION}" | grep -c "${TPM_KEYSLOT}: luks2") != 0 ]]; then
+    echo "KILL EXISTING TPM LUKS KEY FROM KEYSLOT"
     if [[ "x${KEY_FILE}" == "x" ]]; then
       echo -n "${KNOWN_UNKNOWN}" | cryptsetup \
-        --key-slot="${TPM_KEYSLOT}" \
-        luksAddKey \
+        luksKillSlot \
         "${CRYPT_PARTITION}" \
-        "${TPM_SECRET_LUKS_KEY}" || ( echo "COULD NOT ADD KEY" && exit 2 )
+        "${TPM_KEYSLOT}" || ( echo "COULD NOT KILL KEYSLOT" && exit 2 )
     else
       cryptsetup \
-        --key-slot="${TPM_KEYSLOT}" \
         --key-file="${KEY_FILE}" \
-        luksAddKey \
+        luksKillSlot \
         "${CRYPT_PARTITION}" \
-        "${TPM_SECRET_LUKS_KEY}" || ( echo "COULD NOT ADD KEY" && exit 2 )
+        "${TPM_KEYSLOT}" || ( echo "COULD NOT KILL KEYSLOT" && exit 2 )
     fi
   fi
+
+  echo "ADD NEW GENERATED SECRET TPM LUKS KEY"
+  if [[ "x${KEY_FILE}" == "x" ]]; then
+    echo -n "${KNOWN_UNKNOWN}" | cryptsetup \
+      --key-slot="${TPM_KEYSLOT}" \
+      luksAddKey \
+      "${CRYPT_PARTITION}" \
+      "${TPM_SECRET_LUKS_KEY}" || ( echo "COULD NOT ADD KEY" && exit 2 )
+  else
+    cryptsetup \
+      --key-slot="${TPM_KEYSLOT}" \
+      --key-file="${KEY_FILE}" \
+      luksAddKey \
+      "${CRYPT_PARTITION}" \
+      "${TPM_SECRET_LUKS_KEY}" || ( echo "COULD NOT ADD KEY" && exit 2 )
+  fi
   
+  echo "EXTEND PCR 11"
+  sectpmctl key extend --random
+
+  # Create empty dat for PCR 8, 9 and 14
+  if [[ -f "${SECTPMCTL_KEYS}/pcrNull.dat" ]]; then
+    rm -f "${SECTPMCTL_KEYS}/pcrNull.dat"
+  fi
+  dd if=/dev/zero of="${SECTPMCTL_KEYS}/pcrNull.dat" bs=1 count="${HASH_LENGTH}" conv=excl,fsync
+  chmod 600 "${SECTPMCTL_KEYS}/pcrNull.dat"
+
   # optional key creation and escrow
   if [[ "x${SET_RECOVERY_KEY}" == "xtrue" ]]; then
+    echo "SET RECOVERY KEY"
     RECOVERY_KEY="$(create_recovery_key ${RECOVERY_GROUPS} ${RECOVERY_GROUP_LENGTH})" || exit 1
 
     echo -n "$RECOVERY_KEY" > "./keyfile"
@@ -868,17 +765,18 @@ generate_tpm2_policy() {
     else
       echo
       echo "########################################"
+      echo "########################################"
+      echo
       echo "WARNING!"
-      echo "Please save this recovery in a save place."
+      echo "Please save this recovery in a safe place."
       echo "When lost you will have difficulties to recover."
-      echo "If the TPM is deleted or secureboot changed you"
-      echo "will not be able to recover in case of lost"
+      echo "If the TPM is deleted or secureboot changed, you"
+      echo "will not be able to recover in case of a lost"
       echo "recovery key!"
-      echo "If the TPM is not deleted and secureboot did't"
-      echo "change, read the man page for how to recover a"
-      echo "lost recovery key."
       echo
       echo "RECOVERY KEY: ${RECOVERY_KEY}"
+      echo
+      echo "########################################"
       echo "########################################"
       echo
     fi
@@ -899,16 +797,6 @@ generate_tpm2_policy() {
     fi
     shred -f -z -u "./keyfile"
   fi
-  
-  echo "EXTEND PCR 11"
-  tpm2_pcrextend -Q 11:${PCR_BANK}=$(tpm2_getrandom --hex ${HASH_LENGTH})
-
-  # Create empty dat for PCR 8, 9 and 14
-  if [[ -f "${SECTPMCTL_KEYS}/pcrNull.dat" ]]; then
-    rm -f "${SECTPMCTL_KEYS}/pcrNull.dat"
-  fi
-  dd if=/dev/zero of="${SECTPMCTL_KEYS}/pcrNull.dat" bs=1 count="${HASH_LENGTH}" conv=excl,fsync
-  chmod 600 "${SECTPMCTL_KEYS}/pcrNull.dat"
 
   echo "CREATING PCR VALUES"
   if (( PCR_VALUES_TO_USE == 7 )); then
@@ -918,97 +806,33 @@ generate_tpm2_policy() {
     tpm2_pcrread -Q \
       --output="${SECTPMCTL_KEYS}/pcr7.dat" \
       ${PCR_BANK}:${PCR_VALUES_TO_USE}
-    cp "${SECTPMCTL_KEYS}/pcr7.dat" pcrprimary.dat
     chmod 600 "${SECTPMCTL_KEYS}/pcr7.dat"
-  else
-    tpm2_pcrread -Q \
-      --output=pcrprimary.dat \
-      ${PCR_BANK}:${PCR_VALUES_TO_USE}
   fi
 
   if [[ -f "${SECTPMCTL_KEYS}/pcr11.dat" ]]; then
     rm -f "${SECTPMCTL_KEYS}/pcr11.dat"
   fi
   # Calculate expected value for PCR 11
-  cryptsetup luksDump ${CRYPT_PARTITION} | openssl dgst -${PCR_BANK} -binary -out pcr11luks.dat -
+  cryptsetup luksDump "${CRYPT_PARTITION}" | openssl dgst -${PCR_BANK} -binary -out pcr11luks.dat -
   cat "${SECTPMCTL_KEYS}/pcrNull.dat" pcr11luks.dat > pcr11combined.dat
-  openssl dgst -${PCR_BANK} -binary -out pcr11.dat pcr11combined.dat
-  cp pcr11.dat "${SECTPMCTL_KEYS}/pcr11.dat"
+  openssl dgst -${PCR_BANK} -binary -out "${SECTPMCTL_KEYS}/pcr11.dat" pcr11combined.dat
   chmod 600 "${SECTPMCTL_KEYS}/pcr11.dat"
+  shred -f -z -u pcr11luks.dat pcr11combined.dat
 
-  # Combine primary PCR, 8, 9, 11, 14 into pcrvalues.dat
-  cat pcrprimary.dat "${SECTPMCTL_KEYS}/pcrNull.dat" "${SECTPMCTL_KEYS}/pcrNull.dat" pcr11.dat "${SECTPMCTL_KEYS}/pcrNull.dat" > pcrvalues.dat
-  
-  echo "CREATE TPM PCR POLICY TRIAL SESSION FOR SEALING"
-  tpm2_startauthsession -Q \
-    --session=session.ctx
-
-  tpm2_policypcr -Q \
-    --session=session.ctx \
-    --pcr-list="${PCR_BANK}:${PCR_VALUES_TO_USE},8,9,11,14" \
-    --pcr=pcrvalues.dat \
-    --policy=pcr.policy
-
-  tpm2_flushcontext -Q \
-    session.ctx
-
-  echo "CREATE TPM OBJECT"
-  tpm2_startauthsession -Q \
-    --policy-session \
-    --session=session.ctx \
-    --key-context="${SECTPMCTL_KEYS}/tpm_owner_noda.pub"
-  config="$(tpm2_sessionconfig session.ctx)"
-  if [[ $(echo "$config" | grep -c '[ |]encrypt') != 1 ]] || [[ $(echo "$config" | grep -c '[ |]decrypt') != 1 ]]; then
-    echo COULD NOT ENCRYPT SESSION
-    echo
-    exit 1
+  echo "SEAL LUKS KEY to TPM"
+  if (( PCR_VALUES_TO_USE == 7 )); then
+    sectpmctl key seal --handle "${PERSISTANT_HANDLE_TO_USE}" --key-file "${TPM_SECRET_LUKS_KEY}" --noda --pcr-extend
+  else
+    sectpmctl key seal --handle "${PERSISTANT_HANDLE_TO_USE}" --key-file "${TPM_SECRET_LUKS_KEY}" --noda --pcr-extend --pcr-preseed
   fi
-
-  # seems not to work when hash algorithm is changed
-  tpm2_create -Q \
-    --session=session.ctx \
-    --hash-algorithm=sha256 \
-    --public=pcr_seal_key.pub \
-    --private=pcr_seal_key.priv \
-    --sealing-input="${TPM_SECRET_LUKS_KEY}" \
-    --parent-context="${PERSISTANT_OWNER_SRK_NODA}" \
-    --attributes="fixedtpm|fixedparent|noda" \
-    --policy="pcr.policy"
-
-  tpm2_flushcontext -Q \
-    session.ctx
-
-  shred -f -z -u session.ctx
-
-  tpm2_evictcontrol -Q \
-    --hierarchy=o \
-    --object-context="${TPM2_PERSISTANT_HANDLE_TO_USE}" 2> /dev/null || true
-
-  echo "LOAD TPM OBJECT"
-  tpm2_load -Q \
-    --parent-context="${PERSISTANT_OWNER_SRK_NODA}" \
-    --public=pcr_seal_key.pub \
-    --private=pcr_seal_key.priv \
-    --name=pcr_seal_key.name \
-    --key-context=pcr_seal_key.ctx
-
-  tpm2_evictcontrol -Q \
-    --hierarchy=o \
-    --object-context=pcr_seal_key.ctx \
-    "${TPM2_PERSISTANT_HANDLE_TO_USE}"
-
-  # Remove every single file created here. Unsealing doesn't need any of then.
-  shred -f -z -u *.ctx
-  shred -f -z -u *.name
-  shred -f -z -u *.policy
-  shred -f -z -u *.priv
-  shred -f -z -u *.pub
-  shred -f -z -u *.dat
+  
   shred -f -z -u "${TPM_SECRET_LUKS_KEY}"
   
-  cd -
+  cd - > /dev/null
   umount "${TEMPDIR}"
   rmdir "${TEMPDIR}"
+  
+  echo "DONE"
 }
 
 edit_crypttab() {
@@ -1064,20 +888,41 @@ esac
 
 . /usr/share/initramfs-tools/hook-functions
 
-copy_exec ${SECTPMCTL_KEYS}/tpm_owner_noda.pub /sectpmctl.pub
-
 copy_exec /bin/bash /bin
+
+copy_exec ${SECTPMCTL_KEYS}/tpm_owner.pub ${SECTPMCTL_KEYS}/tpm_owner.pub
+copy_exec ${SECTPMCTL_KEYS}/tpm_owner_noda.pub ${SECTPMCTL_KEYS}/tpm_owner_noda.pub
+
+copy_exec /usr/bin/awk /usr/bin
+copy_exec /usr/bin/basename /usr/bin
+copy_exec /usr/bin/cat /usr/bin
 copy_exec /usr/bin/grep /usr/bin
-copy_exec /usr/bin/${PCR_BANK}sum /usr/bin
+copy_exec /usr/bin/install /usr/bin
+copy_exec /usr/bin/mktemp /usr/bin
+copy_exec /usr/bin/od /usr/bin
+copy_exec /usr/bin/realpath /usr/bin
+copy_exec /usr/bin/rmdir /usr/bin
+copy_exec /usr/bin/sha256sum /usr/bin
+copy_exec /usr/bin/sha384sum /usr/bin
+copy_exec /usr/bin/sha512sum /usr/bin
 copy_exec /usr/bin/shred /usr/bin
+copy_exec /usr/bin/timeout /usr/bin
 copy_exec /usr/bin/tpm2_flushcontext /usr/bin
+copy_exec /usr/bin/tpm2_getcap /usr/bin
 copy_exec /usr/bin/tpm2_getrandom /usr/bin
+copy_exec /usr/bin/tpm2_load /usr/bin
 copy_exec /usr/bin/tpm2_pcrextend /usr/bin
+copy_exec /usr/bin/tpm2_policyauthvalue /usr/bin
 copy_exec /usr/bin/tpm2_policypcr /usr/bin
 copy_exec /usr/bin/tpm2_sessionconfig /usr/bin
 copy_exec /usr/bin/tpm2_startauthsession /usr/bin
 copy_exec /usr/bin/tpm2_unseal /usr/bin
+copy_exec /usr/bin/tr /usr/bin
+copy_exec /usr/bin/wc /usr/bin
 
+copy_exec /usr/sbin/sectpmctl /usr/sbin
+
+copy_exec /usr/lib/sectpmctl/scripts/sectpmctl-key /usr/lib/sectpmctl/scripts/sectpmctl-key
 copy_exec /usr/lib/x86_64-linux-gnu/libtss2-tcti-device.so.0 /usr/lib/x86_64-linux-gnu
 
 force_load tpm_tis
@@ -1117,11 +962,9 @@ initial_tpm2_setup() {
   RECOVERY_GROUPS="${14}"
   RECOVERY_GROUP_LENGTH="${15}"
   RECOVERY_KEYSLOT="${16}"
-  CREATE_KEY="${17}"
-  SET_LUKS_KEY="${18}"
-  KNOWN_UNKNOWN="${19}"
-  PERSISTANT_OWNER_SRK_NODA="${20}"
-  SECTPMCTL_KEYS="${21}"
+  KNOWN_UNKNOWN="${17}"
+  PERSISTANT_OWNER_SRK_NODA="${18}"
+  SECTPMCTL_KEYS="${19}"
 
   check_tpm2_secureboot
 
@@ -1149,15 +992,12 @@ initial_tpm2_setup() {
     "${RECOVERY_GROUPS}" \
     "${RECOVERY_GROUP_LENGTH}" \
     "${RECOVERY_KEYSLOT}" \
-    "${CREATE_KEY}" \
-    "${SET_LUKS_KEY}" \
     "${KNOWN_UNKNOWN}" \
     "${PERSISTANT_OWNER_SRK_NODA}" \
     "${SECTPMCTL_KEYS}"
 
   generate_unseal_script \
     "${PCR_BANK}" \
-    "${PCR_VALUES_TO_USE}" \
     "${PERSISTANT_HANDLE_TO_USE}" \
     "${KEY_SCRIPT}" \
     "${CRYPT_PARTITION}" \

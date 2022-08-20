@@ -22,6 +22,10 @@ installation, see 'Recovery' for more information.
 
 It is recommended to only have one LUKS slot in use, which is mostly slot 0. sectpmctl will additionally use slot 5 to store the TPM key.
 
+You can easily test the installation with virt-manager on a Ubuntu 22.04 host and a Ubuntu 22.04 guest. When creating a new VM you need to
+configure the VM before it starts automatically. In the overview select 'OVMF_CODE_4M.secboot.fd' as firmware and then add a new 'TPM
+emulated TIS 2.0'device. After installation of Ubuntu you can start installing sectpmctl.
+
 ## Build and install tpmsbsigntool
 
 ```
@@ -39,6 +43,8 @@ sudo apt install -f
 ```
 
 ## Build sectpmctl
+
+You can ignore the 'debsign: gpg error occurred!  Aborting....' error when building yourself.
 
 ```
 sudo apt install debhelper efibootmgr efitools sbsigntool binutils mokutil dkms systemd udev \

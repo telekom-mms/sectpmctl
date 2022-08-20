@@ -4,7 +4,7 @@
 # AUTHORS: Heike Pesch <heike.pesch@t-systems.com>
 #          Richard Robert Reitz <richard-robert.reitz@t-systems.com>
 
-# sectpmctl key - A tool to store encrypted secrets in TPM2 key hash objects
+# sectpmctl key - A tool to store encrypted secrets in TPM2 keyed hash objects
 
 # reserve stdout only for validated output
 exec 4>&1
@@ -792,7 +792,9 @@ _check_input_and_state() {
     ret=${?}
 
     if [[ "${TIMEOUT}" == "1" ]]; then
-      echo "${ME} ${CMD}: TPM Timeout, flushing all saved TPM sessions now" > /dev/kmsg
+      echo "${ME} ${CMD}: TPM Timeout, kernel bug maybe, flushing all" > /dev/kmsg
+      tpm2_flushcontext -t
+      tpm2_flushcontext -l
       tpm2_flushcontext -s
     else
       break
