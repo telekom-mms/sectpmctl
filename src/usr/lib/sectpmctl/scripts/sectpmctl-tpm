@@ -56,7 +56,7 @@ COMMANDS
   check
   help
   install
-    [--dont-extend] [--dont-createkey] [--dont-setlukskey] [--key <file>]
+    [--dont-extend] [--key <file>]
     [--preseed-pcr] [[--setrecoverykey][[--recoveryfile <file>]|[--recoveryscripthelper <file>]]]
     [--recoverygroups <num>] [--recoverygrouplength <num>  ]
   provisioning 
@@ -66,8 +66,6 @@ COMMANDS
 OPTIONS
   install 
     --dont-extend
-    --dont-createkey
-    --dont-setlukskey
     --key <file>
     --preseed-pcr
     --recoveryfile <file>
@@ -101,7 +99,7 @@ COMMANDS
   check
   help
   install
-    [--dont-extend] [--dont-createkey] [--dont-setlukskey] [--key <file>]
+    [--dont-extend] [--key <file>]
     [--preseed-pcr] [[--setrecoverykey][[--recoveryfile <file>]|[--recoveryscripthelper <file>]]]
     [--recoverygroups <num>] [--recoverygrouplength <num>  ] [--setrecoverykey]
   provisioning 
@@ -124,17 +122,6 @@ OPTIONS
     --dont-extend
 
       Dont extend PCR set in initrd for later use
-
-
-    --dont-createkey
-
-      Don't create secret TPM2 LUKS Key. Read from Keyfile instead.
-      Implies Keyfile is set.
-
-
-    --dont-setlukskey
-
-      Don't store TPM2 Key to LUKS.
 
 
     --key <file>
@@ -293,8 +280,6 @@ _check_input() {
   export RECOVERY_KEYSLOT="0"
   export DO_PROVISIONING=""
   export PROVISIONING_LOCKOUT_AUTH=""
-  export CREATE_KEY="true"
-  export SET_LUKS_KEY="true"
   export KNOWN_UNKNOWN=""
 
   ME=$(basename "$0")
@@ -372,12 +357,6 @@ _check_input() {
           exit 1
         fi
         ;;
-      --dont-createkey)
-        export CREATE_KEY=""
-        ;;
-      --dont-setlukskey)
-        export SET_LUKS_KEY=""
-        ;;
       --help|help|-h)
         _usage_long "${VERSION}"
         ;;
@@ -429,8 +408,6 @@ _check_input() {
       "${RECOVERY_GROUPS}" \
       "${RECOVERY_GROUP_LENGTH}" \
       "${RECOVERY_KEYSLOT}" \
-      "${CREATE_KEY}" \
-      "${SET_LUKS_KEY}" \
       "${KNOWN_UNKNOWN}" \
       "${PERSISTANT_OWNER_SRK_NODA}" \
       "${SECTPMCTL_KEYS}"
@@ -703,11 +680,9 @@ generate_tpm2_policy() {
   RECOVERY_GROUPS="${10}"
   RECOVERY_GROUP_LENGTH="${11}"
   RECOVERY_KEYSLOT="${12}"
-  CREATE_KEY="${13}"
-  SET_LUKS_KEY="${14}"
-  KNOWN_UNKNOWN="${15}"
-  PERSISTANT_OWNER_SRK_NODA="${16}"
-  SECTPMCTL_KEYS="${17}"
+  KNOWN_UNKNOWN="${13}"
+  PERSISTANT_OWNER_SRK_NODA="${14}"
+  SECTPMCTL_KEYS="${15}"
 
   # calculate length of hash in bytes
   if [[ -f /tmp/hashlength ]]; then
@@ -987,11 +962,9 @@ initial_tpm2_setup() {
   RECOVERY_GROUPS="${14}"
   RECOVERY_GROUP_LENGTH="${15}"
   RECOVERY_KEYSLOT="${16}"
-  CREATE_KEY="${17}"
-  SET_LUKS_KEY="${18}"
-  KNOWN_UNKNOWN="${19}"
-  PERSISTANT_OWNER_SRK_NODA="${20}"
-  SECTPMCTL_KEYS="${21}"
+  KNOWN_UNKNOWN="${17}"
+  PERSISTANT_OWNER_SRK_NODA="${18}"
+  SECTPMCTL_KEYS="${19}"
 
   check_tpm2_secureboot
 
@@ -1019,8 +992,6 @@ initial_tpm2_setup() {
     "${RECOVERY_GROUPS}" \
     "${RECOVERY_GROUP_LENGTH}" \
     "${RECOVERY_KEYSLOT}" \
-    "${CREATE_KEY}" \
-    "${SET_LUKS_KEY}" \
     "${KNOWN_UNKNOWN}" \
     "${PERSISTANT_OWNER_SRK_NODA}" \
     "${SECTPMCTL_KEYS}"
