@@ -846,14 +846,25 @@ generate_tpm2_policy() {
 
   echo "SEAL LUKS KEY to TPM"
   if (( PCR_VALUES_TO_USE == 7 )); then
-    sectpmctl key seal --handle "${PERSISTANT_HANDLE_TO_USE}" --key-file "${TPM_SECRET_LUKS_KEY}" --noda --pcr-extend
+    bash -x sectpmctl key seal --handle "${PERSISTANT_HANDLE_TO_USE}" --key-file "${TPM_SECRET_LUKS_KEY}" --noda --pcr-extend
+    
+    echo test
+    echo
+    sha256sum "${TPM_SECRET_LUKS_KEY}"
+    sectpmctl key seal --handle "0x81000105" --key-file "${TPM_SECRET_LUKS_KEY}" --noda
+    sectpmctl key unseal --handle "0x81000105" --noda
+    echo
+    sectpmctl key unseal --handle "0x81000105" --noda > b
+    sha256sum b
+    rm b
+    echo
   else
     sectpmctl key seal --handle "${PERSISTANT_HANDLE_TO_USE}" --key-file "${TPM_SECRET_LUKS_KEY}" --noda --pcr-extend --pcr-preseed
   fi
   
   shred -f -z -u "${TPM_SECRET_LUKS_KEY}"
   
-  cd -
+  cd - > /dev/null
   umount "${TEMPDIR}"
   rmdir "${TEMPDIR}"
   
