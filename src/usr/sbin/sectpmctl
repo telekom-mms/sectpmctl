@@ -19,10 +19,13 @@ _usage_short() {
   cat <<__END
 $ME COMMAND [OPTIONS...]
 
-A tool to ...
+sectpmctl provides a small EFI-Bootloader and the ability to open the 
+LUKS encrypted Root Partition during boot with in TPM2 stored secret.
 
 Commands
-  ...
+  boot
+  key
+  tpm
   help
   version
 __END
@@ -32,12 +35,28 @@ _usage_long() {
   cat <<__END
 $ME COMMAND [OPTIONS...]
 
-A tool to ...
-
+sectpmctl provides a small EFI-Bootloader and the ability to open the 
+LUKS encrypted Root Partition during boot with in TPM2 stored secret.
 
 Commands
-  ...
-    ...
+  boot
+
+    command to interact with $ME bootloader
+    For more information use:
+    $ME boot help
+
+  key
+
+    command to interact with $ME key tool
+    For more information use:
+    $ME key help
+
+  tpm
+
+    command to interact with $ME TPM2 and LUKS-Device
+    For more information use:
+    $ME tpm help
+
 
   help
 
