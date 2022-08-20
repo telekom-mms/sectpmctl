@@ -2,8 +2,8 @@
 
 We want to secure the Ubuntu 22.04 installation with LUKS and TPM2. Please read this README carefully before installation.
 
-We also assue a normal installation of Ubuntu 22.04 desktop with erasing the disk and with LVM and encryption. Otherwise an installation is
-possible, but currently undocumented.
+We also assume a normal installation of Ubuntu 22.04 desktop with erasing the disk and using LVM and encryption. Otherwise an installation
+is possible but currently undocumented. A preseed installation is also possible but currently undocumented as well.
 
 In this initial version no password is requested while booting. That means that you should supply a BIOS start password. It is planed to
 release an update shortly which implements a TPM + password option. In that case a BIOS start password is not neccessary. Without either
@@ -14,7 +14,7 @@ Either way you should also supply a BIOS admin password.
 
 When installing the sectpmct bootloader, Microsoft UEFI keys are automatically uploaded to the Secure Boot database for your own safety.
 In a future release an option will be included to suppress installing the Microsoft keys. Together with an BIOS admin password, hardware
-without an crucial UEFI OptionROM requirement like laptops with integrated graphics could benefit from doing so.
+without an crucial UEFI OptionROM requirement like laptops with integrated graphics would benefit from doing so.
 
 Dual booting Windows is not recommended and has never been tested with sectpmctl. The risk is that Windows will update the Secure Boot DBX
 database which will prevent the successfull unlocking of the LUKS key. In such case you need the recovery key and need to redo the sectpmctl
@@ -53,7 +53,7 @@ cd ..
 
 ## Install sectpmctl
 
-Warning: After removeing grub and shim there is no alternative then to complete the installation, otherwise your system will most probably
+Warning: After removing grub and shim there is no alternative then to complete the installation, otherwise your system will most probably
 not boot anymore.
 
 ### Prerequisite
@@ -63,7 +63,7 @@ not boot anymore.
 Your BIOS has to be in Secure Boot Setup Mode. That means that your BIOS need to have Secure Boot enabled and that all keys are cleared. You
 can do so by entering your BIOS, enable Secure Boot and find inside the Secure Boot section the button to "Clear all keys".
 
-I never came across a BIOS which does not offer a way to enter Secure Boot Setup Mode. If your BIOS supports listing all keys, after entering
+We never came across a BIOS which does not offer a way to enter Secure Boot Setup Mode. If your BIOS supports listing all keys, after entering
 the setup mode, the amount of keys of all databases should be listed as zero.
 
 First check if your Secure Boot is enabled and cleared by executing this two commands:
@@ -93,7 +93,7 @@ user@laptop:~$
 As sectpmctl will provision your TPM in a minimal way it is required to start the installation with a cleared TPM. That can be achived in three
 ways:
 
-- Clear the TPM (sometimes also called Security Chip) in the BIOS if available. Some BIOS require you press a key after a reboot to clear the TPM.
+- Clear the TPM (sometimes also called Security Chip) in the BIOS if available. Some BIOS types require you press a key after a reboot to clear the TPM.
 - Use Windows to disable TPM autoprovisioning and clear the TPM by using PowerShell commands, followed by a reboot.
 - Execute in Linux: "echo 5 | sudo tee /sys/class/tpm/tpm0/ppi/request" and reboot.
 
@@ -102,21 +102,40 @@ Be warned that if you put already some keys into the TPM, they will be lost by t
 Be also warned that when a TPM lockout password is set and you try to clear the TPM with software commands entering a wrong lockout password, there
 will be a time penalty until you can try again. The above three ways to clear should allow to clear the TPM even when you entered a wrong lockout password.
 
-The following command "sectpmctl tpm provisioning" should run successfully with a cleared TPM and the output should look like this:
+To check if the TPM is in a good state enter:
 
 ```
-user@laptop:~# sectpmctl tpm provisioning
+sudo tpm2_getcap properties-variable
+```
+
+The output should look like this:
+
+```
+user@laptop:~$ sudo tpm2_getcap properties-variable
+...
+  lockoutAuthSet:            0
+...
+  inLockout:                 0
+...
+user@laptop:~$
+```
+
+The command which will be executed later while installing, "sectpmctl tpm provisioning", should run successfully with a cleared TPM and the output
+should look like this:
+
+```
+user@laptop:~$ sudo sectpmctl tpm provisioning
 START PROVISIONING
 ## TPM CLEAR
 ## SET DICTIONARY LOCKOUT SETTINGS
 ## CREATE AND SET THE LOCKOUTAUTH VALUE
 ## CREATE PERSISTENT PRIMARY OWNER SRK AT 0x81000100
 ## CREATE PERSISTENT PRIMARY OWNER NODA SRK AT 0x81000101
-user@laptop:~#
+user@laptop:~$
 ```
 
 The provisioning will set a random lockout password which is stored in '/var/lib/sectpmctl/keys/lockout.pwd', set sane dictionary attack lockout time
-penalty settings and create two TPM primary keys, one with dictionary attack lockout flag (DA) and one without (NODA).
+penalty settings and create two TPM primary keys, one with the dictionary attack lockout flag (DA) and one without (NODA).
 
 The following DA lockout values are set:
 
@@ -124,97 +143,93 @@ The following DA lockout values are set:
 - Recovery time = 10 minutes
 - Lockout recovery time = 30 minutes
 
-Unsealing the LUKS key (without TPM + password) while booting and signing of kernels and kernel modules is done by using the NODA primary key to
-not break updates in case of a dictionary lockout situation. In the next release, when using TPM + password, specificly the unsealing will be done
-with the DA key, while keep using the NODA key for signing kernels and kernel modules. 
+Unsealing the LUKS key while booting (currently without TPM + password) and signing of kernels and kernel modules is done by using the NODA primary key to
+not break updates in case of a dictionary lockout situation. In the next release, when using the TPM + password option, specificly the unsealing will be
+done with the DA key, while keep using the NODA key for signing kernels and kernel modules. 
 
 All generated keys, passwords or serialized keys are stored in '/var/lib/sectpmctl/keys'.
 
 ### Installation
 
 ```
-sudo bash
+# 1. Point of no return, you need to complete at least until the following reboot command
+sudo apt remove --allow-remove-essential "grub*" "shim*"
+sudo dpkg -i sectpmctl_1.0.0-1_amd64.deb
+sudo apt install -f
 
 
-# Point of no return, you need to complete at least until the following reboot command
-apt remove --allow-remove-essential "grub*" "shim*"
-dpkg -i sectpmctl_1.0.0-1_amd64.deb
-apt install -f
-
-sectpmctl tpm provisioning
+# 2. TPM Provisioning
+sudo sectpmctl tpm provisioning
 
 
-# Cleanup leftovers from grub, shim and windows stuff from efibootmgr
+# 3. Cleanup leftovers from grub, shim and windows stuff from efibootmgr
 entryId=""
 entryId=$(efibootmgr -v | grep -i "Windows Boot Manager" | sed -e 's/^Boot\([0-9]\+\)\(.*\)$/\1/')
 if [[ "x${entryId}" != "x" ]]; then
-  efibootmgr -q -b "${entryId}" -B
+  sudo efibootmgr -q -b "${entryId}" -B
 fi
 entryId=""
 entryId=$(efibootmgr -v | grep -i "ubuntu" | sed -e 's/^Boot\([0-9]\+\)\(.*\)$/\1/')
 if [[ "x${entryId}" != "x" ]]; then
-  efibootmgr -q -b "${entryId}" -B
+  sudo efibootmgr -q -b "${entryId}" -B
 fi
 while [[ $(efibootmgr | grep -c -m 1 "SECTPMCTL Bootloader") -gt 0 ]]
 do
   entryId=$(efibootmgr -v | grep -m 1 -i "SECTPMCTL Bootloader" | sed -e 's/^Boot\([0-9]\+\)\(.*\)$/\1/')
-  efibootmgr -q -b "${entryId}" -B
+  sudo efibootmgr -q -b "${entryId}" -B
 done
 
 
-# Now migrate boot partition to root, the following partition table is assumed, change all referenced
-# according to your device and/or partition names and numbers:
-# /dev/vda1 (EFI-System, vfat, partition type 1)
-# /dev/vda2 (boot partition, ext4)
-# /dev/vda3 (encrypted root partition)
+# 4. Now migrate boot partition to root, the following partition table is assumed, change all references
+# according to your device and partition names and numbers:
 
-umount /boot/efi
-umount /boot
-mkdir /oldboot
-mount /dev/vda2 /oldboot
-cp -rp /oldboot/* /boot/
-umount /oldboot
-rmdir /oldboot
+# $DISK          -> /dev/vda (the disk)
+# $EFIPARTITION  -> /dev/vda1 (EFI-System, vfat, partition type 1)
+# $BOOTPARTITION -> /dev/vda2 (boot partition, ext4)
+# $LUKSPARTITION -> /dev/vda3 (encrypted root partition)
 
-dd if=/dev/zero of=/dev/vda1 bs=1M
-dd if=/dev/zero of=/dev/vda2 bs=1M
-fdisk /dev/vda
-  # delete partition 2
-  # delete partition 1
-  # create parttion 1
-    # startsector same as startsector of old vda1
-    # lastsector same as lastsector of old vda2
+sudo umount /boot/efi
+sudo umount /boot
+sudo mkdir /oldboot
+sudo mount /dev/$BOOTPARTITION /oldboot
+sudo cp -rp /oldboot/* /boot/
+sudo umount /oldboot
+sudo rmdir /oldboot
+
+sudo dd if=/dev/zero of=/dev/$EFIPARTITION bs=1M
+sudo dd if=/dev/zero of=/dev/$BOOTPARTITION bs=1M
+sudo fdisk /dev/$DISK
+  # delete partition $BOOTPARTITION (e.g. vda2)
+  # delete partition $EFIPARTITION (e.g. vda1)
+  # create new parttion $EFIPARTITION (e.g. vda1)
+    # startsector same as startsector of old $EFIPARTITION
+    # lastsector same as lastsector of old $BOOTPARTITION
     # remove signature: YES
-  # change type of partition 1
+  # change type of partition $EFIPARTITION (e.g. vda1)
     # type nr: 1 (EFI-System)
   # write and quit
-
-mkfs.vfat /dev/vda1
-blkid -s UUID -o value /dev/vda1
-  # note the UUID of /dev/vda1, something like: 00A5-1112
-vi /etc/fstab
+sudo mkfs.vfat /dev/$EFIPARTITION
+sudo blkid -s UUID -o value /dev/$EFIPARTITION
+  # copy the UUID of /dev/$EFIPARTITION, something like: 00A5-1112
+sudo vi /etc/fstab
   # remove /boot entry from fstab
-  # change UUID of /boot/efi to the UUID thich blkid listed
-mount /boot/efi
+  # change the old UUID of /boot/efi to the copied new UUID of the blkid output
+sudo mount /boot/efi
 
 
-# Continue installation of bootloader
-
-sectpmctl boot install
+# 5. Install the bootloader
+sudo sectpmctl boot install
 
 # After this reboot your current LUKS password is still required
-reboot
+sudo reboot
 
 
-# Continue installation of TPM
-
-sudo bash
-
+# 6. Install the LUKS TPM implementation
 # Now your machine has its own set of Secure Boot keys, test it
-sectpmctl boot test
+sudo sectpmctl boot test
 
 # Install the LUKS TPM key. Enter your current LUKS key when asked.
-sectpmctl tpm install --setrecoverykey
+sudo sectpmctl tpm install --setrecoverykey
 
 # STORE THE PRINTED RECOVERY KEY NOW!!!
 ```
@@ -222,9 +237,9 @@ sectpmctl tpm install --setrecoverykey
 The 'sectpmctl tpm install' command will print out the recovery key. It is highly recommended to store this key in a safe location. Without this key you can loose
 all your data when the TPM breaks or when accessing your hard disk in another machine. You have been warned!
 
-After a reboot the LUKS partition should decrypt automatically and the installation is complete.
+After a reboot, the LUKS partition should decrypt automatically and the installation is complete.
 
-You can then do some boot loader configuration by editing '/etc/sectpmctl/boot.conf'. Remember to update the boot loader afterwards by executing
+You can then do some bootloader configuration by editing '/etc/sectpmctl/boot.conf'. Remember to update the bootloader afterwards by executing:
 
 ```
 sudo sectpmctl boot update
@@ -242,56 +257,56 @@ Remember that entering the recovery key while booting is the only option when se
 
 ### Kernel or kernel module updates
 
-Kernel or kernel module updates will not create any problems.  Whenever a kernel update is installed or a new DKMS module or update to it, the corresponding
+Kernel or kernel module updates will not create any problems.  Whenever a kernel update is installed or a new DKMS module or update to such, the corresponding
 hooks are called to automatically sign the kernel and/or kernel modules in a very similar way like DKMS and grub for example are doing updates.
 
-### User space updates
+### Userspace updates
 
-No user space application except boot loaders should be able to cause any problem anytime. It is better to not install any other bootloader. The UEFI
-specification allows for many boot loaders being installed in parallel. No other bootloader will overwrite sectpmctl but most probably change the boot order.
-In such case you can enter the boot menu of your BIOS (often the F12 key or such) and select sectpmctl again as boot entry. You can do it also permanently by
+No userspace application except bootloaders should be able to cause any problem anytime. It is better to not install any other bootloader. The UEFI
+specification allows for many bootloaders being installed in parallel. No other bootloader will overwrite sectpmctl but most probably change the boot order.
+In such case you can enter the bootmenu of your BIOS (often the F12 key or such) and select sectpmctl again as boot entry. You can do it also permanently by
 using the efibootmgr command although it could be a bit of a fiddle.
 
-### BIOS Updates, eventually even with an updated Secure Boot database
+### BIOS Updates, eventually even with an Secure Boot database update
 
-BIOS updates should be no problem as sectpmctl is not sealing the LUKS key to a specific BIOS version but only to a specific Secure Boot database and state and
-enforces only use of it's own Secure Boot keys for booting while successfully unlocking the LUKS key. On Lenovo Thinkpads it is even safe to install BIOS
-updates which contain updates to the Secure Boot Database (most probably to supply an updated DBX list). It is safe to install such BIOS update as well as the
+BIOS updates should be no problem as sectpmctl is not sealing the LUKS key to a specific BIOS version, but only to a specific Secure Boot database and state
+while enforcing the use of it's own Secure Boot db keys for successfully unlocking the LUKS key while booting. On some BIOS types it is even safe to install BIOS
+updates which contain updates to the Secure Boot Database (most probably to supply an updated DBX list). It is safe to install such BIOS update as wells as the
 new database is only provided but not applied automatically by the BIOS update.
 
 ### Custom kernels or kernel modules
 
-After installing sectpmctl, a key to sign kernels and kernel modules is stored inside the TPM in a serialized form in
+After installing sectpmctl, a key (db) to sign kernels and kernel modules is stored in the TPM in a serialized form in
 '/var/lib/sectpmctl/keys/db.obj' for use with tpmsbsigntool. The key password is stored in '/var/lib/sectpmctl/keys/db.pwd'
 
 You normally don't need to use the db key manually. DKMS and kernel hooks are integrated and execute the sign commands automatically
-for every kind of update. There are two helper scripts which behave like sbsign and kmodsign in '/usr/lib/sectpmctl/scripts' when you
+for every kind of Ubuntu upgrades. There are two helper scripts which behave like sbsign and kmodsign in '/usr/lib/sectpmctl/scripts' when you
 need to sign things manually:
 
 - sbsign.sh
 - kmodsign.sh
 
 You can even link the helper scripts over the sbsigntool executables by leveraging a debian config package if you need to do so,
-for example to support maintainance of commercial anti virus applications or such.
+for example to support maintainance of commercial antivirus applications or such.
 
-You then need to supply a key and certificate which are stored in '/var/lib/sectpmctl/keys/':
+You then need to supply a key the certificate which are stored in '/var/lib/sectpmctl/keys/':
 
 - db.obj (key)
 - db.cer (certificate)
 - db.crt (certificate)
 
-Depending on the tool you either need the CER or the CRT format as certificate.
+Depending on the tool you either need the CER or the CRT file as certificate.
 
-Please read the helper scripts before manual using as they have specific needs for rewriting parameters. Hopefully the patches of tpmsbsigntool can be merged
+Please read the helper scripts before manual using them as they have specific needs for rewriting parameters. Hopefully the patches of tpmsbsigntool can be merged
 upstream in sbsigntool in the future.
 
 ## Recovery
 
 In case of a changed Secure Boot database, sectpmctl will not unlock anymore. In that case you can simply repeat the sectpmctl installation. First clear the
-Secure Boot database, then clear the TPM and finally repeat all steps from the installation. It is possible to do it more fine grained which will be documented in a later
-release.
+Secure Boot database, then clear the TPM and finally repeat all steps exept 1. and 4. from the installation. It is possible to do it more fine grained which will
+be documented in a later release.
 
-You can then omit the '--setrecoverykey' option in the 'sectpmctl tpm install' command to keep your current recovery key.
+You could then omit the '--setrecoverykey' option in the 'sectpmctl tpm install' command to keep your current recovery key.
 
 ## Disclaimer
 
