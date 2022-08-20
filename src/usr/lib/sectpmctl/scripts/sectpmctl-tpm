@@ -776,27 +776,6 @@ generate_tpm2_policy() {
   dd if=/dev/zero of="${SECTPMCTL_KEYS}/pcrNull.dat" bs=1 count="${HASH_LENGTH}" conv=excl,fsync
   chmod 600 "${SECTPMCTL_KEYS}/pcrNull.dat"
 
-  echo "CREATING PCR VALUES"
-  if (( PCR_VALUES_TO_USE == 7 )); then
-    if [[ -f "${SECTPMCTL_KEYS}/pcr7.dat" ]]; then
-      rm -f "${SECTPMCTL_KEYS}/pcr7.dat"
-    fi
-    tpm2_pcrread -Q \
-      --output="${SECTPMCTL_KEYS}/pcr7.dat" \
-      ${PCR_BANK}:${PCR_VALUES_TO_USE}
-    chmod 600 "${SECTPMCTL_KEYS}/pcr7.dat"
-  fi
-
-  if [[ -f "${SECTPMCTL_KEYS}/pcr11.dat" ]]; then
-    rm -f "${SECTPMCTL_KEYS}/pcr11.dat"
-  fi
-  # Calculate expected value for PCR 11
-  cryptsetup luksDump "${CRYPT_PARTITION}" | openssl dgst -${PCR_BANK} -binary -out pcr11luks.dat -
-  cat "${SECTPMCTL_KEYS}/pcrNull.dat" pcr11luks.dat > pcr11combined.dat
-  openssl dgst -${PCR_BANK} -binary -out "${SECTPMCTL_KEYS}/pcr11.dat" pcr11combined.dat
-  chmod 600 "${SECTPMCTL_KEYS}/pcr11.dat"
-  shred -f -z -u pcr11luks.dat pcr11combined.dat
-
   # optional key creation and escrow
   if [[ "x${SET_RECOVERY_KEY}" == "xtrue" ]]; then
     echo "SET RECOVERY KEY"
@@ -844,20 +823,30 @@ generate_tpm2_policy() {
     shred -f -z -u "./keyfile"
   fi
 
+  echo "CREATING PCR VALUES"
+  if (( PCR_VALUES_TO_USE == 7 )); then
+    if [[ -f "${SECTPMCTL_KEYS}/pcr7.dat" ]]; then
+      rm -f "${SECTPMCTL_KEYS}/pcr7.dat"
+    fi
+    tpm2_pcrread -Q \
+      --output="${SECTPMCTL_KEYS}/pcr7.dat" \
+      ${PCR_BANK}:${PCR_VALUES_TO_USE}
+    chmod 600 "${SECTPMCTL_KEYS}/pcr7.dat"
+  fi
+
+  if [[ -f "${SECTPMCTL_KEYS}/pcr11.dat" ]]; then
+    rm -f "${SECTPMCTL_KEYS}/pcr11.dat"
+  fi
+  # Calculate expected value for PCR 11
+  cryptsetup luksDump "${CRYPT_PARTITION}" | openssl dgst -${PCR_BANK} -binary -out pcr11luks.dat -
+  cat "${SECTPMCTL_KEYS}/pcrNull.dat" pcr11luks.dat > pcr11combined.dat
+  openssl dgst -${PCR_BANK} -binary -out "${SECTPMCTL_KEYS}/pcr11.dat" pcr11combined.dat
+  chmod 600 "${SECTPMCTL_KEYS}/pcr11.dat"
+  shred -f -z -u pcr11luks.dat pcr11combined.dat
+
   echo "SEAL LUKS KEY to TPM"
   if (( PCR_VALUES_TO_USE == 7 )); then
-    bash -x sectpmctl key seal --handle "${PERSISTANT_HANDLE_TO_USE}" --key-file "${TPM_SECRET_LUKS_KEY}" --noda --pcr-extend
-    
-    echo test
-    echo
-    sha256sum "${TPM_SECRET_LUKS_KEY}"
-    sectpmctl key seal --handle "0x81000105" --key-file "${TPM_SECRET_LUKS_KEY}" --noda
-    sectpmctl key unseal --handle "0x81000105" --noda
-    echo
-    sectpmctl key unseal --handle "0x81000105" --noda > b
-    sha256sum b
-    rm b
-    echo
+    sectpmctl key seal --handle "${PERSISTANT_HANDLE_TO_USE}" --key-file "${TPM_SECRET_LUKS_KEY}" --noda --pcr-extend
   else
     sectpmctl key seal --handle "${PERSISTANT_HANDLE_TO_USE}" --key-file "${TPM_SECRET_LUKS_KEY}" --noda --pcr-extend --pcr-preseed
   fi
