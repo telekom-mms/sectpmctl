@@ -139,7 +139,7 @@ OPTIONS
 
     --key <file>
 
-      Keyfile which can be used to add Key.
+      LUKS Keyfile which can be used to add Key.
       Must be an absolute path. 
       Reads from stdin if this option is not given.
 
@@ -398,7 +398,7 @@ _check_input() {
   if [[ "x$KEY_FILE" == "x" ]] && [[ "x$INITIAL" == "xtrue" || "x$SEAL" == "xtrue" ]]; then
     if [[ -t 0 ]]; then
       # stdin is coming from the terminal
-      echo -n "Enter Password: "
+      echo -n "Enter LUKS Password: "
       read -sr line || true
       export KNOWN_UNKNOWN="$line"
     else
@@ -1051,7 +1051,7 @@ copy_exec /usr/bin/wc /usr/bin
 
 copy_exec /usr/sbin/sectpmctl /usr/sbin
 
-copy_exec /usr/lib/sectpmctl/scripts/sectpmctl-key /usr/lib/sectpmctl/scripts
+copy_exec /usr/lib/sectpmctl/scripts/sectpmctl-key /usr/lib/sectpmctl/scripts/sectpmctl-key
 copy_exec /usr/lib/x86_64-linux-gnu/libtss2-tcti-device.so.0 /usr/lib/x86_64-linux-gnu
 
 force_load tpm_tis
