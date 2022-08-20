@@ -625,7 +625,7 @@ if [ "\$CRYPTTAB_TRIED" = 0 ]; then
         echo sectpmctl
         echo
         tpm2_pcrextend 11:${PCR_BANK}=\$(cryptsetup luksDump "${CRYPT_PARTITION}" | ${PCR_BANK}sum | awk '{print \$1;}')
-        tpm2_startauthsession --policy-session --session=session.ctx --key-context=/sectpmctl.pub
+        tpm2_startauthsession --policy-session --session=session.ctx --key-context=${SECTPMCTL_KEYS}/tpm_owner_noda.pub
         retVal=\$?
         if [ \$retVal -ne 0 ]; then
                 echo NOT THE EXPECTED TPM MODULE
@@ -645,7 +645,7 @@ if [ "\$CRYPTTAB_TRIED" = 0 ]; then
         retVal=\$?
         tpm2_pcrextend 11:${PCR_BANK}=\$(tpm2_getrandom --hex ${HASH_LENGTH})
         tpm2_flushcontext session.ctx
-        tpm2_startauthsession --policy-session --session=session_test.ctx --key-context=/sectpmctl.pub
+        tpm2_startauthsession --policy-session --session=session_test.ctx --key-context=${SECTPMCTL_KEYS}/tpm_owner_noda.pub
         retVal=\$?
         if [ \$retVal -ne 0 ]; then
                 echo NOT THE EXPECTED TPM MODULE
@@ -694,7 +694,7 @@ if [ "\$CRYPTTAB_TRIED" = 0 ]; then
         echo sectpmctl, only for preseed usage!
         echo
         tpm2_pcrextend 11:${PCR_BANK}=\$(cryptsetup luksDump "${CRYPT_PARTITION}" | ${PCR_BANK}sum | awk '{print \$1;}')
-        tpm2_startauthsession --policy-session --session=session.ctx --key-context=/sectpmctl.pub
+        tpm2_startauthsession --policy-session --session=session.ctx --key-context=${SECTPMCTL_KEYS}/tpm_owner_noda.pub
         retVal=\$?
         if [ \$retVal -ne 0 ]; then
                 echo NOT THE EXPECTED TPM MODULE
