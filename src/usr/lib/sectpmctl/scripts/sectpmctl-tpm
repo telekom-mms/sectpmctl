@@ -555,24 +555,30 @@ cat > "${KEY_SCRIPT}" <<__EOT
 
 exec 3>&1 1>&2
 
-mkdir /dev/shm
-mount -t tmpfs tmpfs /dev/shm
-
 if [ "\$CRYPTTAB_TRIED" = 0 ]; then
         echo
         echo sectpmctl
         echo
+        
+        mkdir /dev/shm > /dev/null 2> /dev/null
+        mount -t tmpfs tmpfs /dev/shm
 
+        echo sectpmctl key extend --string "\$(cryptsetup luksDump "${CRYPT_PARTITION}" | ${PCR_BANK}sum | awk '{print \$1;}')"
         sectpmctl key extend --string "\$(cryptsetup luksDump "${CRYPT_PARTITION}" | ${PCR_BANK}sum | awk '{print \$1;}')"
 
+        echo sectpmctl key unseal --handle "${PERSISTANT_HANDLE_TO_USE}" --noda --pcr-extend 1>&3 3>&-
         sectpmctl key unseal --handle "${PERSISTANT_HANDLE_TO_USE}" --noda --pcr-extend 1>&3 3>&-
         retVal=\$?
 
+        echo now extend
         sectpmctl key extend --random
 
+        echo sectpmctl key unseal --handle "${PERSISTANT_HANDLE_TO_USE}" --noda --pcr-extend > /dev/null 2> /dev/null
         sectpmctl key unseal --handle "${PERSISTANT_HANDLE_TO_USE}" --noda --pcr-extend > /dev/null 2> /dev/null
         retValTest=\$?
 
+        umount /dev/shm
+        
         if [ \$retVal -ne 0 ]; then
                 echo UNSEAL FAILED
                 echo
@@ -606,11 +612,16 @@ if [ "\$CRYPTTAB_TRIED" = 0 ]; then
         echo sectpmctl, only for preseed usage!
         echo
 
+        mkdir /dev/shm > /dev/null 2> /dev/null
+        mount -t tmpfs tmpfs /dev/shm
+
         sectpmctl key extend --string "\$(cryptsetup luksDump "${CRYPT_PARTITION}" | ${PCR_BANK}sum | awk '{print \$1;}')"
 
         sectpmctl key unseal --handle "${PERSISTANT_HANDLE_TO_USE}" --noda --pcr-extend --pcr-preseed 1>&3 3>&-
         retVal=\$?
 
+        umount /dev/shm
+        
         if [ \$retVal -ne 0 ]; then
                 echo UNSEAL FAILED
                 echo
@@ -774,17 +785,18 @@ generate_tpm2_policy() {
     else
       echo
       echo "########################################"
+      echo "########################################"
+      echo
       echo "WARNING!"
       echo "Please save this recovery in a save place."
       echo "When lost you will have difficulties to recover."
       echo "If the TPM is deleted or secureboot changed you"
       echo "will not be able to recover in case of lost"
       echo "recovery key!"
-      echo "If the TPM is not deleted and secureboot did't"
-      echo "change, read the man page for how to recover a"
-      echo "lost recovery key."
       echo
       echo "RECOVERY KEY: ${RECOVERY_KEY}"
+      echo
+      echo "########################################"
       echo "########################################"
       echo
     fi
