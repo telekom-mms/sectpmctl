@@ -287,14 +287,12 @@ _check_input_and_state() {
               elif [[ -z "${HANDLE}" ]]; then
                 if [[ $( echo "${2}" | grep -cE '^0x([0-9A-Fa-f][0-9A-Fa-f])+$' ) == 1 ]]; then
                   HANDLE="$( echo "${2}" | tr '[:upper:]' '[:lower:]' )"
-                  if [[ "${CMD}" != "unseal" ]]; then
-                    if [[ "${HANDLE}" == $( echo "${HANDLE_O_SRK}" | tr '[:upper:]' '[:lower:]' ) ]]; then
-                      _print_error "${ME} ${CMD} ${1}: Handle '${HANDLE}' can not be equal to owner DA SRK"
-                      return 1
-                    elif [[ "${HANDLE}" == $( echo "${HANDLE_O_SRK_NODA}" | tr '[:upper:]' '[:lower:]' ) ]]; then
-                      _print_error "${ME} ${CMD} ${1}: Handle '${HANDLE}' can not be equal to owner NODA SRK"
-                      return 1
-                    fi
+                  if [[ "${HANDLE}" == $( echo "${HANDLE_O_SRK}" | tr '[:upper:]' '[:lower:]' ) ]]; then
+                    _print_error "${ME} ${CMD} ${1}: Handle '${HANDLE}' can not be equal to owner DA SRK"
+                    return 1
+                  elif [[ "${HANDLE}" == $( echo "${HANDLE_O_SRK_NODA}" | tr '[:upper:]' '[:lower:]' ) ]]; then
+                    _print_error "${ME} ${CMD} ${1}: Handle '${HANDLE}' can not be equal to owner NODA SRK"
+                    return 1
                   fi
                 else
                   _print_error "${ME} ${CMD} ${1}: Option is not a hex string '${2}'"

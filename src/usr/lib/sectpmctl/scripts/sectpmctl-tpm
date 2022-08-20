@@ -563,17 +563,15 @@ if [ "\$CRYPTTAB_TRIED" = 0 ]; then
         mkdir /dev/shm > /dev/null 2> /dev/null
         mount -t tmpfs tmpfs /dev/shm
 
-        echo sectpmctl key extend --string "\$(cryptsetup luksDump "${CRYPT_PARTITION}" | ${PCR_BANK}sum | awk '{print \$1;}')"
-        sectpmctl key extend --string "\$(cryptsetup luksDump "${CRYPT_PARTITION}" | ${PCR_BANK}sum | awk '{print \$1;}')"
+        cryptsetup luksDump "${CRYPT_PARTITION}" > luks.dat
+        sectpmctl key extend --file luks.dat
+        shred -f -z -u luks.dat
 
-        echo sectpmctl key unseal --handle "${PERSISTANT_HANDLE_TO_USE}" --noda --pcr-extend 1>&3 3>&-
         sectpmctl key unseal --handle "${PERSISTANT_HANDLE_TO_USE}" --noda --pcr-extend 1>&3 3>&-
         retVal=\$?
 
-        echo now extend
         sectpmctl key extend --random
 
-        echo sectpmctl key unseal --handle "${PERSISTANT_HANDLE_TO_USE}" --noda --pcr-extend > /dev/null 2> /dev/null
         sectpmctl key unseal --handle "${PERSISTANT_HANDLE_TO_USE}" --noda --pcr-extend > /dev/null 2> /dev/null
         retValTest=\$?
 
@@ -615,7 +613,9 @@ if [ "\$CRYPTTAB_TRIED" = 0 ]; then
         mkdir /dev/shm > /dev/null 2> /dev/null
         mount -t tmpfs tmpfs /dev/shm
 
-        sectpmctl key extend --string "\$(cryptsetup luksDump "${CRYPT_PARTITION}" | ${PCR_BANK}sum | awk '{print \$1;}')"
+        cryptsetup luksDump "${CRYPT_PARTITION}" > luks.dat
+        sectpmctl key extend --file luks.dat
+        shred -f -z -u luks.dat
 
         sectpmctl key unseal --handle "${PERSISTANT_HANDLE_TO_USE}" --noda --pcr-extend --pcr-preseed 1>&3 3>&-
         retVal=\$?
