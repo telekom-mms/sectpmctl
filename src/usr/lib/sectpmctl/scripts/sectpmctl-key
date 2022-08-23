@@ -30,7 +30,7 @@ PCR_EXTENDED="11"
 PCR_BANK="sha256"
 PCR_HASH_LENGTH="32"
 KEYED_HASH="sha256"
-MAX_PIN_LENGTH="64"
+MAX_PASSWORD_LENGTH="64"
 PCR_VAR="${PCR_EXTENDED},"
 PCRLIST_PRESEED_ONCE="${PCR_BANK}:${PCR_BIOS},8,9,${PCR_VAR}14"
 PCRLIST_PRIMARY_ONCE="${PCR_BANK}:${PCR_SECUREBOOT},8,9,${PCR_VAR}14"
@@ -59,9 +59,9 @@ NAME=""
 NAME_DIR=""
 HANDLE=""
 KEY_FILE=""
-PIN=""
+PASSWORD=""
 NODA=false
-OLDPIN=""
+OLDPASSWORD=""
 PARENT_PUBLIC=""
 PARENT_HANDLE=""
 PCRLIST=""
@@ -87,9 +87,9 @@ $ME COMMAND [OPTIONS...]
 A tool to store encrypted secrets in TPM2 key hash objects
 
 Commands
-  changepin
-    <handle> [noda] <oldpin | oldpin-hex | oldpin-file>
-    <pin | pin-hex | pin-file>
+  changepassword
+    <handle> [noda] <oldpassword | oldpassword-hex | oldpassword-file>
+    <password | password-hex | password-file>
   extend
     <[file] | [random] | [string]>
   help
@@ -97,10 +97,10 @@ Commands
     <handle | name [name-dir]>
   seal
     <handle | name [name-dir]> [key-file] [noda] [pcr-extend] [pcr-preseed]
-    [pin | pin-hex | pin-file]
+    [password | password-hex | password-file]
   unseal
     <handle | name [name-dir]> [noda] [pcr-extend] [pcr-preseed]
-    [pin | pin-hex | pin-file]
+    [password | password-hex | password-file]
 
 Options
   --file <file>
@@ -109,14 +109,14 @@ Options
   --name <string>
   --name-dir <directory>
   --noda
-  --oldpin <string>
-  --oldpin-hex <hex string>
-  --oldpin-file <file>
+  --oldpassword <string>
+  --oldpassword-hex <hex string>
+  --oldpassword-file <file>
   --pcr-extend
   --pcr-preseed
-  --pin <string>
-  --pin-hex <hex string>
-  --pin-file <file>
+  --password <string>
+  --password-hex <hex string>
+  --password-file <file>
   --random
   --string <string>
 __END
@@ -130,11 +130,11 @@ A tool to store encrypted secrets in TPM2 key hash objects
 
 
 Commands
-  changepin
-    <handle> [noda] <oldpin | oldpin-hex | oldpin-file>
-    <pin | pin-hex | pin-file>
+  changepassword
+    <handle> [noda] <oldpassword | oldpassword-hex | oldpassword-file>
+    <password | password-hex | password-file>
 
-    Changes the PIN of a sealed object which is persisted in the TPM
+    Changes the password of a sealed object which is persisted in the TPM
 
   extend
     <[file] | [random] | [string]>
@@ -150,11 +150,11 @@ Commands
 
   seal
     <handle | name [name-dir]> [key-file] [noda] [pcr-extend] [pcr-preseed]
-    [pin | pin-hex | pin-file]
+    [password | password-hex | password-file]
 
   unseal
     <handle | name [name-dir]> [noda] [pcr-extend] [pcr-preseed]
-    [pin | pin-hex | pin-file]
+    [password | password-hex | password-file]
 
 
 Options
@@ -166,13 +166,13 @@ Options
 
   --noda
 
-  --pin <string>
-  --pin-hex <hex string>
-  --pin-file <file>
+  --password <string>
+  --password-hex <hex string>
+  --password-file <file>
 
-  --oldpin <string>
-  --oldpin-hex <hex string>
-  --oldpin-file <file>
+  --oldpassword <string>
+  --oldpassword-hex <hex string>
+  --oldpassword-file <file>
 
   --pcr-extend
   --pcr-preseed
@@ -184,23 +184,23 @@ Options
 
 Examples
   Seal secret
-    $ME seal --name dbkey --pin "1234"
+    $ME seal --name dbkey --password "1234"
     Enter Password: secret
  
-    echo secret | $ME seal --name dbkey --pin "1234"
+    echo secret | $ME seal --name dbkey --password "1234"
 
     echo secret > key
-    $ME seal --name dbkey --key-file key --pin "1234"
+    $ME seal --name dbkey --key-file key --password "1234"
 
     openssl rand 64 | $ME seal --handle 0x81000003 --noda
 
   Unseal secret
-    $ME unseal --name dbkey --pin "1234"
+    $ME unseal --name dbkey --password "1234"
 
     $ME unseal --handle 0x81000003 --noda
 
-  Change PIN of secret
-    $ME changepin --handle 0x81000003 --oldpin "1234" --pin "567989433"
+  Change password of secret
+    $ME changepassword --handle 0x81000003 --oldpassword "1234" --password "567989433"
 
   Remove secret
     $ME remove --name dbkey
@@ -262,7 +262,7 @@ _check_input_and_state() {
   CMD="${1}"
   
   case "${CMD}" in
-    changepin | enterlockout | extend | leavelockout | remove | seal | unseal)
+    changepassword | enterlockout | extend | leavelockout | remove | seal | unseal)
       ;;
     help)
       _usage_long
@@ -279,7 +279,7 @@ _check_input_and_state() {
     case "${1}" in
       --handle)
         case "${CMD}" in
-          changepin | remove | seal | unseal)
+          changepassword | remove | seal | unseal)
             if (( ${#} >= 2 )) && [[ ! "${2}" =~ ^- ]]; then
               if [[ -n "${NAME}" ]]; then
                 _print_error "${ME} ${CMD} ${1}: Option '--name' already set"
@@ -393,7 +393,7 @@ _check_input_and_state() {
         ;;
       --noda)
         case "${CMD}" in
-          changepin | seal | unseal)
+          changepassword | seal | unseal)
             if [[ -z "${PARENT_PUBLIC}" ]]; then
               PARENT_PUBLIC="${O_SRK_PUB_NODA}"
               PARENT_HANDLE="${HANDLE_O_SRK_NODA}"
@@ -501,15 +501,17 @@ _check_input_and_state() {
             ;;
         esac
         ;;
-      --pin)
+      --password)
         case "${CMD}" in
-          changepin | seal | unseal)
+          changepassword | seal | unseal)
             if (( ${#} >= 2 )) && [[ ! "${2}" =~ ^- ]]; then
-              if [[ -z "${PIN}" ]]; then
-                PIN="$(echo -n "${2}" | od -A n -v -t x1 | tr -d ' \n')"
-                if (( $( echo -n "${PIN}" | wc -c ) > MAX_PIN_LENGTH*2 )); then
-                  _print_error "${ME} ${CMD} ${1}: Maximum length 64 bytes '${2}'"
-                  return 1
+              if [[ -z "${PASSWORD}" ]]; then
+                PASSWORD="$(echo -n "${2}" | od -A n -v -t x1 | tr -d ' \n')"
+                if (( $( echo -n "${PASSWORD}" | wc -c ) > MAX_PASSWORD_LENGTH*2 )); then
+                  if [[ "${CMD}" != "unseal" ]]; then
+                    _print_error "${ME} ${CMD} ${1}: Maximum length 64 bytes '${2}'"
+                    return 1
+                  fi
                 fi
               else
                 _print_error "${ME} ${CMD} ${1}: Can not be set twice"
@@ -527,20 +529,22 @@ _check_input_and_state() {
             ;;
         esac
         ;;
-      --pin-file)
+      --password-file)
         case "${CMD}" in
-          changepin | seal | unseal)
+          changepassword | seal | unseal)
             if (( ${#} >= 2 )) && [[ ! "${2}" =~ ^- ]]; then
-              if [[ -z "${PIN}" ]]; then
+              if [[ -z "${PASSWORD}" ]]; then
                 p1="$( od -A n -v -t x1 "${2}" | tr -d ' \n')" || p1=""
                 if [[ "${p1}" == "" ]]; then
                   _print_error "${ME} ${CMD} ${1}: Could not read file content '${2}'"
                   return 1
-                elif (( $( echo -n "${p1}" | wc -c ) > MAX_PIN_LENGTH*2 )); then
-                  _print_error "${ME} ${CMD} ${1}: Maximum length is ${MAX_PIN_LENGTH} bytes '${2}'"
-                  return 1
+                elif (( $( echo -n "${p1}" | wc -c ) > MAX_PASSWORD_LENGTH*2 )); then
+                  if [[ "${CMD}" != "unseal" ]]; then
+                    _print_error "${ME} ${CMD} ${1}: Maximum length is ${MAX_PASSWORD_LENGTH} bytes '${2}'"
+                    return 1
+                  fi
                 fi
-                PIN="${p1}"
+                PASSWORD="${p1}"
               else
                 _print_error "${ME} ${CMD} ${1}: Can not be set twice"
                 return 1
@@ -557,16 +561,18 @@ _check_input_and_state() {
             ;;
         esac
         ;;
-      --pin-hex)
+      --password-hex)
         case "${CMD}" in
-          changepin | seal | unseal)
+          changepassword | seal | unseal)
             if (( ${#} >= 2 )) && [[ ! "${2}" =~ ^- ]]; then
-              if [[ -z "${PIN}" ]]; then
+              if [[ -z "${PASSWORD}" ]]; then
                 if [[ $( echo "${2}" | grep -cE '^0x([0-9A-Fa-f][0-9A-Fa-f])+$' ) == 1 ]]; then
-                  PIN="$( echo "${2:2}" | tr '[:upper:]' '[:lower:]' )"
-                  if (( $( echo -n "${PIN}" | wc -c ) > MAX_PIN_LENGTH*2 )); then
-                    _print_error "${ME} ${CMD} ${1}: Maximum length 64 bytes '${2}'"
-                    return 1
+                  PASSWORD="$( echo "${2:2}" | tr '[:upper:]' '[:lower:]' )"
+                  if (( $( echo -n "${PASSWORD}" | wc -c ) > MAX_PASSWORD_LENGTH*2 )); then
+                    if [[ "${CMD}" != "unseal" ]]; then
+                      _print_error "${ME} ${CMD} ${1}: Maximum length 64 bytes '${2}'"
+                      return 1
+                    fi
                   fi
                 else
                   _print_error "${ME} ${CMD} ${1}: Option is not a hex string '${2}'"
@@ -588,13 +594,13 @@ _check_input_and_state() {
             ;;
         esac
         ;;
-      --oldpin)
+      --oldpassword)
         case "${CMD}" in
-          changepin)
+          changepassword)
             if (( ${#} >= 2 )) && [[ ! "${2}" =~ ^- ]]; then
-              if [[ -z "${OLDPIN}" ]]; then
-                OLDPIN="$(echo -n "${2}" | od -A n -v -t x1 | tr -d ' \n')"
-                if (( $( echo -n "${OLDPIN}" | wc -c ) > MAX_PIN_LENGTH*2 )); then
+              if [[ -z "${OLDPASSWORD}" ]]; then
+                OLDPASSWORD="$(echo -n "${2}" | od -A n -v -t x1 | tr -d ' \n')"
+                if (( $( echo -n "${OLDPASSWORD}" | wc -c ) > MAX_PASSWORD_LENGTH*2 )); then
                   _print_error "${ME} ${CMD} ${1}: Maximum length 64 bytes '${2}'"
                   return 1
                 fi
@@ -614,20 +620,20 @@ _check_input_and_state() {
             ;;
         esac
         ;;
-      --oldpin-file)
+      --oldpassword-file)
         case "${CMD}" in
-          changepin)
+          changepassword)
             if (( ${#} >= 2 )) && [[ ! "${2}" =~ ^- ]]; then
-              if [[ -z "${OLDPIN}" ]]; then
+              if [[ -z "${OLDPASSWORD}" ]]; then
                 p1="$( od -A n -v -t x1 "${2}" | tr -d ' \n')" || p1=""
                 if [[ "${p1}" == "" ]]; then
                   _print_error "${ME} ${CMD} ${1}: Could not read file content '${2}'"
                   return 1
-                elif (( $( echo -n "${p1}" | wc -c ) > MAX_PIN_LENGTH*2 )); then
-                  _print_error "${ME} ${CMD} ${1}: Maximum length is ${MAX_PIN_LENGTH} bytes '${2}'"
+                elif (( $( echo -n "${p1}" | wc -c ) > MAX_PASSWORD_LENGTH*2 )); then
+                  _print_error "${ME} ${CMD} ${1}: Maximum length is ${MAX_PASSWORD_LENGTH} bytes '${2}'"
                   return 1
                 fi
-                OLDPIN="${p1}"
+                OLDPASSWORD="${p1}"
               else
                 _print_error "${ME} ${CMD} ${1}: Can not be set twice"
                 return 1
@@ -644,14 +650,14 @@ _check_input_and_state() {
             ;;
         esac
         ;;
-      --oldpin-hex)
+      --oldpassword-hex)
         case "${CMD}" in
-          changepin)
+          changepassword)
             if (( ${#} >= 2 )) && [[ ! "${2}" =~ ^- ]]; then
-              if [[ -z "${OLDPIN}" ]]; then
+              if [[ -z "${OLDPASSWORD}" ]]; then
                 if [[ $( echo "${2}" | grep -cE '^0x([0-9A-Fa-f][0-9A-Fa-f])+$' ) == 1 ]]; then
-                  OLDPIN="$( echo "${2:2}" | tr '[:upper:]' '[:lower:]' )"
-                  if (( $( echo -n "${OLDPIN}" | wc -c ) > MAX_PIN_LENGTH*2 )); then
+                  OLDPASSWORD="$( echo "${2:2}" | tr '[:upper:]' '[:lower:]' )"
+                  if (( $( echo -n "${OLDPASSWORD}" | wc -c ) > MAX_PASSWORD_LENGTH*2 )); then
                     _print_error "${ME} ${CMD} ${1}: Maximum length 64 bytes '${2}'"
                     return 1
                   fi
@@ -698,13 +704,13 @@ _check_input_and_state() {
   fi
   
   case "${CMD}" in
-    changepin)
-      if [[ -z "${PIN}" ]]; then
-        _print_error "${ME} ${CMD}: '--pin', '--pin-hex' or '--pin-file' required"
+    changepassword)
+      if [[ -z "${PASSWORD}" ]]; then
+        _print_error "${ME} ${CMD}: '--password', '--password-hex' or '--password-file' required"
         return 1
       fi
-      if [[ -z "${OLDPIN}" ]]; then
-        _print_error "${ME} ${CMD}: '--oldpin', '--oldpin-hex' or '--oldpin-file' required"
+      if [[ -z "${OLDPASSWORD}" ]]; then
+        _print_error "${ME} ${CMD}: '--oldpassword', '--oldpassword-hex' or '--oldpassword-file' required"
         return 1
       fi
       ;;
@@ -724,7 +730,7 @@ _check_input_and_state() {
   esac
   
   case "${CMD}" in
-    changepin)
+    changepassword)
       if [[ -z "${HANDLE}" ]]; then
         _print_error "${ME} ${CMD}: Handle is required"
         return 1
@@ -781,8 +787,8 @@ _check_input_and_state() {
       unseal)
         _unseal
         ;;
-      changepin)
-        _changepin
+      changepassword)
+        _changepassword
         ;;
       *)
         _print_error "${ME} ${CMD}: Unknown command"
@@ -894,17 +900,17 @@ _enterlockout() {
   sectpmctl key remove --handle 0x81000999 2> /dev/null > /dev/null
   
   _tx "${ME} ${CMD}: Could not seal lockout test object" \
-    echo "abc" | sectpmctl key seal --handle 0x81000999 --pin 123 --pcr-preseed || return 1
+    echo "abc" | sectpmctl key seal --handle 0x81000999 --password 123 --pcr-preseed || return 1
 
-  sectpmctl key unseal --handle 0x81000999 --pin wrongpwd --pcr-preseed 2> /dev/null > /dev/null
-  sectpmctl key unseal --handle 0x81000999 --pin wrongpwd --pcr-preseed 2> /dev/null > /dev/null
-  sectpmctl key unseal --handle 0x81000999 --pin wrongpwd --pcr-preseed 2> /dev/null > /dev/null
-  sectpmctl key unseal --handle 0x81000999 --pin wrongpwd --pcr-preseed 2> /dev/null > /dev/null
-  sectpmctl key unseal --handle 0x81000999 --pin wrongpwd --pcr-preseed 2> /dev/null > /dev/null
-  sectpmctl key unseal --handle 0x81000999 --pin wrongpwd --pcr-preseed 2> /dev/null > /dev/null
-  sectpmctl key unseal --handle 0x81000999 --pin wrongpwd --pcr-preseed 2> /dev/null > /dev/null
-  sectpmctl key unseal --handle 0x81000999 --pin wrongpwd --pcr-preseed 2> /dev/null > /dev/null
-  sectpmctl key unseal --handle 0x81000999 --pin wrongpwd --pcr-preseed 2> /dev/null > /dev/null
+  sectpmctl key unseal --handle 0x81000999 --password wrongpwd --pcr-preseed 2> /dev/null > /dev/null
+  sectpmctl key unseal --handle 0x81000999 --password wrongpwd --pcr-preseed 2> /dev/null > /dev/null
+  sectpmctl key unseal --handle 0x81000999 --password wrongpwd --pcr-preseed 2> /dev/null > /dev/null
+  sectpmctl key unseal --handle 0x81000999 --password wrongpwd --pcr-preseed 2> /dev/null > /dev/null
+  sectpmctl key unseal --handle 0x81000999 --password wrongpwd --pcr-preseed 2> /dev/null > /dev/null
+  sectpmctl key unseal --handle 0x81000999 --password wrongpwd --pcr-preseed 2> /dev/null > /dev/null
+  sectpmctl key unseal --handle 0x81000999 --password wrongpwd --pcr-preseed 2> /dev/null > /dev/null
+  sectpmctl key unseal --handle 0x81000999 --password wrongpwd --pcr-preseed 2> /dev/null > /dev/null
+  sectpmctl key unseal --handle 0x81000999 --password wrongpwd --pcr-preseed 2> /dev/null > /dev/null
 
   p1="$( _tx "${ME} ${CMD}: Could not read getcap properties-variable" \
     tpm2_getcap properties-variable )" || _xt $? || return 1
@@ -990,7 +996,7 @@ _extend() {
   done
 }
 
-_changepin() {
+_changepassword() {
   ERR=false
 
   tempdir="$( _ex "${ME} ${CMD}: Could not create temporary ramfs directory" \
@@ -1006,7 +1012,7 @@ _changepin() {
         tpm2_readpublic -Q -c "${HANDLE}" -o key.pub || break
       # change authorisation
       _tx "${ME} ${CMD}: Could not change authorisation" \
-        tpm2_changeauth -Q -c "${HANDLE}" -C "${PARENT_HANDLE}" -r new.priv -p "hex:${OLDPIN}" "hex:${PIN}" || break
+        tpm2_changeauth -Q -c "${HANDLE}" -C "${PARENT_HANDLE}" -r new.priv -p "hex:${OLDPASSWORD}" "hex:${PASSWORD}" || break
       # remove current object in handle, may fail if empty
       tpm2_evictcontrol -Q -c "${HANDLE}" -C o 2> /dev/null > /dev/null || true
       # load the key
@@ -1108,7 +1114,7 @@ _seal() {
       tpm2_startauthsession -Q -S trialsession.ctx || break
     _tx "${ME} ${CMD}: Could not add PCR policy to trial session" \
       tpm2_policypcr -Q -S trialsession.ctx -l "${PCRLIST}" -f pcr_values.dat -L pcr.policy || break
-    if [[ -n ${PIN} ]]; then
+    if [[ -n ${PASSWORD} ]]; then
       _tx "${ME} ${CMD}: Could not add authValue policy to trial session" \
         tpm2_policyauthvalue -Q -S trialsession.ctx -L pcr.policy || break
     fi
@@ -1145,9 +1151,9 @@ _seal() {
     if [[ ${NODA} == true ]]; then
         nodaAttribute="|noda"
     fi
-    if [[ -n ${PIN} ]]; then
+    if [[ -n ${PASSWORD} ]]; then
       _tx "${ME} ${CMD}: Could not seal data" \
-        tpm2_create -Q --session=session.ctx -g "${KEYED_HASH}" -u "${name_key_pub}" -r "${name_key_priv}" -i "${input_file}" -C "${PARENT_HANDLE}" -L pcr.policy -a "fixedtpm|fixedparent${nodaAttribute}" -p "hex:${PIN}" || break
+        tpm2_create -Q --session=session.ctx -g "${KEYED_HASH}" -u "${name_key_pub}" -r "${name_key_priv}" -i "${input_file}" -C "${PARENT_HANDLE}" -L pcr.policy -a "fixedtpm|fixedparent${nodaAttribute}" -p "hex:${PASSWORD}" || break
     else
       _tx "${ME} ${CMD}: Could not seal data" \
         tpm2_create -Q --session=session.ctx -g "${KEYED_HASH}" -u "${name_key_pub}" -r "${name_key_priv}" -i "${input_file}" -C "${PARENT_HANDLE}" -L pcr.policy -a "fixedtpm|fixedparent${nodaAttribute}" || break
@@ -1244,7 +1250,7 @@ _unseal() {
     # supply pcr and authvalue policy to session
     _tx "${ME} ${CMD}: Could not create PCR policy" \
       tpm2_policypcr -Q -S session.ctx -l ${PCRLIST} || break
-    if [[ -n ${PIN} ]]; then
+    if [[ -n ${PASSWORD} ]]; then
       _tx "${ME} ${CMD}: Could not create authValue policy" \
         tpm2_policyauthvalue -Q -S session.ctx || break
     fi
@@ -1263,9 +1269,9 @@ _unseal() {
     fi
 
     # load secret from keyed hash object
-    if [[ -n ${PIN} ]]; then
+    if [[ -n ${PASSWORD} ]]; then
       _tx "${ME} ${CMD}: Could not unseal data" \
-        tpm2_unseal -p "session:session.ctx+hex:${PIN}" -c "${context_handle}" 1>&4 || break
+        tpm2_unseal -p "session:session.ctx+hex:${PASSWORD}" -c "${context_handle}" 1>&4 || break
     else
       _tx "${ME} ${CMD}: Could not unseal data" \
         tpm2_unseal -p "session:session.ctx" -c "${context_handle}" 1>&4 || break

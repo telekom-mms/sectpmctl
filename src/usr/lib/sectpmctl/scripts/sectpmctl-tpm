@@ -56,7 +56,7 @@ COMMANDS
   check
   help
   install
-    [--dont-extend] [--key <file>]
+    [--dont-extend] [--key <file>] [--password <tpm password>]
     [--preseed-pcr] [[--setrecoverykey][[--recoveryfile <file>]|[--recoveryscripthelper <file>]]]
     [--recoverygroups <num>] [--recoverygrouplength <num>  ]
   provisioning 
@@ -99,7 +99,7 @@ COMMANDS
   check
   help
   install
-    [--dont-extend] [--key <file>]
+    [--dont-extend] [--key <file>] [--password <TPM password>]
     [--preseed-pcr] [[--setrecoverykey][[--recoveryfile <file>]|[--recoveryscripthelper <file>]]]
     [--recoverygroups <num>] [--recoverygrouplength <num>  ] [--setrecoverykey]
   provisioning 
@@ -129,6 +129,14 @@ OPTIONS
       LUKS Keyfile which can be used to add Key.
       Must be an absolute path. 
       Reads from stdin if this option is not given.
+
+
+    --password <TPM password>
+
+      Seal the LUKS key to PCR values and a password. Internally this
+      option is not combined with the --noda option to enable DA
+      protection. When unsealing while booting, the same TPM password
+      has to be provided.
 
 
     --setrecoverykey
@@ -239,6 +247,8 @@ EXAMPLES
     $ sudo ${ME/-/ } install --setrecoverykey
 
     $ sudo ${ME/-/ } install --setrecoverykey --recoveryfile /path/to/my/secret.key
+
+    $ sudo ${ME/-/ } install --password "0q4c3kc8" --setrecoverykey
 
     CAUTION:
     The Example command will print out the recovery key.
@@ -563,7 +573,7 @@ echo -n "Enter TPM Password: "
 read -sr password || true
 echo
 
-sectpmctl key unseal --handle "${PERSISTANT_HANDLE_TO_USE}" --pin "\${password}" --pcr-extend 1>&3 3>&-
+sectpmctl key unseal --handle "${PERSISTANT_HANDLE_TO_USE}" --password "\${password}" --pcr-extend 1>&3 3>&-
 if [ \$? -ne 0 ]; then
         umount /dev/shm
         echo UNSEAL FAILED, CHECKING RECOVERY KEY
@@ -573,7 +583,7 @@ fi
 
 sectpmctl key extend --random
 
-sectpmctl key unseal --handle "${PERSISTANT_HANDLE_TO_USE}" --pin "\${password}" --pcr-extend > /dev/null 2> /dev/null
+sectpmctl key unseal --handle "${PERSISTANT_HANDLE_TO_USE}" --password "\${password}" --pcr-extend > /dev/null 2> /dev/null
 if [ \$? -eq 0 ]; then
         echo KEY COULD NOT BE SECURED. PLEASE REBOOT.
         echo
@@ -886,7 +896,7 @@ generate_tpm2_policy() {
     USE_PRESEED_PCR="--pcr-preseed"
   fi
   if [[ -n ${TPM_PASSWORD} ]]; then
-    sectpmctl key seal --handle "${PERSISTANT_HANDLE_TO_USE}" --key-file "${TPM_SECRET_LUKS_KEY}" --pin "${TPM_PASSWORD}" --pcr-extend ${USE_PRESEED_PCR}
+    sectpmctl key seal --handle "${PERSISTANT_HANDLE_TO_USE}" --key-file "${TPM_SECRET_LUKS_KEY}" --password "${TPM_PASSWORD}" --pcr-extend ${USE_PRESEED_PCR}
   else
     sectpmctl key seal --handle "${PERSISTANT_HANDLE_TO_USE}" --key-file "${TPM_SECRET_LUKS_KEY}" --noda --pcr-extend ${USE_PRESEED_PCR}
   fi

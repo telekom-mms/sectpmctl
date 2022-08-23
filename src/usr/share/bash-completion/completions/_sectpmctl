@@ -74,22 +74,22 @@ _sectpmctl_boot()
 
 _sectpmctl_key()
 {
-  local cur prev cmd main_opts seal_opts unseal_opts changepin_opts remove_opts
+  local cur prev cmd main_opts seal_opts unseal_opts changepassword_opts remove_opts
 
   COMPREPLY=()
   cur="${COMP_WORDS[COMP_CWORD]}"
   prev="${COMP_WORDS[COMP_CWORD-1]}"
   cmd="${COMP_WORDS[2]}"
 
-  main_opts="changepin enterlockout extend help leavelockout remove seal unseal"
-  seal_opts="--handle --key-file --name --name-dir --noda --pcr-extend --pcr-preseed --pin --pin-hex --pin-file"
-  unseal_opts="--handle --name --name-dir --noda --pcr-extend --pcr-preseed --pin --pin-hex --pin-file"
-  changepin_opts="--handle --noda --oldpin --oldpin-hex --oldpin-file --pin --pin-hex --pin-file"
+  main_opts="changepassword enterlockout extend help leavelockout remove seal unseal"
+  seal_opts="--handle --key-file --name --name-dir --noda --pcr-extend --pcr-preseed --password --password-hex --password-file"
+  unseal_opts="--handle --name --name-dir --noda --pcr-extend --pcr-preseed --password --password-hex --password-file"
+  changepassword_opts="--handle --noda --oldpassword --oldpassword-hex --oldpassword-file --password --password-hex --password-file"
   remove_opts="--handle --name --name-dir"
   extend_opts="--file --random --string"
 
   case "${cmd}" in
-    changepin | remove | seal | unseal)
+    changepassword | remove | seal | unseal)
       case "${prev}" in
         --handle)
           COMPREPLY=($( compgen -W "$( __get_handles )" -- ${cur} ))
@@ -151,13 +151,13 @@ _sectpmctl_key()
   esac
 
   case "${cmd}" in
-    changepin | seal | unseal)
+    changepassword | seal | unseal)
       case "${prev}" in
-        --pin | --pin-hex)
+        --password | --password-hex)
           COMPREPLY=()
           return 0
           ;;
-        --pin-file)
+        --password-file)
           case "${cur}" in
             -)
               COMPREPLY=()
@@ -181,13 +181,13 @@ _sectpmctl_key()
     enterlockout | help | leavelockout)
       return 0
       ;;
-    changepin)
+    changepassword)
       case "${prev}" in
-        --oldpin | --oldpin-hex)
+        --oldpassword | --oldpassword-hex)
           COMPREPLY=()
           return 0
           ;;
-        --oldpin-file)
+        --oldpassword-file)
           case "${cur}" in
             -)
               COMPREPLY=()
@@ -202,7 +202,7 @@ _sectpmctl_key()
         *)
           ;;
       esac
-      COMPREPLY=($( compgen -W "${changepin_opts}" -- ${cur} ))
+      COMPREPLY=($( compgen -W "${changepassword_opts}" -- ${cur} ))
       return 0
       ;;
     extend)
@@ -274,7 +274,7 @@ _sectpmctl_tpm()
   cmd="${COMP_WORDS[2]}"
 
   main_opts="check help install provisioning"
-  install_opts="--dont-createkey --dont-extend --dont-setlukskey --key --pcr-preseed --recoveryfile --recoverygrouplength --recoverygroups --recoveryscripthelper --setrecoverykey"
+  install_opts="--dont-createkey --dont-extend --dont-setlukskey --key --password --pcr-preseed --recoveryfile --recoverygrouplength --recoverygroups --recoveryscripthelper --setrecoverykey"
   provisioning_opts="--lockout-auth"
 
   case "${cmd}" in
@@ -287,7 +287,7 @@ _sectpmctl_tpm()
           COMPREPLY=()
           return 0
           ;;
-        --key | --recoveryfile | --recoveryscripthelper)
+        --key | --password | --recoveryfile | --recoveryscripthelper)
           case "${cur}" in
             -)
               COMPREPLY=()
