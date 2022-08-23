@@ -49,6 +49,8 @@ emulated TIS 2.0'device. After installation of Ubuntu you can start installing s
 * Uses and integrates systemd-stub and systemd-boot as bootloader, does not invent a new one
 * Implemented in bash
 
+Using a splash screen and the TPM + Password option does not work. If that happens you can enter the password blind, it will work.
+
 ## Build and install tpmsbsigntool
 
 ```
@@ -288,7 +290,9 @@ Then you need to scroll up a bit to see it.
 
 After a reboot, the LUKS partition should decrypt automatically and the installation is complete.
 
-You can then do some bootloader configuration by editing '/etc/sectpmctl/boot.conf'. Remember to update the bootloader afterwards by executing:
+You can then do some bootloader configuration by editing '/etc/sectpmctl/boot.conf'. Currently a splash screen should not be activated. It
+is disabled by default. The kernel option "quiet" is supported, but disabled as well by default. Remember to update the bootloader afterwards
+by executing:
 
 ```
 sudo sectpmctl boot update
