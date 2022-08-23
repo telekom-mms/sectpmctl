@@ -281,6 +281,7 @@ _check_input() {
   export DO_PROVISIONING=""
   export PROVISIONING_LOCKOUT_AUTH=""
   export KNOWN_UNKNOWN=""
+  export TPM_PASSWORD=""
 
   ME=$(basename "$0")
   while [ $# != 0 ]; do
@@ -338,6 +339,15 @@ _check_input() {
         ;;
       install)
         export INITIAL="true"
+        ;;
+      --password)
+        if (( $# >= 2 )) && [[ ! "$2" =~ ^- ]]; then
+          export TPM_PASSWORD="${2}"
+          shift
+        else
+          echo "--password requires an argument"
+          exit 1
+        fi
         ;;
       --preseed-pcr)
         export PCR_VALUES_TO_USE="0"
@@ -410,7 +420,8 @@ _check_input() {
       "${RECOVERY_KEYSLOT}" \
       "${KNOWN_UNKNOWN}" \
       "${PERSISTANT_OWNER_SRK_NODA}" \
-      "${SECTPMCTL_KEYS}"
+      "${SECTPMCTL_KEYS}" \
+      "${TPM_PASSWORD}"
 
   [[ "${CHECK}" == "true" ]] \
     && check_tpm2_secureboot
@@ -683,6 +694,7 @@ generate_tpm2_policy() {
   KNOWN_UNKNOWN="${13}"
   PERSISTANT_OWNER_SRK_NODA="${14}"
   SECTPMCTL_KEYS="${15}"
+  TPM_PASSWORD="${16}"
 
   # calculate length of hash in bytes
   if [[ -f /tmp/hashlength ]]; then
@@ -820,12 +832,16 @@ generate_tpm2_policy() {
   shred -f -z -u pcr11luks.dat pcr11combined.dat
 
   echo "SEAL LUKS KEY to TPM"
-  if (( PCR_VALUES_TO_USE == 7 )); then
-    sectpmctl key seal --handle "${PERSISTANT_HANDLE_TO_USE}" --key-file "${TPM_SECRET_LUKS_KEY}" --noda --pcr-extend
-  else
-    sectpmctl key seal --handle "${PERSISTANT_HANDLE_TO_USE}" --key-file "${TPM_SECRET_LUKS_KEY}" --noda --pcr-extend --pcr-preseed
+  USE_PRESEED_PCR=""
+  if (( PCR_VALUES_TO_USE == 0 )); then
+    USE_PRESEED_PCR="--pcr-preseed"
   fi
-  
+  if [[ -n ${TPM_PASSWORD} ]]; then
+    sectpmctl key seal --handle "${PERSISTANT_HANDLE_TO_USE}" --key-file "${TPM_SECRET_LUKS_KEY}" --pin "${TPM_PASSWORD}" --pcr-extend ${USE_PRESEED_PCR}
+  else
+    sectpmctl key seal --handle "${PERSISTANT_HANDLE_TO_USE}" --key-file "${TPM_SECRET_LUKS_KEY}" --noda --pcr-extend ${USE_PRESEED_PCR}
+  fi
+
   shred -f -z -u "${TPM_SECRET_LUKS_KEY}"
   
   cd - > /dev/null
@@ -965,6 +981,7 @@ initial_tpm2_setup() {
   KNOWN_UNKNOWN="${17}"
   PERSISTANT_OWNER_SRK_NODA="${18}"
   SECTPMCTL_KEYS="${19}"
+  TPM_PASSWORD="${20}"
 
   check_tpm2_secureboot
 
@@ -994,7 +1011,8 @@ initial_tpm2_setup() {
     "${RECOVERY_KEYSLOT}" \
     "${KNOWN_UNKNOWN}" \
     "${PERSISTANT_OWNER_SRK_NODA}" \
-    "${SECTPMCTL_KEYS}"
+    "${SECTPMCTL_KEYS}" \
+    "${TPM_PASSWORD}"
 
   generate_unseal_script \
     "${PCR_BANK}" \
