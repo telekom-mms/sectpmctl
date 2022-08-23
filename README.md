@@ -5,10 +5,9 @@ We want to secure the Ubuntu 22.04 installation with LUKS and TPM2. Please read 
 We also assume a normal installation of Ubuntu 22.04 desktop with erasing the disk and using LVM and encryption. Otherwise an installation
 is possible but currently undocumented. A preseed installation is also possible but currently undocumented as well.
 
-In this initial version no password is requested while booting. That means that you should supply a BIOS start password. It is planed to
-release an update shortly which implements a TPM + password option. In that case a BIOS start password is not neccessary. Without either
-a BIOS start password or TPM + password, the device would boot up to the login screen and someone could try to read out the memory or
-find a bug in the login screen to recover the LUKS key.
+If you are not using the TPM + password option you should supply a BIOS start password. Without either a BIOS start password or
+TPM + password, the device would boot up to the login screen and someone could try to read out the memory or find a bug in the login
+screen to recover the LUKS key.
 
 Either way you should also supply a BIOS admin password.
 
@@ -25,6 +24,32 @@ It is recommended to only have one LUKS slot in use, which is mostly slot 0. sec
 You can easily test the installation with virt-manager on a Ubuntu 22.04 host and a Ubuntu 22.04 guest. When creating a new VM you need to
 configure the VM before it starts automatically. In the overview select 'OVMF_CODE_4M.secboot.fd' as firmware and then add a new 'TPM
 emulated TIS 2.0'device. After installation of Ubuntu you can start installing sectpmctl.
+
+## Features
+
+* TPM2 backed FDE
+* Provisions the TPM with sane settings in a minimal way
+* Encrypts communication to and from the TPM
+* Uses the trust on first use (TOFU) principle. The bonding happens at TPM provisioning time
+* Passwordless or TPM + password option
+  + Passwordless option is not influenced by DA lockout
+  + TPM + Password option is influenced by DA lockout
+  + Secure Boot signing is not influenced by DA lockout
+* The Secure Boot signing key is backed by the TPM as well
+* Zero TPM administrative overhead by managing Secure Boot instead of the TPM
+  + Secure Boot is more easy to manage
+  + FDE key is only bound to the Secure Boot state, not to userspace
+  + Immune to operating system upgrades
+  + No postprocessing other then the kernel and initrd signing required
+  + Interrupted update of new kernels should still keep old kernels bootable
+  + Additional installation of other bootloaders will not overwrite sectpmctl, they are placed alongside
+* Can be integrated in a nealy fullly automated preseed installation
+  + The only upfront action is to clear TPM and Secure Boot
+* The secureboot datase is completly rebuild with own keys and Microsoft keys for safety reasons
+* Uses and integrates systemd-stub and systemd-boot as bootloader, does not invent a new one
+* Implemented in bash
+
+Using a splash screen and the TPM + Password option does not work. If that happens you can enter the password blind, it will work.
 
 ## Build and install tpmsbsigntool
 
@@ -160,7 +185,7 @@ All generated keys, passwords or serialized keys are stored in '/var/lib/sectpmc
 ```
 # 1. Point of no return, you need to complete at least until the following reboot command
 sudo apt remove --allow-remove-essential "grub*" "shim*"
-sudo dpkg -i sectpmctl_1.0.0-1_amd64.deb
+sudo dpkg -i sectpmctl_1.1.0-1_amd64.deb
 sudo apt install -f
 
 
@@ -235,17 +260,39 @@ sudo reboot
 sudo sectpmctl boot test
 
 # Install the LUKS TPM key. Enter your current LUKS key when asked.
-sudo sectpmctl tpm install --setrecoverykey
+cat > install_tpm.sh <<__EOT
+#! /bin/bash
+echo -n "Enter TPM Password: "
+read -sr tpmpwda
+echo
+echo -n "Enter TPM Password again: "
+read -sr tpmpwdb
+echo
+if [[ "x\${tpmpwda}" == "x\${tpmpwdb}" ]]; then
+  sudo sectpmctl tpm install --setrecoverykey --password "\${tpmpwda}"
+else
+  echo "Passwords don't match. Exit"
+  exit 1
+fi
+__EOT
+chmod +x install_tpm.sh
+./install_tpm.sh
 
 # STORE THE PRINTED RECOVERY KEY NOW!!!
+# SCROLL UP A BIT IF IT GET'S OUT OF SIGHT!!!
 ```
 
 The 'sectpmctl tpm install' command will print out the recovery key. It is highly recommended to store this key in a safe location. Without this key you can loose
 all your data when the TPM breaks or when accessing your hard disk in another machine. You have been warned!
 
+The recovery key will be printed first, then the bootloader is update. It can happen that the recovery key is not visible after the installation.
+Then you need to scroll up a bit to see it.
+
 After a reboot, the LUKS partition should decrypt automatically and the installation is complete.
 
-You can then do some bootloader configuration by editing '/etc/sectpmctl/boot.conf'. Remember to update the bootloader afterwards by executing:
+You can then do some bootloader configuration by editing '/etc/sectpmctl/boot.conf'. Currently a splash screen should not be activated. It
+is disabled by default. The kernel option "quiet" is supported, but disabled as well by default. Remember to update the bootloader afterwards
+by executing:
 
 ```
 sudo sectpmctl boot update
@@ -257,6 +304,18 @@ followed by a reboot. You can also use the bootctl command for basic tasks like 
 sudo bootctl list
 ```
 
+If the password option has been used, the current password can be changed at runtime with:
+
+```
+sudo sectpmctl key changepassword --handle 0x81000102 --oldpassword "myoldpwd" --password "mynewpwd"
+```
+
+If the current password is lost, a new password can be set with the recovery key by installing again:
+
+```
+sectpmctl tpm install --setrecoverykey --password "mynewpassword"
+```
+      
 ## Updates
 
 Remember that entering the recovery key while booting is the only option when sectpmctl will not unlock automatically anymore. See 'Recovery' for how to fix.
