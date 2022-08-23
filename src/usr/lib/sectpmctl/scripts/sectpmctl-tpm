@@ -563,13 +563,15 @@ echo -n "Enter TPM Password: "
 read -sr password || true
 echo
 
-sectpmctl key unseal --handle "${PERSISTANT_HANDLE_TO_USE}" --pin "\${password}" --pcr-extend 1>&3 3>&-
+sectpmctl key unseal --handle "${PERSISTANT_HANDLE_TO_USE}" --pin "\${password}" --pcr-extend > luks.key
 if [ \$? -ne 0 ]; then
         umount /dev/shm
         echo UNSEAL FAILED, CHECKING RECOVERY KEY
         echo "\${password}" 1>&3 3>&-
         exit 1
 fi
+cat luks.key 1>&3 3>&-
+shred -f -z -u luks.key
 
 sectpmctl key extend --random
 
