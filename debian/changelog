@@ -1,3 +1,9 @@
+sectpmctl (1.1.0-1) jammy; urgency=medium
+
+  * Added TPM + Password option
+
+ -- Richard Robert Reitz <richard-robert.reitz@t-systems.com>  Wed, 24 Aug 2022 00:39:24 +0200
+
 sectpmctl (1.0.0-1) jammy; urgency=medium
 
   * Initial upload
