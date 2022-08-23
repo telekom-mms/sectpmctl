@@ -258,13 +258,33 @@ sudo reboot
 sudo sectpmctl boot test
 
 # Install the LUKS TPM key. Enter your current LUKS key when asked.
-sudo sectpmctl tpm install --setrecoverykey --password "mypassword"
+cat > install_tpm.sh <<__EOT
+#! /bin/bash
+echo -n "Enter TPM Password: "
+read -sr tpmpwda
+echo
+echo -n "Enter TPM Password again: "
+read -sr tpmpwdb
+echo
+if [[ "x\${tpmpwda}" == "x\${tpmpwdb}" ]]; then
+  sudo sectpmctl tpm install --setrecoverykey --password "\${tpmpwda}"
+else
+  echo "Passwords don't match. Exit"
+  exit 1
+fi
+__EOT
+chmod +x install_tpm.sh
+./install_tpm.sh
 
 # STORE THE PRINTED RECOVERY KEY NOW!!!
+# SCROLL UP A BIT IF IT GET'S OUT OF SIGHT!!!
 ```
 
 The 'sectpmctl tpm install' command will print out the recovery key. It is highly recommended to store this key in a safe location. Without this key you can loose
 all your data when the TPM breaks or when accessing your hard disk in another machine. You have been warned!
+
+The recovery key will be printed first, then the bootloader is update. It can happen that the recovery key is not visible after the installation.
+Then you need to scroll up a bit to see it.
 
 After a reboot, the LUKS partition should decrypt automatically and the installation is complete.
 
