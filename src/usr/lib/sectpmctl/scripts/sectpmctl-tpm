@@ -545,51 +545,45 @@ generate_unseal_script() {
 
 exec 3>&1 1>&2
 
-if (( CRYPTTAB_TRIED <= 2 )); then
-        echo
-        echo sectpmctl
-        echo
-        
-        mkdir /dev/shm > /dev/null 2> /dev/null
-        mount -t tmpfs tmpfs /dev/shm
+echo
+echo sectpmctl
+echo
 
-        tpm2_pcrread sha256:11 | grep -q "^[[:space:]]\+11:[[:space:]]\+0x[0]\+$"
-        if [ \$? -eq 0 ]; then
-                cryptsetup luksDump "${CRYPT_PARTITION}" > luks.dat
-                sectpmctl key extend --file luks.dat
-                shred -f -z -u luks.dat
-        fi
+mkdir /dev/shm > /dev/null 2> /dev/null
+mount -t tmpfs tmpfs /dev/shm
 
-        echo -n "Enter TPM Password: "
-        read -sr password || true
-        echo
-
-        sectpmctl key unseal --handle "${PERSISTANT_HANDLE_TO_USE}" --pin "\${password}" --pcr-extend 1>&3 3>&-
-        if [ \$? -ne 0 ]; then
-                umount /dev/shm
-                echo UNSEAL FAILED
-                echo
-                exit 1
-        fi
-        
-        sectpmctl key extend --random
-
-        sectpmctl key unseal --handle "${PERSISTANT_HANDLE_TO_USE}" --pin "\${password}" --pcr-extend > /dev/null 2> /dev/null
-        if [ \$? -eq 0 ]; then
-                echo KEY COULD NOT BE SECURED. PLEASE REBOOT.
-                echo
-                while true; do
-                        sleep 9999
-                done
-        fi
-
-        echo UNSEALED, EXTENDED
-        echo
-else
-        keyscript="/lib/cryptsetup/askpass"
-        keyscriptarg="Enter Recovery Key: "
-        exec "\$keyscript" "\$keyscriptarg" 1>&3 3>&-
+tpm2_pcrread sha256:11 | grep -q "^[[:space:]]\+11:[[:space:]]\+0x[0]\+$"
+if [ \$? -eq 0 ]; then
+        cryptsetup luksDump "${CRYPT_PARTITION}" > luks.dat
+        sectpmctl key extend --file luks.dat
+        shred -f -z -u luks.dat
 fi
+
+echo -n "Enter TPM Password: "
+read -sr password || true
+echo
+
+sectpmctl key unseal --handle "${PERSISTANT_HANDLE_TO_USE}" --pin "\${password}" --pcr-extend 1>&3 3>&-
+if [ \$? -ne 0 ]; then
+        umount /dev/shm
+        echo UNSEAL FAILED, CHECKING RECOVERY KEY
+        echo "\${password}" 1>&3 3>&-
+        exit 1
+fi
+
+sectpmctl key extend --random
+
+sectpmctl key unseal --handle "${PERSISTANT_HANDLE_TO_USE}" --pin "\${password}" --pcr-extend > /dev/null 2> /dev/null
+if [ \$? -eq 0 ]; then
+        echo KEY COULD NOT BE SECURED. PLEASE REBOOT.
+        echo
+        while true; do
+                sleep 9999
+        done
+fi
+
+echo UNSEALED, EXTENDED
+echo
 __EOT
     else
       cat > "${KEY_SCRIPT}" <<__EOT
