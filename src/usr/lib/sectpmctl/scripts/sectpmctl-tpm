@@ -521,6 +521,7 @@ generate_unseal_script() {
   CRYPT_PARTITION="${4}"
   EXTEND="${5}"
   SECTPMCTL_KEYS="${6}"
+  TPM_PASSWORD="${7}"
 
   CREATE_PRIMARY_HASH="sha256"
   if [[ $(tpm2_getcap algorithms | grep -c 'sha384:') == 1 ]]; then
@@ -538,7 +539,63 @@ generate_unseal_script() {
   echo "CREATE AND ADD TPM UNSEAL SCRIPT"
   # KEYSCRIPT FOR TRANSPARENT ENCRYPTION ON BOOT
   if [[ "${EXTEND}" == "true" ]]; then
-cat > "${KEY_SCRIPT}" <<__EOT
+    if [[ -n ${TPM_PASSWORD} ]]; then
+      cat > "${KEY_SCRIPT}" <<__EOT
+#! /bin/bash -
+
+exec 3>&1 1>&2
+
+if [ "\$CRYPTTAB_TRIED" = 0 ]; then
+        echo
+        echo sectpmctl
+        echo
+        
+        mkdir /dev/shm > /dev/null 2> /dev/null
+        mount -t tmpfs tmpfs /dev/shm
+
+        cryptsetup luksDump "${CRYPT_PARTITION}" > luks.dat
+        sectpmctl key extend --file luks.dat
+        shred -f -z -u luks.dat
+
+        echo -n "Enter TPM Password: "
+        read -sr password || true
+        echo
+
+        echo sectpmctl key unseal --handle "${PERSISTANT_HANDLE_TO_USE}" --pin "\${password}" --pcr-extend 1>&3 3>&-
+        sectpmctl key unseal --handle "${PERSISTANT_HANDLE_TO_USE}" --pin "\${password}" --pcr-extend 1>&3 3>&-
+        retVal=\$?
+
+        sectpmctl key extend --random
+
+        sectpmctl key unseal --handle "${PERSISTANT_HANDLE_TO_USE}" --pin "\${password}" --pcr-extend > /dev/null 2> /dev/null
+        retValTest=\$?
+
+        umount /dev/shm
+        
+        if [ \$retVal -ne 0 ]; then
+                echo UNSEAL FAILED
+                echo
+                exit 1
+        fi
+        
+        if [ \$retValTest -eq 0 ]; then
+                echo KEY COULD NOT BE SECURED. PLEASE REBOOT.
+                echo
+                while true; do
+                        sleep 9999
+                done
+        fi
+
+        echo UNSEALED, EXTENDED
+        echo
+else
+        keyscript="/lib/cryptsetup/askpass"
+        keyscriptarg=": "
+        exec "\$keyscript" "\$keyscriptarg" 1>&3 3>&-
+fi
+__EOT
+    else
+      cat > "${KEY_SCRIPT}" <<__EOT
 #! /bin/bash -
 
 exec 3>&1 1>&2
@@ -837,8 +894,10 @@ generate_tpm2_policy() {
     USE_PRESEED_PCR="--pcr-preseed"
   fi
   if [[ -n ${TPM_PASSWORD} ]]; then
+    echo sectpmctl key seal --handle "${PERSISTANT_HANDLE_TO_USE}" --key-file "${TPM_SECRET_LUKS_KEY}" --pin "${TPM_PASSWORD}" --pcr-extend ${USE_PRESEED_PCR}
     sectpmctl key seal --handle "${PERSISTANT_HANDLE_TO_USE}" --key-file "${TPM_SECRET_LUKS_KEY}" --pin "${TPM_PASSWORD}" --pcr-extend ${USE_PRESEED_PCR}
   else
+    echo sectpmctl key seal --handle "${PERSISTANT_HANDLE_TO_USE}" --key-file "${TPM_SECRET_LUKS_KEY}" --noda --pcr-extend ${USE_PRESEED_PCR}
     sectpmctl key seal --handle "${PERSISTANT_HANDLE_TO_USE}" --key-file "${TPM_SECRET_LUKS_KEY}" --noda --pcr-extend ${USE_PRESEED_PCR}
   fi
 
@@ -1020,7 +1079,8 @@ initial_tpm2_setup() {
     "${KEY_SCRIPT}" \
     "${CRYPT_PARTITION}" \
     "${EXTEND}" \
-    "${SECTPMCTL_KEYS}"
+    "${SECTPMCTL_KEYS}" \
+    "${TPM_PASSWORD}"
 
   update_initramfs
 }
