@@ -35,6 +35,7 @@ emulated TIS 2.0'device. After installation of Ubuntu you can start installing s
   + Passwordless option is not influenced by DA lockout
   + TPM + Password option is influenced by DA lockout
   + Secure Boot signing is not influenced by DA lockout
+* The Secure Boot signing key is backed by the TPM as well
 * Zero TPM administrative overhead by managing Secure Boot instead of the TPM
   + Secure Boot is more easy to manage
   + FDE key is only bound to the Secure Boot state, not to userspace
