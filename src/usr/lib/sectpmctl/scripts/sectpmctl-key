@@ -262,7 +262,7 @@ _check_input_and_state() {
   CMD="${1}"
   
   case "${CMD}" in
-    changepassword | enterlockout | extend | leavelockout | remove | seal | unseal)
+    changepassword | extend | remove | seal | unseal)
       ;;
     help)
       _usage_long
@@ -772,12 +772,6 @@ _check_input_and_state() {
       extend)
         _extend
         ;;
-      enterlockout)
-        _enterlockout
-        ;;
-      leavelockout)
-        _leavelockout
-        ;;
       remove)
         _remove
         ;;
@@ -868,89 +862,6 @@ _xt() {
   fi
 
   return 0
-}
-
-_enterlockout() {
-  sectpmctl key leavelockout 2> /dev/null > /dev/null
-
-  p1="$( _tx "${ME} ${CMD}: Could not read getcap properties-variable" \
-    tpm2_getcap properties-variable )" || _xt $? || return 1
-  if [[ "$( grep -c "TPM2_PT_MAX_AUTH_FAIL: 0x20" <<< "$p1" )" == "1" ]]; then
-    p1="$( _tx "${ME} ${CMD}: Could not get lockout authValue" \
-      cat /var/lib/sectpmctl/keys/lockout.pwd )" || _xt $? || return 1
-    _tx "${ME} ${CMD}: Could not reset lockout counter for testing" \
-      tpm2_dictionarylockout -Q -c --setup-parameters -p "${p1}" || return 1
-    _tx "${ME} ${CMD}: Could not set lowered lockout settings for testing" \
-      tpm2_dictionarylockout -Q --max-tries=8 --recovery-time=900 --lockout-recovery-time=900 --setup-parameters -p "${p1}" || return 1
-  fi
-
-  p1="$( _tx "${ME} ${CMD}: Could not read getcap properties-variable" \
-    tpm2_getcap properties-variable )" || _xt $? || return 1
-  if [[ "$( grep -c "TPM2_PT_MAX_AUTH_FAIL: 0x8" <<< "$p1" )" == "0" ]]; then
-    echo "${ME} ${CMD}: could not set lockout settings"
-    return 1
-  fi
-  p1="$( _tx "${ME} ${CMD}: Could not read getcap properties-variable" \
-    tpm2_getcap properties-variable )" || _xt $? || return 1
-  if [[ "$( grep -c "inLockout:                 1" <<< "$p1" )" == "1" ]]; then
-    echo "${ME} ${CMD}: already in lockout"
-    return 1
-  fi
-
-  sectpmctl key remove --handle 0x81000999 2> /dev/null > /dev/null
-  
-  _tx "${ME} ${CMD}: Could not seal lockout test object" \
-    echo "abc" | sectpmctl key seal --handle 0x81000999 --password 123 --pcr-preseed || return 1
-
-  sectpmctl key unseal --handle 0x81000999 --password wrongpwd --pcr-preseed 2> /dev/null > /dev/null
-  sectpmctl key unseal --handle 0x81000999 --password wrongpwd --pcr-preseed 2> /dev/null > /dev/null
-  sectpmctl key unseal --handle 0x81000999 --password wrongpwd --pcr-preseed 2> /dev/null > /dev/null
-  sectpmctl key unseal --handle 0x81000999 --password wrongpwd --pcr-preseed 2> /dev/null > /dev/null
-  sectpmctl key unseal --handle 0x81000999 --password wrongpwd --pcr-preseed 2> /dev/null > /dev/null
-  sectpmctl key unseal --handle 0x81000999 --password wrongpwd --pcr-preseed 2> /dev/null > /dev/null
-  sectpmctl key unseal --handle 0x81000999 --password wrongpwd --pcr-preseed 2> /dev/null > /dev/null
-  sectpmctl key unseal --handle 0x81000999 --password wrongpwd --pcr-preseed 2> /dev/null > /dev/null
-  sectpmctl key unseal --handle 0x81000999 --password wrongpwd --pcr-preseed 2> /dev/null > /dev/null
-
-  p1="$( _tx "${ME} ${CMD}: Could not read getcap properties-variable" \
-    tpm2_getcap properties-variable )" || _xt $? || return 1
-  if [[ "$( grep -c "inLockout:                 1" <<< "$p1" )" == "1" ]]; then
-    echo "in lockout" 1>&4
-  else
-    echo "${ME} ${CMD}: could not enter lockout"
-    return 1
-  fi
-}
-
-_leavelockout() {
-  p1="$( _tx "${ME} ${CMD}: Could not read getcap properties-variable" \
-    tpm2_getcap properties-variable )" || _xt $? || return 1
-  if [[ "$( grep -c "TPM2_PT_MAX_AUTH_FAIL: 0x8" <<< "$p1" )" == "1" ]]; then
-    p1="$( _tx "${ME} ${CMD}: Could not get lockout authValue" \
-      cat /var/lib/sectpmctl/keys/lockout.pwd )" || _xt $? || return 1
-    _tx "${ME} ${CMD}: Could not reset lockout counter for testing" \
-      tpm2_dictionarylockout -Q -c --setup-parameters -p "${p1}" || return 1
-    _tx "${ME} ${CMD}: Could not set lowered lockout settings for testing" \
-      tpm2_dictionarylockout -Q --max-tries=32 --recovery-time=600 --lockout-recovery-time=1800 --setup-parameters -p "${p1}" || return 1
-  fi
-
-  p1="$( _tx "${ME} ${CMD}: Could not read getcap properties-variable" \
-    tpm2_getcap properties-variable )" || _xt $? || return 1
-  if [[ "$( grep -c "TPM2_PT_MAX_AUTH_FAIL: 0x20" <<< "$p1" )" == "0" ]]; then
-    echo "${ME} ${CMD}: could not set lockout settings"
-    return 1
-  fi
-
-  sectpmctl key remove --handle 0x81000999 2> /dev/null > /dev/null
-
-  p1="$( _tx "${ME} ${CMD}: Could not read getcap properties-variable" \
-    tpm2_getcap properties-variable )" || _xt $? || return 1
-  if [[ "$( grep -c "inLockout:                 0" <<< "$p1" )" == "1" ]]; then
-    echo "out of lockout" 1>&4
-  else
-    echo "${ME} ${CMD}: could not leave lockout"
-    return 1
-  fi
 }
 
 _remove() {
