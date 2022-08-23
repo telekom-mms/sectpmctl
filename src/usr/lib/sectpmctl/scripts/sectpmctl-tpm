@@ -545,7 +545,7 @@ generate_unseal_script() {
 
 exec 3>&1 1>&2
 
-if [ "\$CRYPTTAB_TRIED" = 0 ]; then
+if (( CRYPTTAB_TRIED <= 2 )); then
         echo
         echo sectpmctl
         echo
@@ -553,32 +553,29 @@ if [ "\$CRYPTTAB_TRIED" = 0 ]; then
         mkdir /dev/shm > /dev/null 2> /dev/null
         mount -t tmpfs tmpfs /dev/shm
 
-        cryptsetup luksDump "${CRYPT_PARTITION}" > luks.dat
-        sectpmctl key extend --file luks.dat
-        shred -f -z -u luks.dat
+        tpm2_pcrread sha256:11 | grep -q "^[[:space:]]\+11:[[:space:]]\+0x[0]\+$"
+        if [ \$? -eq 0 ]; then
+                cryptsetup luksDump "${CRYPT_PARTITION}" > luks.dat
+                sectpmctl key extend --file luks.dat
+                shred -f -z -u luks.dat
+        fi
 
         echo -n "Enter TPM Password: "
         read -sr password || true
         echo
 
-        echo sectpmctl key unseal --handle "${PERSISTANT_HANDLE_TO_USE}" --pin "\${password}" --pcr-extend
         sectpmctl key unseal --handle "${PERSISTANT_HANDLE_TO_USE}" --pin "\${password}" --pcr-extend 1>&3 3>&-
-        retVal=\$?
-
-        sectpmctl key extend --random
-
-        sectpmctl key unseal --handle "${PERSISTANT_HANDLE_TO_USE}" --pin "\${password}" --pcr-extend > /dev/null 2> /dev/null
-        retValTest=\$?
-
-        umount /dev/shm
-        
-        if [ \$retVal -ne 0 ]; then
+        if [ \$? -ne 0 ]; then
+                umount /dev/shm
                 echo UNSEAL FAILED
                 echo
                 exit 1
         fi
         
-        if [ \$retValTest -eq 0 ]; then
+        sectpmctl key extend --random
+
+        sectpmctl key unseal --handle "${PERSISTANT_HANDLE_TO_USE}" --pin "\${password}" --pcr-extend > /dev/null 2> /dev/null
+        if [ \$? -eq 0 ]; then
                 echo KEY COULD NOT BE SECURED. PLEASE REBOOT.
                 echo
                 while true; do
@@ -590,7 +587,7 @@ if [ "\$CRYPTTAB_TRIED" = 0 ]; then
         echo
 else
         keyscript="/lib/cryptsetup/askpass"
-        keyscriptarg=": "
+        keyscriptarg="Enter Recovery Key: "
         exec "\$keyscript" "\$keyscriptarg" 1>&3 3>&-
 fi
 __EOT
@@ -640,7 +637,7 @@ if [ "\$CRYPTTAB_TRIED" = 0 ]; then
         echo
 else
         keyscript="/lib/cryptsetup/askpass"
-        keyscriptarg=": "
+        keyscriptarg="Enter Recovery Key: "
         exec "\$keyscript" "\$keyscriptarg" 1>&3 3>&-
 fi
 __EOT
@@ -678,7 +675,7 @@ if [ "\$CRYPTTAB_TRIED" = 0 ]; then
         echo
 else
         keyscript="/lib/cryptsetup/askpass"
-        keyscriptarg=": "
+        keyscriptarg="Enter Recovery Key: "
         exec "\$keyscript" "\$keyscriptarg" 1>&3 3>&-
 fi
 __EOT
@@ -895,10 +892,8 @@ generate_tpm2_policy() {
     USE_PRESEED_PCR="--pcr-preseed"
   fi
   if [[ -n ${TPM_PASSWORD} ]]; then
-    echo sectpmctl key seal --handle "${PERSISTANT_HANDLE_TO_USE}" --key-file "${TPM_SECRET_LUKS_KEY}" --pin "${TPM_PASSWORD}" --pcr-extend ${USE_PRESEED_PCR}
     sectpmctl key seal --handle "${PERSISTANT_HANDLE_TO_USE}" --key-file "${TPM_SECRET_LUKS_KEY}" --pin "${TPM_PASSWORD}" --pcr-extend ${USE_PRESEED_PCR}
   else
-    echo sectpmctl key seal --handle "${PERSISTANT_HANDLE_TO_USE}" --key-file "${TPM_SECRET_LUKS_KEY}" --noda --pcr-extend ${USE_PRESEED_PCR}
     sectpmctl key seal --handle "${PERSISTANT_HANDLE_TO_USE}" --key-file "${TPM_SECRET_LUKS_KEY}" --noda --pcr-extend ${USE_PRESEED_PCR}
   fi
 
@@ -988,6 +983,7 @@ copy_exec /usr/bin/tpm2_getcap /usr/bin
 copy_exec /usr/bin/tpm2_getrandom /usr/bin
 copy_exec /usr/bin/tpm2_load /usr/bin
 copy_exec /usr/bin/tpm2_pcrextend /usr/bin
+copy_exec /usr/bin/tpm2_pcrread /usr/bin
 copy_exec /usr/bin/tpm2_policyauthvalue /usr/bin
 copy_exec /usr/bin/tpm2_policypcr /usr/bin
 copy_exec /usr/bin/tpm2_sessionconfig /usr/bin
