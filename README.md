@@ -383,7 +383,9 @@ do it more fine grained which will be documented in a later release.
 
 You could then omit the '--setrecoverykey' option in the 'sectpmctl tpm install' command to keep your current recovery key.
 
-## TPM2 Commands
+## TPM2 Internals
+
+### Used handles
 
 The following persistant handles are created after provisioning and installation. The keyed hash is using one of the two parent objects.
 
@@ -392,6 +394,22 @@ The following persistant handles are created after provisioning and installation
 | 0x81000100 | Parent object with DA |
 | 0x81000101 | Parent object with NODA |
 | 0x81000102 | Keyed hash of LUKS key |
+
+### Used PCR values
+
+| PCR | value |
+| --- | ----- |
+| 7 | Secureboot state |
+| 8 | zero |
+| 9 | zero |
+| 11 | LUKS header |
+| 14 | zero |
+
+PCR8, 9 and 14 will be zero when sectpmctl is installed. This is also verified by binding the LUKS key also to this zero values.
+
+PCR11, the LUKS header, is measured while sealing in the installation and while unsealing by the initrd. It has a special purpose. After
+unsealing the LUKS key in the initrd, PCR11 is extended with a random value. That blocks a second unsealing without having to extend a more
+meaningful like PCR7.
 
 ### Provisioning
 
@@ -455,10 +473,42 @@ tpm2_startauthsession --policy-session --session="session.ctx" --key-context="tp
 
 ### Sealing with TPM password
 
+```
+# Foresee all pcr values into pcr_values.dat
+
+# create trial pcr with authvalue policy session
+tpm2_startauthsession -S trialsession.ctx
+
+tpm2_policypcr -Q -S trialsession.ctx -l "sha256:7,8,9,11,14" -f pcr_values.dat -L pcr.policy
+
+tpm2_policyauthvalue -Q -S trialsession.ctx -L pcr.policy
+
+tpm2_flushcontext trialsession.ctx
+
+# connect encrypted to the TPM with key enforcement (TOFU)
+tpm2_startauthsession -Q --policy-session -S session.ctx --key-context="tpm_owner.pub"
+
+tpm2_sessionconfig session.ctx
+# -> Session-Attributes: continuesession|decrypt|encrypt
+
+tpm2_create -Q --session=session.ctx -g sha256 -u "pcr_seal_key.pub" -r "pcr_seal_key.priv" -i "INPUT_SECRET_FILE" -C "0x81000100" \
+    -L pcr.policy -a "fixedtpm|fixedparent" -p "hex:PASSWORD"
+
+tpm2_flushcontext session.ctx
+
+# remove current object in handle, may fail if empty
+tpm2_evictcontrol -Q -C o -c "0x81000102"
+
+tpm2_load -Q -C "0x81000100" -u pcr_seal_key.pub -r pcr_seal_key.priv -n pcr_seal_key.name -c pcr_seal_key.ctx
+
+# evict loaded key
+tpm2_evictcontrol -Q -c pcr_seal_key.ctx "0x81000102" -C o
+```
+
 ### Unsealing with TPM password
 
 ```
-tpm2_startauthsession --policy-session -S "session.ctx" -c "0x81000100"
+tpm2_startauthsession --policy-session -S "session.ctx" --key-context="tpm_owner.pub"
 
 tpm2_sessionconfig "session.ctx"
 # -> Session-Attributes: continuesession|decrypt|encrypt
@@ -468,6 +518,8 @@ tpm2_policypcr -Q -S session.ctx -l "PCRLIST"
 tpm2_policyauthvalue -Q -S session.ctx
 
 tpm2_unseal -p "session:session.ctx+hex:PASSWORD" -c "0x81000102"
+
+tpm2_flushcontext session.ctx
 ```
 
 ### Changing the TPM password

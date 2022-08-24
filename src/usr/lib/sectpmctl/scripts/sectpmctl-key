@@ -1224,7 +1224,7 @@ _check_input_and_state "$@"
 ret=${?}
 
 if [[ ${ret} == 2 ]]; then
-  _print_error "${ME}" finished with timeout
+  _print_error "${ME}" finished with timeout error
   exit 2
 elif [[ ${ret} == 1 ]]; then
   _print_error "${ME}" finished with error
