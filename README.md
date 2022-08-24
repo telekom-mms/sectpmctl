@@ -1,4 +1,4 @@
-# sectpmctl
+# sectpmctl 1.1.1
 
 We want to secure the Ubuntu 22.04 installation with LUKS and TPM2. Please read this README carefully before installation.
 
@@ -19,12 +19,18 @@ Dual booting Windows is not recommended and has never been tested with sectpmctl
 database which will prevent the successfull unlocking of the LUKS key. In such case you need the recovery key and need to redo the sectpmctl
 installation, see 'Recovery' for more information.
 
-It is recommended to only have one LUKS slot in use, which is mostly slot 0. sectpmctl will additionally use slot 5 to store the TPM key.
+It is recommended to only have one LUKS slot in use before installation, which is mostly slot 0. sectpmctl will additionally use slot 5 to
+store the TPM key.
 
 You can easily test the installation with virt-manager on a Ubuntu 22.04 host and a Ubuntu 22.04 guest. When creating a new VM you need to
 configure the VM before it starts automatically. In the overview select 'OVMF_CODE_4M.secboot.fd' as firmware and then add a new 'TPM
-emulated TIS 2.0'device. After installation of Ubuntu you can start installing sectpmctl.
+emulated TIS 2.0' device. After installation of Ubuntu you can start installing sectpmctl.
 
+For transparency the tpm2-tools commands for session encryption, provisioning, TOFU, seal, unseal and password change are documented at the end
+of this README. The commands for using Secure Boot are standard with the exception of using the TPM as keystore for the db signing key. Take a
+look in the source code to see how that works. If you are wondering, yes the PK and KEK key's are not stored at all in the current
+implementation, they are simply not needed for anything.
+ 
 ## Features
 
 * TPM2 backed FDE
@@ -124,14 +130,16 @@ user@laptop:~$
 As sectpmctl will provision your TPM in a minimal way it is required to start the installation with a cleared TPM. That can be achived in three
 ways:
 
-- Clear the TPM (sometimes also called Security Chip) in the BIOS if available. Some BIOS types require you press a key after a reboot to clear the TPM.
+- Clear the TPM (sometimes also called Security Chip) in the BIOS if available. Some BIOS types require you press a key after a reboot to clear
+the TPM.
 - Use Windows to disable TPM autoprovisioning and clear the TPM by using PowerShell commands, followed by a reboot.
 - Execute in Linux: "echo 5 | sudo tee /sys/class/tpm/tpm0/ppi/request" and reboot.
 
 Be warned that if you put already some keys into the TPM, they will be lost by the clearing.
 
-Be also warned that when a TPM lockout password is set and you try to clear the TPM with software commands entering a wrong lockout password, there
-will be a time penalty until you can try again. The above three ways to clear should allow to clear the TPM even when you entered a wrong lockout password.
+Be also warned that when a TPM lockout password is set and you try to clear the TPM with software commands entering a wrong lockout password,
+there will be a time penalty until you can try again. The above three ways to clear should allow to clear the TPM even when you entered a wrong
+lockout password.
 
 To check if the TPM is in a good state enter:
 
@@ -151,8 +159,8 @@ user@laptop:~$ sudo tpm2_getcap properties-variable
 user@laptop:~$
 ```
 
-The command which will be executed later while installing, "sectpmctl tpm provisioning", should run successfully with a cleared TPM and the output
-should look like this:
+The command which will be executed later while installing, "sectpmctl tpm provisioning", should run successfully with a cleared TPM and the
+output should look like this:
 
 ```
 user@laptop:~$ sudo sectpmctl tpm provisioning
@@ -165,8 +173,8 @@ START PROVISIONING
 user@laptop:~$
 ```
 
-The provisioning will set a random lockout password which is stored in '/var/lib/sectpmctl/keys/lockout.pwd', set sane dictionary attack lockout time
-penalty settings and create two TPM primary keys, one with the dictionary attack lockout flag (DA) and one without (NODA).
+The provisioning will set a random lockout password which is stored in '/var/lib/sectpmctl/keys/lockout.pwd', set sane dictionary attack lockout
+time penalty settings and create two TPM primary keys, one with the dictionary attack lockout flag (DA) and one without (NODA).
 
 The following DA lockout values are set:
 
@@ -174,9 +182,9 @@ The following DA lockout values are set:
 - Recovery time = 10 minutes
 - Lockout recovery time = 30 minutes
 
-Unsealing the LUKS key while booting (currently without TPM + password) and signing of kernels and kernel modules is done by using the NODA primary key to
-not break updates in case of a dictionary lockout situation. In the next release, when using the TPM + password option, specificly the unsealing will be
-done with the DA key, while keep using the NODA key for signing kernels and kernel modules. 
+Unsealing the LUKS key while booting (currently without TPM + password) and signing of kernels and kernel modules is done by using the NODA
+primary key to not break updates in case of a dictionary lockout situation. In the next release, when using the TPM + password option,
+specificly the unsealing will be done with the DA key, while keep using the NODA key for signing kernels and kernel modules. 
 
 All generated keys, passwords or serialized keys are stored in '/var/lib/sectpmctl/keys'.
 
@@ -282,11 +290,11 @@ chmod +x install_tpm.sh
 # SCROLL UP A BIT IF IT GET'S OUT OF SIGHT!!!
 ```
 
-The 'sectpmctl tpm install' command will print out the recovery key. It is highly recommended to store this key in a safe location. Without this key you can loose
-all your data when the TPM breaks or when accessing your hard disk in another machine. You have been warned!
+The 'sectpmctl tpm install' command will print out the recovery key. It is highly recommended to store this key in a safe location. Without this
+key you can loose all your data when the TPM breaks or when accessing your hard disk in another machine. You have been warned!
 
-The recovery key will be printed first, then the bootloader is update. It can happen that the recovery key is not visible after the installation.
-Then you need to scroll up a bit to see it.
+The recovery key will be printed first, then the bootloader is update. It can happen that the recovery key is not visible after the
+installation. Then you need to scroll up a bit to see it.
 
 After a reboot, the LUKS partition should decrypt automatically and the installation is complete.
 
@@ -318,26 +326,28 @@ sectpmctl tpm install --setrecoverykey --password "mynewpassword"
       
 ## Updates
 
-Remember that entering the recovery key while booting is the only option when sectpmctl will not unlock automatically anymore. See 'Recovery' for how to fix.
+Remember that entering the recovery key while booting is the only option when sectpmctl will not unlock automatically anymore. See 'Recovery'
+for how to fix.
 
 ### Kernel or kernel module updates
 
-Kernel or kernel module updates will not create any problems.  Whenever a kernel update is installed or a new DKMS module or update to such, the corresponding
-hooks are called to automatically sign the kernel and/or kernel modules in a very similar way like DKMS and grub for example are doing updates.
+Kernel or kernel module updates will not create any problems.  Whenever a kernel update is installed or a new DKMS module or update to such,
+the corresponding hooks are called to automatically sign the kernel and/or kernel modules in a very similar way like DKMS and grub for example
+are doing updates.
 
 ### Userspace updates
 
-No userspace application except bootloaders should be able to cause any problem anytime. It is better to not install any other bootloader. The UEFI
-specification allows for many bootloaders being installed in parallel. No other bootloader will overwrite sectpmctl but most probably change the boot order.
-In such case you can enter the bootmenu of your BIOS (often the F12 key or such) and select sectpmctl again as boot entry. You can do it also permanently by
-using the efibootmgr command although it could be a bit of a fiddle.
+No userspace application except bootloaders should be able to cause any problem anytime. It is better to not install any other bootloader. The
+UEFI specification allows for many bootloaders being installed in parallel. No other bootloader will overwrite sectpmctl but most probably
+change the boot order. In such case you can enter the bootmenu of your BIOS (often the F12 key or such) and select sectpmctl again as boot
+entry. You can do it also permanently by using the efibootmgr command although it could be a bit of a fiddle.
 
 ### BIOS Updates, eventually even with an Secure Boot database update
 
-BIOS updates should be no problem as sectpmctl is not sealing the LUKS key to a specific BIOS version, but only to a specific Secure Boot database and state
-while enforcing the use of it's own Secure Boot db keys for successfully unlocking the LUKS key while booting. On some BIOS types it is even safe to install BIOS
-updates which contain updates to the Secure Boot Database (most probably to supply an updated DBX list). It is safe to install such BIOS update as wells as the
-new database is only provided but not applied automatically by the BIOS update.
+BIOS updates should be no problem as sectpmctl is not sealing the LUKS key to a specific BIOS version, but only to a specific Secure Boot
+database and state while enforcing the use of it's own Secure Boot db keys for successfully unlocking the LUKS key while booting. On some BIOS
+types it is even safe to install BIOS updates which contain updates to the Secure Boot Database (most probably to supply an updated DBX list).
+It is safe to install such BIOS update as wells as the new database is only provided but not applied automatically by the BIOS update.
 
 ### Custom kernels or kernel modules
 
@@ -362,16 +372,144 @@ You then need to supply a key the certificate which are stored in '/var/lib/sect
 
 Depending on the tool you either need the CER or the CRT file as certificate.
 
-Please read the helper scripts before manual using them as they have specific needs for rewriting parameters. Hopefully the patches of tpmsbsigntool can be merged
-upstream in sbsigntool in the future.
+Please read the helper scripts before manual using them as they have specific needs for rewriting parameters. Hopefully the patches of
+tpmsbsigntool can be merged upstream in sbsigntool in the future.
 
 ## Recovery
 
-In case of a changed Secure Boot database, sectpmctl will not unlock anymore. In that case you can simply repeat the sectpmctl installation. First clear the
-Secure Boot database, then clear the TPM and finally repeat all steps exept 1. and 4. from the installation. It is possible to do it more fine grained which will
-be documented in a later release.
+In case of a changed Secure Boot database, sectpmctl will not unlock anymore. In that case you can simply repeat the sectpmctl installation.
+First clear the Secure Boot database, then clear the TPM and finally repeat all steps exept 1. and 4. from the installation. It is possible to
+do it more fine grained which will be documented in a later release.
 
 You could then omit the '--setrecoverykey' option in the 'sectpmctl tpm install' command to keep your current recovery key.
+
+## TPM2 Commands
+
+The following persistant handles are created after provisioning and installation. The keyed hash is using one of the two parent objects.
+
+| Handle | Object |
+| ------ | ------ |
+| 0x81000100 | Parent object with DA |
+| 0x81000101 | Parent object with NODA |
+| 0x81000102 | Keyed hash of LUKS key |
+
+### Provisioning
+
+Performing a TPM provisioning is required for advanced usage. The TPM has to be partitioned and secured. This implementation does not make use
+of the endorsement key, some users want to disable this hirarchy anyway for privacy reasons. It also does't set passwords for the owner hirarchy
+because that will sooner or later create problems with software which simply would not allow to use an owner password, tpm2-topt for example.
+The root user would be able to create new primary keys or even delete them, but that should not break security.
+
+Setting a high entropy password for the endorsement hirarchy and deleting it afterwards could be an intresting option in future to disable
+the endorsement hirarchy. An option for not storing the lockout authorization password could maybe a good thing in a future update. A recovery
+can always be done by a reinstallation.
+
+The two public keys 'tpm_owner.pub' and 'tpm_owner_noda.pub' play an important role. They are used for session encryption, but more importantly
+they build the foundation of the TOFU principle. These public keys are used to establish a TPM session when unsealing in the initrd. If
+the corresponding private key is not inside the TPM, then the communication is directly rejected. The public key is copied into the initrd and
+of course signed by Secure Boot, so that manupulation of the public key won't boot. Deleting the private key in the TPM or using a different TPM
+also won't boot. Only when the initrd finds the private keys created at provisioning time together with the initrd's public key, the encrypted
+session is established.
+
+```
+# Clear the TPM
+tpm2_clear
+
+# Set lockout values
+tpm2_dictionarylockout --max-tries=32 --recovery-time=600 --lockout-recovery-time=1800 --setup-parameters
+
+# The lockout authorization password is stored in plain text inside the encrypted root partition
+tpm2_changeauth --object-context=lockout "high entropy password"
+
+# Create the first primary key with DA flag, store the public key for TOFU
+tpm2_createprimary --hierarchy=o --key-algorithm=rsa --key-context=prim.ctx
+tpm2_evictcontrol --hierarchy=o --object-context=prim.ctx "0x81000100"
+tpm2_readpublic --object-context="0x81000100" --serialized-handle="tpm_owner.pub"
+
+# Create the second primary key with NODA flag, store the public key for TOFU
+tpm2_createprimary --hierarchy=o --key-algorithm=rsa --key-context=prim_noda.ctx \
+    --attributes="fixedtpm|fixedparent|sensitivedataorigin|userwithauth|restricted|decrypt|noda"
+tpm2_evictcontrol --hierarchy=o --object-context=prim_noda.ctx "0x81000101"
+tpm2_readpublic --object-context="0x81000101" --serialized-handle="tpm_owner_noda.pub"
+```
+
+### Session encryption and TOFU
+
+When a session is established for sealing or unsealing, the public keys from the provisioning are used
+
+```
+# The tpm_owner_noda private key is available in the TPM
+
+tpm2_startauthsession --policy-session --session="session.ctx" --key-context="tpm_owner_noda.pub"
+
+tpm2_sessionconfig "session.ctx"
+# -> Session-Attributes: continuesession|decrypt|encrypt
+```
+
+```
+# The tpm_owner_noda private key is not available in the TPM
+
+tpm2_startauthsession --policy-session --session="session.ctx" --key-context="tpm_owner_noda.pub"
+# -> ERROR: Esys_StartAuthSession(0x18B) - tpm:handle(1):the handle is not correct for the use
+```
+
+### Sealing with TPM password
+
+### Unsealing with TPM password
+
+```
+tpm2_startauthsession --policy-session -S "session.ctx" -c "0x81000100"
+
+tpm2_sessionconfig "session.ctx"
+# -> Session-Attributes: continuesession|decrypt|encrypt
+
+tpm2_policypcr -Q -S session.ctx -l "PCRLIST"
+
+tpm2_policyauthvalue -Q -S session.ctx
+
+tpm2_unseal -p "session:session.ctx+hex:PASSWORD" -c "0x81000102"
+```
+
+### Changing the TPM password
+
+```
+tpm2_readpublic -Q -c "0x81000102" -o key.pub
+
+# change authorisation
+tpm2_changeauth -Q -c "0x81000102" -C "0x81000100" -r new.priv -p "hex:OLDPASSWORD" "hex:PASSWORD"
+
+tpm2_evictcontrol -Q -c "0x81000102" -C o
+
+tpm2_load -Q -C "0x81000100" -u key.pub -r new.priv -n new.name -c new.ctx
+
+tpm2_evictcontrol -Q -c new.ctx "0x81000102" -C o
+```
+
+### Authorized policies
+
+The current implementation doen't need authorized policies. The next release will most probably include them to do advanced updates without
+the need for a recovery key.
+
+## Bugs found
+
+When TPM (policy) sessions are created and not freed after use, a kernel bug could be triggered. When that happens, the TPM will not awnser
+anymore to any commands. A dmesg output will then show problems. A hotfix, which is already integrated in sectpmctl key (but not yet in
+tpmsbsigntool) will detect that case by using a timeout. When the timeout is detected, a force flush of all sessions is performed. That is
+not very polite but strictly neccessary to deliver functional unsealing. Signing of kernels and kernel modules is currently not protected by
+the force flush. The kernel bug is persistent, so reboots don't solve the problem.
+
+## Changelog
+
+* 1.1.1
+  + Fixed cleanup bugs in sectpmctl key
+  + Added documentation
+
+* 1.1.0
+  + Added support for TPM + Password
+  + Added documentation
+
+* 1.0.0
+  + Initial upload
 
 ## Disclaimer
 

@@ -881,30 +881,37 @@ _remove() {
 }
 
 _extend() {
+  ERR=false
+
   for _ in {1..1}; do
     if [[ -n ${EXTEND_FILE} ]]; then
       p1="$( _ex "${ME} ${CMD}: Could not create hash from file '${EXTEND_FILE}'" \
-        cat "${EXTEND_FILE}" | ${PCR_BANK}sum | awk '{print $1;}' )" || return 1
+        cat "${EXTEND_FILE}" | ${PCR_BANK}sum | awk '{print $1;}' )" || break
         
       _tx "${ME} ${CMD}: Could not extend PCR '${PCR_BANK}:${PCR_EXTENDED}' with file '${EXTEND_FILE}'" \
-        tpm2_pcrextend -Q "${PCR_EXTENDED}:${PCR_BANK}=${p1}" || return 1
+        tpm2_pcrextend -Q "${PCR_EXTENDED}:${PCR_BANK}=${p1}" || break
     elif [[ ${EXTEND_RANDOM} == true ]]; then
       p1="$( _tx "${ME} ${CMD}: Could not create random data with length ${PCR_HASH_LENGTH}" \
         tpm2_getrandom --hex "${PCR_HASH_LENGTH}" )" || _xt $? || break
         
       _tx "${ME} ${CMD}: Could not extend PCR '${PCR_BANK}:${PCR_EXTENDED}' with random data" \
-        tpm2_pcrextend -Q "${PCR_EXTENDED}:${PCR_BANK}=${p1}" || return 1
+        tpm2_pcrextend -Q "${PCR_EXTENDED}:${PCR_BANK}=${p1}" || break
     elif [[ -n ${EXTEND_STRING} ]]; then
       p1="$( _ex "${ME} ${CMD}: Could not create hash from string '${EXTEND_STRING}'" \
-        echo -n "${EXTEND_STRING}" | ${PCR_BANK}sum | awk '{print $1;}' )" || return 1
+        echo -n "${EXTEND_STRING}" | ${PCR_BANK}sum | awk '{print $1;}' )" || break
         
       _tx "${ME} ${CMD}: Could not extend PCR '${PCR_BANK}:${PCR_EXTENDED}' with input string '${EXTEND_STRING}'" \
-        tpm2_pcrextend -Q "${PCR_EXTENDED}:${PCR_BANK}=${p1}" || return 1
+        tpm2_pcrextend -Q "${PCR_EXTENDED}:${PCR_BANK}=${p1}" || break
     else
       print_error "${ME} ${CMD}: Could not extend PCR, no input data"
-      return 1
+      ERR=true
+      break
     fi
   done
+
+  if [[ $ERR == true ]]; then
+    return 1
+  fi
 }
 
 _changepassword() {
@@ -924,41 +931,41 @@ _changepassword() {
       # change authorisation
       _tx "${ME} ${CMD}: Could not change authorisation" \
         tpm2_changeauth -Q -c "${HANDLE}" -C "${PARENT_HANDLE}" -r new.priv -p "hex:${OLDPASSWORD}" "hex:${PASSWORD}" || break
-      # remove current object in handle, may fail if empty
-      tpm2_evictcontrol -Q -c "${HANDLE}" -C o 2> /dev/null > /dev/null || true
+      # remove current object in handle
+      tpm2_evictcontrol -Q -c "${HANDLE}" -C o || break
       # load the key
       _tx "${ME} ${CMD}: Could not load created key" \
-        tpm2_load -Q -C "${PARENT_HANDLE}" -u key.pub -r new.priv -n new.name -c new.ctx || return 1
+        tpm2_load -Q -C "${PARENT_HANDLE}" -u key.pub -r new.priv -n new.name -c new.ctx || break
       # evict loaded key
       _tx "${ME} ${CMD}: Could not evict loaded key to handle ${HANDLE@Q}" \
-        tpm2_evictcontrol -Q -c new.ctx "${HANDLE}" -C o || return 1
+        tpm2_evictcontrol -Q -c new.ctx "${HANDLE}" -C o || break
     fi
   done
 
   if [[ -n ${HANDLE}  ]]; then
     if [[ -f key.pub ]]; then
       _ex "${ME} ${CMD}: Could not remove public key" \
-        shred -f -z -u key.pub || return 1
+        shred -f -z -u key.pub
     fi
     if [[ -f new.priv ]]; then
       _ex "${ME} ${CMD}: Could not remove new private key" \
-        shred -f -z -u new.priv || return 1
+        shred -f -z -u new.priv
     fi
     if [[ -f new.name ]]; then
       _ex "${ME} ${CMD}: Could not remove new private key name" \
-        shred -f -z -u new.name || return 1
+        shred -f -z -u new.name
     fi
     if [[ -f new.ctx ]]; then
       _ex "${ME} ${CMD}: Could not remove new private key context" \
-        shred -f -z -u new.ctx || return 1
+        shred -f -z -u new.ctx
     fi
   fi
 
   _ex "${ME} ${CMD}: Could not leave temporary ramfs directory" \
-    cd - > /dev/null || return 1
+    cd - > /dev/null
 
   _ex "${ME} ${CMD}: Could not remove temporary ramfs directory" \
-    rmdir "${tempdir}" || return 1
+    rmdir "${tempdir}"
 
   if [[ $ERR == true ]]; then
     return 1
@@ -1080,56 +1087,56 @@ _seal() {
       tpm2_evictcontrol -Q -C o -c "${HANDLE}" 2> /dev/null > /dev/null || true
       # load the key
       _tx "${ME} ${CMD}: Could not load created key" \
-        tpm2_load -Q -C "${PARENT_HANDLE}" -u pcr_seal_key.pub -r pcr_seal_key.priv -n pcr_seal_key.name -c pcr_seal_key.ctx || return 1
+        tpm2_load -Q -C "${PARENT_HANDLE}" -u pcr_seal_key.pub -r pcr_seal_key.priv -n pcr_seal_key.name -c pcr_seal_key.ctx || break
       # evict loaded key
       _tx "${ME} ${CMD}: Could not evict loaded key to handle '${HANDLE}'" \
-        tpm2_evictcontrol -Q -c pcr_seal_key.ctx "${HANDLE}" -C o || return 1
+        tpm2_evictcontrol -Q -c pcr_seal_key.ctx "${HANDLE}" -C o || break
     fi
   done
 
   if [[ -f trialsession.ctx ]]; then
     tpm2_flushcontext -Q trialsession.ctx 2> /dev/null > /dev/null
     _ex "${ME} ${CMD}: Could not remove trialsession context" \
-      shred -f -z -u trialsession.ctx || return 1
+      shred -f -z -u trialsession.ctx
   fi
   if [[ -f session.ctx ]]; then
     tpm2_flushcontext -Q session.ctx 2> /dev/null > /dev/null
     _ex "${ME} ${CMD}: Could not remove session context" \
-      shred -f -z -u session.ctx || return 1
+      shred -f -z -u session.ctx
   fi
   if [[ -f pcr_values.dat ]]; then
     _ex "${ME} ${CMD}: Could not remove PCR value data" \
-      shred -f -z -u pcr_values.dat || return 1
+      shred -f -z -u pcr_values.dat
   fi
   if [[ -f pcr.policy ]]; then
     _ex "${ME} ${CMD}: Could not remove policy file" \
-      shred -f -z -u pcr.policy || return 1
+      shred -f -z -u pcr.policy
   fi
 
   if [[ -n ${HANDLE}  ]]; then
     if [[ -f pcr_seal_key.priv ]]; then
       _ex "${ME} ${CMD}: Could not remove private PCR sealing key" \
-        shred -f -z -u pcr_seal_key.priv || return 1
+        shred -f -z -u pcr_seal_key.priv
     fi
     if [[ -f pcr_seal_key.pub ]]; then
       _ex "${ME} ${CMD}: Could not remove public PCR sealing key" \
-        shred -f -z -u pcr_seal_key.pub || return 1
+        shred -f -z -u pcr_seal_key.pub
     fi
     if [[ -f pcr_seal_key.ctx ]]; then
       _ex "${ME} ${CMD}: Could not remove PCR sealing key context" \
-        shred -f -z -u pcr_seal_key.ctx || return 1
+        shred -f -z -u pcr_seal_key.ctx
     fi
     if [[ -f pcr_seal_key.name ]]; then
       _ex "${ME} ${CMD}: Could not remove PCR sealing key name" \
-        shred -f -z -u pcr_seal_key.name || return 1
+        shred -f -z -u pcr_seal_key.name
     fi
   fi
 
   _ex "${ME} ${CMD}: Could not leave temporary ramfs directory" \
-    cd - > /dev/null || return 1
+    cd - > /dev/null
 
   _ex "${ME} ${CMD}: Could not remove temporary ramfs directory" \
-    rmdir "${tempdir}" || return 1
+    rmdir "${tempdir}"
 
   if [[ $ERR == true ]]; then
     return 1
@@ -1192,21 +1199,21 @@ _unseal() {
   if [[ -f session.ctx ]]; then
     tpm2_flushcontext -Q session.ctx 2> /dev/null > /dev/null
     _ex "${ME} ${CMD}: Could not remove session context" \
-      shred -f -z -u session.ctx || return 1
+      shred -f -z -u session.ctx
   fi
   
   if [[ -n ${NAME} ]]; then
     if [[ -f ${context_handle} ]]; then
       _ex "${ME} ${CMD}: Could not remove context handle" \
-        shred -f -z -u "${context_handle}" || return 1
+        shred -f -z -u "${context_handle}"
     fi
   fi
 
   _ex "${ME} ${CMD}: Could not leave temporary ramfs directory" \
-    cd - > /dev/null || return 1
+    cd - > /dev/null
 
   _ex "${ME} ${CMD}: Could not remove temporary ramfs directory" \
-    rmdir "${tempdir}" || return 1
+    rmdir "${tempdir}"
 
   if [[ $ERR == true ]]; then
     return 1
