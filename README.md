@@ -45,6 +45,7 @@ implementation, they are simply not needed for anything.
 * Zero TPM administrative overhead by managing Secure Boot instead of the TPM
   + Secure Boot is more easy to manage
   + FDE key is only bound to the Secure Boot state, not to userspace
+  + Immune to BIOS updates
   + Immune to operating system upgrades
   + No postprocessing other then the kernel and initrd signing required
   + Interrupted update of new kernels should still keep old kernels bootable
