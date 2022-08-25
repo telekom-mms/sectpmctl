@@ -60,8 +60,8 @@ Using a splash screen and the TPM + Password option does not work. If that happe
 ## Build and install tpmsbsigntool
 
 ```
-sudo apt install git git-buildpackage debhelper-compat gcc-multilib binutils-dev libssl-dev openssl pkg-config \
-  automake uuid-dev help2man gnu-efi tpm2-openssl
+sudo apt install git git-buildpackage debhelper-compat gcc-multilib binutils-dev libssl-dev \
+  openssl pkg-config automake uuid-dev help2man gnu-efi tpm2-openssl
 
 git clone https://github.com/T-Systems-MMS/tpmsbsigntool.git
 
@@ -219,8 +219,8 @@ do
 done
 
 
-# 4. Now migrate boot partition to root, the following partition table is assumed, change all references
-# according to your device and partition names and numbers:
+# 4. Now migrate boot partition to root, the following partition table is assumed, change all
+# references according to your device and partition names and numbers:
 
 # $DISK          -> /dev/vda (the disk)
 # $EFIPARTITION  -> /dev/vda1 (EFI-System, vfat, partition type 1)
@@ -315,7 +315,7 @@ sudo bootctl list
 If the password option has been used, the current password can be changed at runtime with:
 
 ```
-sudo sectpmctl key changepassword --handle 0x81000102 --oldpassword "myoldpwd" --password "mynewpwd"
+sudo sectpmctl key changepassword --handle 0x81000102 --oldpassword "oldpw" --password "newpw"
 ```
 
 If the current password is lost, a new password can be set with the recovery key by installing again:
@@ -434,7 +434,8 @@ session is established.
 tpm2_clear
 
 # Set lockout values
-tpm2_dictionarylockout --max-tries=32 --recovery-time=600 --lockout-recovery-time=1800 --setup-parameters
+tpm2_dictionarylockout --max-tries=32 --recovery-time=600 --lockout-recovery-time=1800 \
+  --setup-parameters
 
 # The lockout authorization password is stored in plain text inside the encrypted root partition
 tpm2_changeauth --object-context=lockout "high entropy password"
@@ -474,67 +475,77 @@ tpm2_startauthsession --policy-session --session="session.ctx" --key-context="tp
 ### Sealing with TPM password
 
 ```
-# Foresee all pcr values into pcr_values.dat
+# Foresee or read the PCR values into "pcr_values.dat"
+tpm2_pcrread "sha256:7,8,9,11,14" --output="pcr_values.dat"
 
-# create trial pcr with authvalue policy session
-tpm2_startauthsession -S trialsession.ctx
+# Create trial PCR with authvalue policy session
+tpm2_startauthsession --session="trialsession.ctx"
 
-tpm2_policypcr -Q -S trialsession.ctx -l "sha256:7,8,9,11,14" -f pcr_values.dat -L pcr.policy
+tpm2_policypcr --session="trialsession.ctx" --pcr-list="sha256:7,8,9,11,14" \
+  --pcr="pcr_values.dat" --policy="pcr.policy"
 
-tpm2_policyauthvalue -Q -S trialsession.ctx -L pcr.policy
+tpm2_policyauthvalue --session="trialsession.ctx" --policy="pcr.policy"
 
-tpm2_flushcontext trialsession.ctx
+tpm2_flushcontext "trialsession.ctx"
 
-# connect encrypted to the TPM with key enforcement (TOFU)
-tpm2_startauthsession -Q --policy-session -S session.ctx --key-context="tpm_owner.pub"
+# Connect encrypted to the TPM with key enforcement (TOFU)
+tpm2_startauthsession --policy-session --session="session.ctx" --key-context="tpm_owner.pub"
 
-tpm2_sessionconfig session.ctx
+tpm2_sessionconfig "session.ctx"
 # -> Session-Attributes: continuesession|decrypt|encrypt
 
-tpm2_create -Q --session=session.ctx -g sha256 -u "pcr_seal_key.pub" -r "pcr_seal_key.priv" -i "INPUT_SECRET_FILE" -C "0x81000100" \
-    -L pcr.policy -a "fixedtpm|fixedparent" -p "hex:PASSWORD"
+# Seal the secret
+tpm2_create --session="session.ctx" --hash-algorithm=sha256 --public="pcr_seal_key.pub" \
+  --private="pcr_seal_key.priv" --sealing-input="INPUT_SECRET_FILE" \
+  --parent-context="0x81000100" --policy="pcr.policy" --attributes="fixedtpm|fixedparent" \
+  --key-auth="hex:11223344"
 
-tpm2_flushcontext session.ctx
+tpm2_flushcontext "session.ctx"
 
-# remove current object in handle, may fail if empty
-tpm2_evictcontrol -Q -C o -c "0x81000102"
+# Remove current object in handle, may fail if empty
+tpm2_evictcontrol --object-context="0x81000202" --hierarchy=o 2> /dev/null > /dev/null
 
-tpm2_load -Q -C "0x81000100" -u pcr_seal_key.pub -r pcr_seal_key.priv -n pcr_seal_key.name -c pcr_seal_key.ctx
+tpm2_load --parent-context="0x81000100" --public="pcr_seal_key.pub" \
+  --private="pcr_seal_key.priv" --name="pcr_seal_key.name" --key-context="pcr_seal_key.ctx"
 
-# evict loaded key
-tpm2_evictcontrol -Q -c pcr_seal_key.ctx "0x81000102" -C o
+# Store secret
+tpm2_evictcontrol --object-context="pcr_seal_key.ctx" "0x81000202" --hierarchy=o
 ```
 
 ### Unsealing with TPM password
 
 ```
-tpm2_startauthsession --policy-session -S "session.ctx" --key-context="tpm_owner.pub"
+tpm2_startauthsession --policy-session --session="session.ctx" --key-context="tpm_owner.pub"
 
 tpm2_sessionconfig "session.ctx"
 # -> Session-Attributes: continuesession|decrypt|encrypt
 
-tpm2_policypcr -Q -S session.ctx -l "PCRLIST"
+tpm2_policypcr --session="session.ctx" --pcr-list="sha256:7,8,9,11,14"
 
-tpm2_policyauthvalue -Q -S session.ctx
+tpm2_policyauthvalue --session="session.ctx"
 
-tpm2_unseal -p "session:session.ctx+hex:PASSWORD" -c "0x81000102"
+# Unseal the secret
+tpm2_unseal --auth="session:session.ctx+hex:11223344" --object-context="0x81000202"
 
-tpm2_flushcontext session.ctx
+tpm2_flushcontext "session.ctx"
 ```
 
 ### Changing the TPM password
 
 ```
-tpm2_readpublic -Q -c "0x81000102" -o key.pub
+tpm2_readpublic --object-context="0x81000202" --output="key.pub"
 
-# change authorisation
-tpm2_changeauth -Q -c "0x81000102" -C "0x81000100" -r new.priv -p "hex:OLDPASSWORD" "hex:PASSWORD"
+#Change authorisation
+tpm2_changeauth --object-context="0x81000202" --parent-context="0x81000100" \
+  --private="new.priv" --object-auth="hex:11223344" "hex:ff11ff11"
 
-tpm2_evictcontrol -Q -c "0x81000102" -C o
+tpm2_evictcontrol --object-context="0x81000202" --hierarchy=o
 
-tpm2_load -Q -C "0x81000100" -u key.pub -r new.priv -n new.name -c new.ctx
+tpm2_load --parent-context="0x81000100" --public="key.pub" --private="new.priv" \
+  --name="new.name" --key-context="new.ctx"
 
-tpm2_evictcontrol -Q -c new.ctx "0x81000102" -C o
+# Store new authorisation
+tpm2_evictcontrol --object-context="new.ctx" "0x81000202" --hierarchy=o
 ```
 
 ### Authorized policies
@@ -549,6 +560,9 @@ anymore to any commands. A dmesg output will then show problems. A hotfix, which
 tpmsbsigntool) will detect that case by using a timeout. When the timeout is detected, a force flush of all sessions is performed. That is
 not very polite but strictly neccessary to deliver functional unsealing. Signing of kernels and kernel modules is currently not protected by
 the force flush. The kernel bug is persistent, so reboots don't solve the problem.
+
+On other devices the TPM behaved different and produced error codes. In a future version this error codes should be parsed to trigger the
+required flushing.
 
 ## Changelog
 
