@@ -3,7 +3,8 @@
 We want to secure the Ubuntu 22.04 installation with LUKS and TPM2. Please read this README carefully before installation.
 
 We also assume a normal installation of Ubuntu 22.04 desktop with erasing the disk and using LVM and encryption. Otherwise an installation
-is possible but currently undocumented. A preseed installation is also possible but currently undocumented as well.
+is possible but currently undocumented. A preseed installation is also possible but currently undocumented as well. Other Linux distribution can
+probably be supported as well in future releases.
 
 If you are not using the TPM + password option you should supply a BIOS start password. Without either a BIOS start password or
 TPM + password, the device would boot up to the login screen and someone could try to read out the memory or find a bug in the login
@@ -30,7 +31,7 @@ For transparency the tpm2-tools commands for session encryption, provisioning, T
 of this README. The commands for using Secure Boot are standard with the exception of using the TPM as keystore for the db signing key. Take a
 look in the source code to see how that works. If you are wondering, yes the PK and KEK key's are not stored at all in the current
 implementation, they are simply not needed for anything.
- 
+
 ## Features
 
 * TPM2 backed FDE
@@ -259,6 +260,9 @@ sudo mount /boot/efi
 
 # 5. Install the bootloader
 sudo sectpmctl boot install
+
+# TODO: Describe how to reinstall or rebuild all installed or build DKMS kernel
+# modules to have them resigned.
 
 # After this reboot your current LUKS password is still required
 sudo reboot
@@ -570,6 +574,9 @@ the force flush. The kernel bug is persistent, so reboots don't solve the proble
 
 On other devices the TPM behaved different and produced error codes. In a future version this error codes should be parsed to trigger the
 required flushing.
+
+On Ubuntu 22.10 the linux-oem-22.04 5.17 kernel seems to have a bug in the TPM module currently which prevents TPM + Passwort. Use the default
+kernel 5.15 until this is fixed.
 
 ## Changelog
 
