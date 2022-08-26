@@ -299,7 +299,9 @@ The 'sectpmctl tpm install' command will print out the recovery key. It is highl
 key you can loose all your data when the TPM breaks or when accessing your hard disk in another machine. You have been warned!
 
 The recovery key will be printed first, then the bootloader is update. It can happen that the recovery key is not visible after the
-installation. Then you need to scroll up a bit to see it.
+installation. Then you need to scroll up a bit to see it. The recovery key is build by eight groups with eight characters from 0 to 9 and a to
+f which sums up to 256bit. If this is too long you can decrease the number of groups or the grouplength with the 'sectpmctl tpm' options
+'--recoverygroups' and '--recoverygrouplength'. To create a shorter 192bit recovery key you can do so with 8 groups and a grouplength of 6.
 
 After a reboot, the LUKS partition should decrypt automatically and the installation is complete.
 
