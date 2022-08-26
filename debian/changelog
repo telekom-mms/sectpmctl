@@ -1,3 +1,10 @@
+sectpmctl (1.1.1-1) UNRELEASED; urgency=medium
+
+  * Fixed cleanup bugs in sectpmctl key
+  * Added documentation
+
+ -- Richard Robert Reitz <richard-robert.reitz@t-systems.com>  Fri, 26 Aug 2022 20:08:18 +0200
+
 sectpmctl (1.1.0-1) jammy; urgency=medium
 
   * Added TPM + Password option
