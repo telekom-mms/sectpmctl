@@ -317,10 +317,30 @@ followed by a reboot. You can also use the bootctl command for basic tasks like 
 sudo bootctl list
 ```
 
-If the password option has been used, the current password can be changed at runtime with:
+If the password option has been used, the current password can be changed at runtime. The TPM should not be in the DA lockout mode, otherwise
+you have to wait up to 10 minutes.
 
 ```
-sudo sectpmctl key changepassword --handle 0x81000102 --oldpassword "oldpw" --password "newpw"
+cat > change_tpm_password.sh <<__EOT
+#! /bin/bash
+echo -n "Enter old TPM Password: "
+read -sr tpmpwdold
+echo
+echo -n "Enter new TPM Password: "
+read -sr tpmpwda
+echo
+echo -n "Enter new TPM Password again: "
+read -sr tpmpwdb
+echo
+if [[ "x\${tpmpwda}" == "x\${tpmpwdb}" ]]; then
+  sudo sectpmctl key changepassword --handle 0x81000102 --oldpassword "\${tpmpwdold}" --password "\${tpmpwda}"
+else
+  echo "Passwords don't match. Exit"
+  exit 1
+fi
+__EOT
+chmod +x change_tpm_password.sh
+./change_tpm_password.sh
 ```
 
 If the current password is lost, a new password can be set with the recovery key by installing again:
