@@ -429,7 +429,27 @@ The following persistant handles are created after provisioning and installation
 | 0x81000101 | Parent object with NODA |
 | 0x81000102 | Keyed hash of LUKS key |
 
-### Used PCR values
+### List of PCR Values on Ubuntu
+
+| PCR | Description |
+| --- | ----------- |
+| 0 | BIOS |
+| 1 | BIOS Config |
+| 2 | Option ROM |
+| 3 | Option ROM Config |
+| 4 | Bootloaders and EFI Blobs |
+| 5 | GPT Partitionstabelle |
+| 6 | Resume Event (seems not to work on Linux) |
+| 7 | SecureBoot State |
+| 8 | Grub Bootloader Config |
+| 9 | Grub Bootloader Files |
+| 10 |  |
+| 11 | sectpmctl |
+| 12 |  |
+| 13 | Shim Bootloader MOK |
+| 14 |  |
+
+### List of PCR values used by sectpmctl
 
 | PCR | value |
 | --- | ----- |
