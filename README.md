@@ -184,9 +184,9 @@ The following DA lockout values are set:
 - Recovery time = 10 minutes
 - Lockout recovery time = 30 minutes
 
-Unsealing the LUKS key while booting (currently without TPM + password) and signing of kernels and kernel modules is done by using the NODA
-primary key to not break updates in case of a dictionary lockout situation. In the next release, when using the TPM + password option,
-specificly the unsealing will be done with the DA key, while keep using the NODA key for signing kernels and kernel modules. 
+Unsealing the LUKS key while booting without TPM + password and signing of kernels and kernel modules is done by using the NODA primary key to
+not break updates in case of a dictionary lockout situation. When using the TPM + password option, the unsealing while booting is done with the
+DA key, while keep using the NODA key for signing kernels and kernel modules. 
 
 All generated keys, passwords or serialized keys are stored in '/var/lib/sectpmctl/keys'.
 
