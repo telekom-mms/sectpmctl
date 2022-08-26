@@ -438,15 +438,15 @@ The following persistant handles are created after provisioning and installation
 | 2 | Option ROM |
 | 3 | Option ROM Config |
 | 4 | Bootloaders and EFI Blobs |
-| 5 | GPT Partitionstabelle |
-| 6 | Resume Event (seems not to work on Linux) |
+| 5 | GPT Partition Table |
+| 6 | Resume Events (seems not to work on Linux) |
 | 7 | SecureBoot State |
 | 8 | Grub Bootloader Config |
 | 9 | Grub Bootloader Files |
 | 10 |  |
 | 11 | sectpmctl |
 | 12 |  |
-| 13 | Shim Bootloader MOK |
+| 13 | shim Bootloader MOK |
 | 14 |  |
 
 ### List of PCR values used by sectpmctl
