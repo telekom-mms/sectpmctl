@@ -365,7 +365,7 @@ need to sign things manually:
 You can even link the helper scripts over the sbsigntool executables by leveraging a debian config package if you need to do so,
 for example to support maintainance of commercial antivirus applications or such.
 
-You then need to supply a key the certificate which are stored in '/var/lib/sectpmctl/keys/':
+You then need to supply a key and a certificate which are stored in '/var/lib/sectpmctl/keys/':
 
 - db.obj (key)
 - db.cer (certificate)
@@ -385,6 +385,9 @@ do it more fine grained which will be documented in a later release.
 You could then omit the '--setrecoverykey' option in the 'sectpmctl tpm install' command to keep your current recovery key.
 
 ## TPM2 Internals
+
+You can test the implementation on a fresh Ubuntu installation with a cleared TPM. The following snippets from Provisioning, Sealing with TPM
+password, Unsealing with TPM password and Changing the TPM password are execetutable in this order.
 
 ### Used handles
 
@@ -476,6 +479,9 @@ tpm2_startauthsession --policy-session --session="session.ctx" --key-context="tp
 ### Sealing with TPM password
 
 ```
+# Generate the secret
+echo mysecret > INPUT_SECRET_FILE
+
 # Foresee or read the PCR values into "pcr_values.dat"
 tpm2_pcrread "sha256:7,8,9,11,14" --output="pcr_values.dat"
 
