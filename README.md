@@ -319,6 +319,10 @@ followed by a reboot. You can also use the bootctl command for basic tasks like 
 sudo bootctl list
 ```
 
+By default, only kernels signed by Canonical are considered to be shown in the boot list. Unsigned kernels are ignored for safety reasons.
+If you want do have support for all kernels, you can edit '/etc/sectpmctl/boot.conf', set 'SKIP_UNSIGNED_KERNELS' to 'false' and update the
+bootloader with 'sectpmctl boot update'.
+
 If the password option has been used, the current password can be changed at runtime. The TPM should not be in the DA lockout mode, otherwise
 you have to wait up to 10 minutes.
 
