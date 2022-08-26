@@ -441,13 +441,13 @@ The following persistant handles are created after provisioning and installation
 | 5 | GPT Partition Table |
 | 6 | Resume Events (seems not to work on Linux) |
 | 7 | SecureBoot State |
-| 8 | Grub Bootloader Config |
-| 9 | Grub Bootloader Files |
+| 8 | GRUB Bootloader Config |
+| 9 | GRUB Bootloader Files |
 | 10 |  |
 | 11 | sectpmctl |
 | 12 |  |
-| 13 | shim Bootloader MOK |
-| 14 |  |
+| 13 |  |
+| 14 | shim Bootloader MOK |
 
 ### List of PCR values used by sectpmctl
 
@@ -459,7 +459,8 @@ The following persistant handles are created after provisioning and installation
 | 11 | LUKS header |
 | 14 | zero |
 
-PCR8, 9 and 14 will be zero when sectpmctl is installed. This is also verified by binding the LUKS key also to this zero values.
+PCR8, 9 and 14 will be zero when sectpmctl is installed. MOK is not and should not be used. This is verified by binding the LUKS key to this
+three zero values.
 
 PCR11, the LUKS header, is measured while sealing in the installation and while unsealing by the initrd. It has a special purpose. After
 unsealing the LUKS key in the initrd, PCR11 is extended with a random value. That blocks a second unsealing without having to extend a more
