@@ -2,9 +2,9 @@
 
 We want to secure the Ubuntu 22.04 installation with LUKS and TPM2. Please read this README carefully before installation.
 
-We also assume a normal installation of Ubuntu 22.04 desktop with erasing the disk and using LVM and encryption. Otherwise an installation
-is possible but currently undocumented. A preseed installation is also possible but currently undocumented as well. Other Linux distribution can
-probably be supported as well in future releases.
+We also assume a normal installation of Ubuntu 22.04 desktop with erasing the disk and using LVM and encryption. Don't select to create a
+recovery key, only the LUKS password. A preseed installation is possible but currently undocumented. Other Linux distribution can probably be
+supported in future releases.
 
 If you are not using the TPM + password option you should supply a BIOS start password. Without either a BIOS start password or
 TPM + password, the device would boot up to the login screen and someone could try to read out the memory or find a bug in the login
