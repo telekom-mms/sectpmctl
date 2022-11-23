@@ -12,6 +12,8 @@ Depends: ${misc:Depends}, efibootmgr, efitools, sbsigntool, tpmsbsigntool, binut
 Provides: grub, grub2, grub2-common, grub-common, grub-efi, grub-efi-amd64, grub-efi-amd64-bin, grub-efi-amd64-signed, grub-pc, grub-pc-bin, lilo, os-prober, shim, shim-signed
 Conflicts: grub, grub2, grub2-common, grub-common, grub-efi, grub-efi-amd64, grub-efi-amd64-bin, grub-efi-amd64-signed, grub-pc, grub-pc-bin, lilo, os-prober, shim, shim-signed
 Replaces: grub, grub2, grub2-common, grub-common, grub-efi, grub-efi-amd64, grub-efi-amd64-bin, grub-efi-amd64-signed, grub-pc, grub-pc-bin, lilo, os-prober, shim, shim-signed
+XB-Important: yes
+Protected: yes
 Description: sectpmctl - Secure Boot and TPM2 backed LUKS full disc encryption
  The default of most Linux distributions is to use a password and eventually
  a recovery key to decrypt the encrypted root partition of a drive. sectpmctl
