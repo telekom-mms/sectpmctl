@@ -1,4 +1,4 @@
-# sectpmctl 1.1.1
+# sectpmctl 1.1.2
 
 We want to secure the Ubuntu 22.04 installation with LUKS and TPM2. Please read this README carefully before installation.
 
@@ -626,6 +626,9 @@ On Ubuntu 22.10 the linux-oem-22.04 5.17 kernel seems to have a bug in the TPM m
 kernel 5.15 until this is fixed.
 
 ## Changelog
+
+* 1.1.2
+  + Added Debian protected flag and added linking for the signing wrappers
 
 * 1.1.1
   + Fixed cleanup bugs in sectpmctl key
