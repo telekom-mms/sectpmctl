@@ -1,3 +1,10 @@
+sectpmctl (1.1.2-1) jammy; urgency=medium
+
+  * Added support for flexible signing wrapper scripts
+  * Added essential flag for Debian package
+
+ -- Richard Robert Reitz <richard-robert.reitz@t-systems.com>  Wed, 23 Nov 2022 21:16:57 +0100
+
 sectpmctl (1.1.1-1) UNRELEASED; urgency=medium
 
   * Fixed cleanup bugs in sectpmctl key
