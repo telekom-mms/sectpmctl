@@ -44,4 +44,4 @@ package_clean:
 package_dist:
 	cd .. && \
 	DIR=$(lastword $(subst /, ,$(shell pwd))) && \
-	tar cvzf "$${DIR}_1.1.1.orig.tar.gz" "$$DIR"
+	tar cvzf "$${DIR}_1.1.2.orig.tar.gz" "$$DIR"
