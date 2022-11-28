@@ -760,13 +760,24 @@ _check_input_and_state() {
     return 1
   fi
   
-  # loop after emergency flushing of all saved session a second time in
-  # case of a TPM timeout. this is not too polite, but self defense.
-  # secbootctl requires a functional kernel signing facility. we can't
-  # risc any disturbance beause of unclean shutdown of any application 
-  # 'tpm2_getcap handles-saved-session' can be used to list all sessions
+  # if the command is running into a timeout, the loop will be quit with
+  # error code 2. if the command executed successfully, the loop will be
+  # quit with error code 0. the loop is retried for 30 seconds in case of an
+  # error. this is specificaly done to recover from an pcr changed error:
+  # Esys_Unseal(0x128) - tpm:error(2.0): PCR have changed since checked
+  # if the error still exist, the loop is quit with error code 1.
+
+  # errors produced by a session overflow need to be handled outside of the
+  # key tool. The typical error message would be:
+  # Esys_StartAuthSession(0xA000A) - tcti:IO failure
+  # to flush all stored sessions, the tpm2_flushcontext command may be used.
+  # to prevent breaking of unsealing in the initrd caused by a session
+  # overflow, the flush command is always executed at boot time before the
+  # unsealing.
+  i=1
+  n=10
   ret=0
-  for _ in {1..2}; do
+  for i in $(seq 1 ${n}); do
     TIMEOUT=0
     case "${CMD}" in
       extend)
@@ -791,22 +802,20 @@ _check_input_and_state() {
     esac
     ret=${?}
 
-    if [[ "${TIMEOUT}" == "1" ]]; then
-      echo "${ME} ${CMD}: TPM Timeout, kernel bug maybe, flushing all" > /dev/kmsg
-      tpm2_flushcontext -t
-      tpm2_flushcontext -l
-      tpm2_flushcontext -s
+    if [[ "${TIMEOUT}" != "0" ]]; then
+      return 2
+    elif [[ "${ret}" != "0" ]]; then
+      echo "${ME} ${CMD}: Command failed, retry ${i}/${n}"
+      sleep 3
     else
       break
     fi
   done
   
-  if [[ "${TIMEOUT}" == "1" ]]; then
-    return 2
-  elif [[ "${ret}" != "0" ]]; then
-    return 1
-  else
+  if [[ "${ret}" == "0" ]]; then
     return 0
+  else
+    return 1
   fi
 }
 

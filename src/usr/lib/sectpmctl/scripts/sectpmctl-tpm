@@ -567,6 +567,10 @@ echo
 mkdir /dev/shm > /dev/null 2> /dev/null
 mount -t tmpfs tmpfs /dev/shm
 
+tpm2_flushcontext -t
+tpm2_flushcontext -l
+tpm2_flushcontext -s
+
 tpm2_pcrread sha256:11 | grep -q "^[[:space:]]\+11:[[:space:]]\+0x[0]\+$"
 if [ \$? -eq 0 ]; then
         cryptsetup luksDump "${CRYPT_PARTITION}" > luks.dat
@@ -613,6 +617,10 @@ if [ "\$CRYPTTAB_TRIED" = 0 ]; then
         
         mkdir /dev/shm > /dev/null 2> /dev/null
         mount -t tmpfs tmpfs /dev/shm
+
+        tpm2_flushcontext -t
+        tpm2_flushcontext -l
+        tpm2_flushcontext -s
 
         cryptsetup luksDump "${CRYPT_PARTITION}" > luks.dat
         sectpmctl key extend --file luks.dat
@@ -664,6 +672,10 @@ if [ "\$CRYPTTAB_TRIED" = 0 ]; then
 
         mkdir /dev/shm > /dev/null 2> /dev/null
         mount -t tmpfs tmpfs /dev/shm
+
+        tpm2_flushcontext -t
+        tpm2_flushcontext -l
+        tpm2_flushcontext -s
 
         cryptsetup luksDump "${CRYPT_PARTITION}" > luks.dat
         sectpmctl key extend --file luks.dat
