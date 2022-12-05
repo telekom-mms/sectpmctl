@@ -2,6 +2,12 @@
 
 case "$1" in
   'configure')
+    if [ ! -L /usr/lib/sectpmctl/scripts/kmodsign.sh ]; then
+      ln -s /usr/lib/sectpmctl/scripts/kmodsign_obj.sh /usr/lib/sectpmctl/scripts/kmodsign.sh
+    fi
+    if [ ! -L /usr/lib/sectpmctl/scripts/sbsign.sh ]; then
+      ln -s /usr/lib/sectpmctl/scripts/sbsign_obj.sh /usr/lib/sectpmctl/scripts/sbsign.sh
+    fi
     install -d -m 0600 /var/lib/sectpmctl/objects
     install -d -m 0600 /var/lib/sectpmctl/keys
     install -d /var/lib/sectpmctl/scripts

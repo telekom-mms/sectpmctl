@@ -15,9 +15,7 @@ install:
 	install -d $(DESTDIR)/usr/lib/sectpmctl/scripts
 	install -m 0755 src/usr/lib/sectpmctl/scripts/dkms_sign_helper.sh $(DESTDIR)/usr/lib/sectpmctl/scripts
 	install -m 0755 src/usr/lib/sectpmctl/scripts/kmodsign_obj.sh $(DESTDIR)/usr/lib/sectpmctl/scripts
-	ln -s /usr/lib/sectpmctl/scripts/kmodsign_obj.sh $(DESTDIR)/usr/lib/sectpmctl/scripts/kmodsign.sh
 	install -m 0755 src/usr/lib/sectpmctl/scripts/sbsign_obj.sh $(DESTDIR)/usr/lib/sectpmctl/scripts
-	ln -s /usr/lib/sectpmctl/scripts/sbsign_obj.sh $(DESTDIR)/usr/lib/sectpmctl/scripts/sbsign.sh
 	install -m 0755 src/usr/lib/sectpmctl/scripts/sectpmctl-boot $(DESTDIR)/usr/lib/sectpmctl/scripts
 	install -m 0755 src/usr/lib/sectpmctl/scripts/sectpmctl-key $(DESTDIR)/usr/lib/sectpmctl/scripts
 	install -m 0755 src/usr/lib/sectpmctl/scripts/sectpmctl-tpm $(DESTDIR)/usr/lib/sectpmctl/scripts
