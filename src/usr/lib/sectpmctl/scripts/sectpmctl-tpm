@@ -1026,6 +1026,19 @@ check_tpm2_secureboot () {
   tpm2_selftest || (echo 'TPM Selftest Failed' ; exit 3)
 }
 
+check_initial_luks_passphrase() {
+  KNOWN_UNKNOWN="${1}"
+  CRYPT_PARTITION="${2}"
+  CRYPTROOT_LABEL="${3:=testfoo}"
+
+  echo 'Check if proper LUKS Key is given for initial setup'
+  echo -n "${KNOWN_UNKNOWN}" \
+    | cryptsetup open --test-passphrase "${CRYPT_PARTITION}" "${CRYPTROOT_LABEL}" >/dev/null 2>&1 \
+    || { echo "WRONG LUKS KEY PROVIDED. EXITING SETUP." ; exit 4; }
+
+}
+
+
 initial_tpm2_setup() {
   PCR_BANK="${1}"
   PCR_VALUES_TO_USE="${2}"
@@ -1049,6 +1062,11 @@ initial_tpm2_setup() {
   TPM_PASSWORD="${20}"
 
   check_tpm2_secureboot
+
+  check_initial_luks_passphrase \
+    "${KNOWN_UNKNOWN}" \
+    "${CRYPT_PARTITION}" \
+    "${CRYPTROOT_LABEL}"
 
   add_tpm2_hook \
     "${PCR_BANK}" \
