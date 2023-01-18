@@ -1035,7 +1035,17 @@ check_initial_luks_passphrase() {
   echo -n "${KNOWN_UNKNOWN}" \
     | cryptsetup open --test-passphrase "${CRYPT_PARTITION}" "${CRYPTROOT_LABEL}" >/dev/null 2>&1 \
     || { echo "WRONG LUKS KEY PROVIDED. EXITING SETUP." ; exit 4; }
+}
 
+check_initial_luks_keyfile() {
+  KEY_FILE="${1}"
+  CRYPT_PARTITION="${2}"
+  CRYPTROOT_LABEL="${3:=testfoo}"
+
+  echo 'Check if proper LUKS Key is given for initial setup'
+    cryptsetup open --key-file="${KEY_FILE}" --test-passphrase \
+      "${CRYPT_PARTITION}" "${CRYPTROOT_LABEL}" >/dev/null 2>&1 \
+    || { echo "WRONG LUKS KEY PROVIDED. EXITING SETUP." ; exit 4; }
 }
 
 
@@ -1063,10 +1073,17 @@ initial_tpm2_setup() {
 
   check_tpm2_secureboot
 
-  check_initial_luks_passphrase \
-    "${KNOWN_UNKNOWN}" \
-    "${CRYPT_PARTITION}" \
-    "${CRYPTROOT_LABEL}"
+  if [[ "x$KNOWN_UNKNOWN" == "x" ]]; then
+    check_initial_luks_keyfile \
+      "${KEY_FILE}" \
+      "${CRYPT_PARTITION}" \
+      "${CRYPTROOT_LABEL}"
+  else
+    check_initial_luks_passphrase \
+      "${KNOWN_UNKNOWN}" \
+      "${CRYPT_PARTITION}" \
+      "${CRYPTROOT_LABEL}"
+  fi
 
   add_tpm2_hook \
     "${PCR_BANK}" \
