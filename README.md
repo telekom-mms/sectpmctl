@@ -1,5 +1,9 @@
 # sectpmctl 1.1.3
 
+**Warning: It is highly recommended to install sectpmctl on a fresh Ubuntu installation as you could run into problems when the tpm2-tools
+or efitools can't be executed successfully on your device. Create at least a backup of your data before installation. If you already
+installed DKMS modules, it is probably neccessary to rebuild them after installing sectpmctl to have then signed.**
+
 We want to secure the Ubuntu 22.04 installation with LUKS and TPM2. Please read this README carefully before installation.
 
 We assume a normal installation of Ubuntu 22.04 desktop with erasing the disk and using LVM and encryption. Don't select to create a recovery
@@ -203,17 +207,17 @@ sudo apt install -yf
 sudo sectpmctl tpm provisioning
 
 
-# 3. Cleanup leftovers from grub, shim and windows stuff from efibootmgr
-entryId=""
-entryId=$(efibootmgr -v | grep -i "Windows Boot Manager" | sed -e 's/^Boot\([0-9]\+\)\(.*\)$/\1/')
-if [[ "x${entryId}" != "x" ]]; then
+# 3. Cleanup leftovers from grub, shim and windows with efibootmgr
+while [[ $(efibootmgr | grep -c -m 1 "Windows Boot Manager") -gt 0 ]]
+do
+  entryId=$(efibootmgr -v | grep -m 1 -i "Windows Boot Manager" | sed -e 's/^Boot\([0-9]\+\)\(.*\)$/\1/')
   sudo efibootmgr -q -b "${entryId}" -B
-fi
-entryId=""
-entryId=$(efibootmgr -v | grep -i "ubuntu" | sed -e 's/^Boot\([0-9]\+\)\(.*\)$/\1/')
-if [[ "x${entryId}" != "x" ]]; then
+done
+while [[ $(efibootmgr | grep -c -m 1 "ubuntu") -gt 0 ]]
+do
+  entryId=$(efibootmgr -v | grep -m 1 -i "ubuntu" | sed -e 's/^Boot\([0-9]\+\)\(.*\)$/\1/')
   sudo efibootmgr -q -b "${entryId}" -B
-fi
+done
 while [[ $(efibootmgr | grep -c -m 1 "SECTPMCTL Bootloader") -gt 0 ]]
 do
   entryId=$(efibootmgr -v | grep -m 1 -i "SECTPMCTL Bootloader" | sed -e 's/^Boot\([0-9]\+\)\(.*\)$/\1/')
@@ -634,6 +638,7 @@ The first thing to know is that you need to set a BIOS administrator password fi
 
 An installation on an Acer Swift 3 SF314-42 laptop caused some problems which needed changes of the source code to enable an installation:
 
+* The Secure Boot DB database is maybe not cleared by entering Setup Mode. Fix: Clear it before installation with "efi-updatevar -d 0 db".
 * The Secure Boot DBX database could not to cleared by efi-updatevar. Fix: Comment out clearing and updating of DBX in sectpmctl-boot.
 * tpm2_clear fails. Fix: Clear the TPM inside the BIOS, Windows or by executing "echo 5 | sudo tee /sys/class/tpm/tpm0/ppi/request" and remove
 tpm2_clear in sectpmctl-tpm.
@@ -641,6 +646,18 @@ tpm2_clear in sectpmctl-tpm.
 
 After a second installation, tpm2_clear and tpm2_dictionarylockout worked unexpectedly. So that could be related to a BIOS or kernel bug
 and maybe fixed already.
+
+These tools can be used to read the current Secure Boot and TPM settings:
+
+```
+mokutil --sb-state
+efi-readvar
+sudo tpm2_getcap properties-variable
+```
+
+### Gigabyte mainboards
+
+Be carefull with BIOS updates. They may delete the Secure Boot database which then makes use of the recovery password neccessary.
 
 ## Changelog
 
