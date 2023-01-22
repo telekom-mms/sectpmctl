@@ -62,6 +62,8 @@ COMMANDS
     [--recoverygroups <num>] [--recoverygrouplength <num>  ]
   provisioning 
     [--lockoutAuth <password>]
+    [--forgetlockout]
+    [--setforgetendorsement]
 
 
 OPTIONS
@@ -483,7 +485,7 @@ do_provisioning() {
   PERSISTANT_OWNER_SRK_NODA="${4}"
   FORGET_LOCKOUT="${5}"
   SET_FORGET_ENDORSEMENT="${6}"
-  
+
   if [[ "x${PROVISIONING_LOCKOUT_AUTH}" == "x" ]] && [[ $(tpm2_getcap properties-variable | grep -c "lockoutAuthSet:.*1") == 1 ]]; then
     echo "lockoutAuth set in TPM. use --lockout-auth <password> to set it."
     echo "if the password is lost, clear the TPM in the BIOS or try:"
@@ -510,17 +512,30 @@ do_provisioning() {
   
   tpm2_dictionarylockout -Q --max-tries=32 --recovery-time=600 --lockout-recovery-time=1800 --setup-parameters
   
-  echo "## CREATE AND SET THE LOCKOUTAUTH VALUE"
+  if [[ "x${SET_FORGET_ENDORSEMENT}" == "xtrue" ]]; then
+    echo "## CREATE AND SET THE ENDORSEMENT AUTH VALUE"
+
+    # set and forget endorsement password to a random value
+    getendorsementrand=$(rand8base64 2)
+    tpm2_changeauth -Q --object-context=endorsement "$(echo "${getendorsementrand}" | head -c 32)"
+  fi
   
-  # create lockout password required for provisioning
+  echo "## CREATE AND SET THE LOCKOUT AUTH VALUE"
+  
+  # create random lockout password required for provisioning
   shred -f -z -u "${LOCKOUT_FILE}" 2> /dev/null > /dev/null || true
-  getrand=$(rand8base64 2)
-  echo "${getrand}" | head -c 32 > "${LOCKOUT_FILE}"
-  chown root:root "${LOCKOUT_FILE}"
-  chmod 0600 "${LOCKOUT_FILE}"
-  
-  # set lockout password
-  tpm2_changeauth -Q --object-context=lockout "$(cat "${LOCKOUT_FILE}")"
+  getlockoutrand=$(rand8base64 2)
+  if [[ "x${FORGET_LOCKOUT}" == "xtrue" ]]; then
+    # set and forget lockout password
+    tpm2_changeauth -Q --object-context=lockout "$(echo "${getlockoutrand}" | head -c 32)"
+  else
+    echo "${getlockoutrand}" | head -c 32 > "${LOCKOUT_FILE}"
+    chown root:root "${LOCKOUT_FILE}"
+    chmod 0600 "${LOCKOUT_FILE}"
+
+    # set and store lockout password
+    tpm2_changeauth -Q --object-context=lockout "$(cat "${LOCKOUT_FILE}")"
+  fi
 
   tempdir=$(mktemp -d -p /dev/shm)
   chmod 700 "${tempdir}"

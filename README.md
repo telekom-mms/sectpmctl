@@ -218,6 +218,8 @@ sudo apt remove --allow-remove-essential "grub*" "shim*"
 sudo dpkg -i sectpmctl_1.1.1-1_amd64.deb
 sudo apt install -f
 
+# optionally disable swap while keys are created
+sudo swapoff -a
 
 # 2. TPM Provisioning
 sudo sectpmctl tpm provisioning --forgetlockout --setforgetendorsement
@@ -289,6 +291,9 @@ sudo reboot
 
 
 # 6. Install the LUKS TPM implementation
+# optionally disable swap while keys are created
+sudo swapoff -a
+
 # Now your machine has its own set of Secure Boot keys, test it
 sudo sectpmctl boot test
 
@@ -313,6 +318,9 @@ chmod +x install_tpm.sh
 
 # STORE THE PRINTED RECOVERY KEY NOW!!!
 # SCROLL UP A BIT IF IT GET'S OUT OF SIGHT!!!
+
+# Reboot to test the installation
+sudo reboot
 ```
 
 The 'sectpmctl tpm install' command will print out the recovery key. It is highly recommended to store this key in a safe location. Without this
