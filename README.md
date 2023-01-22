@@ -58,7 +58,7 @@ Using a splash screen and the TPM + Password option does not work. If that happe
 
 ## One optional setting is dangerous (disabled by default)
 
-When installing the sectpmct bootloader, Microsoft UEFI keys are automatically uploaded to the Secure Boot database for your own safety.
+When installing the sectpmct bootloader, the Microsoft keys are automatically uploaded to the Secure Boot database for your own safety.
 An option exist to suppress uploading of the Microsoft keys. Together with an BIOS admin password, hardware without an crucial UEFI OptionROM
 requirement like laptops with integrated graphics gain the protection that no other operating system is able to boot. This should probably
 also increase security on another end. When sectpmctl is installed without a TPM password, the device will boot unattended (if there is no
@@ -76,7 +76,7 @@ where the hardware strictly requires the Microsoft keys you will for sure at lea
 
 **Do NOT use the --withoutmicrosoftkeys option of the sectpmctl boot install tool when:**
 
- * You don't know what the Microsoft keys are used for
+ * You don't know what the Microsoft UEFI CA key is used for
  * You have a dedicated NVidia RTX/GTX or AMD Radeon graphic card in a desktop or laptop
  * You have PCI card's in use which are related to booting (storage, network, etc)
 
@@ -94,6 +94,8 @@ The sbctl project has a FAQ for the Microsoft keys: https://github.com/Foxboron/
 
 This option will only work when you enter the Clear Mode in the Secure Boot BIOS settings, that is when the complete Secure Boot database
 is empty. If you enter the Setup Mode (only the PK key is cleared instead of the complete Secure Boot database) this option won't work.
+
+A differentiation of the Microsoft Windows and the Microsoft UEFI key is currently not done. Either both or none will be installed.
 
 **You have been warned, it is highly possible to destroy your system without being able to fix it! Do an internet search before using this
 option and ask somebody who might know if it could work. If you brik your device you are on your own. Use on your own risc!**
