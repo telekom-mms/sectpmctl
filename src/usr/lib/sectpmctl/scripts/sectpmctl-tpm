@@ -400,6 +400,7 @@ _check_input() {
       echo -n "Enter LUKS Password: "
       read -sr line || true
       export KNOWN_UNKNOWN="$line"
+      echo
     else
       # from pipe or redirection
       export KNOWN_UNKNOWN="$(</dev/stdin)"
