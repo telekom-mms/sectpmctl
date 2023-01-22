@@ -55,9 +55,29 @@ implementation, they are simply not needed for anything.
   + The only upfront action is to clear TPM and Secure Boot
 * The secureboot datase is completly rebuild with own keys and Microsoft keys for safety reasons
 * Uses and integrates systemd-stub and systemd-boot as bootloader, does not invent a new one
+* Option to forget the lockout authorization password set while TPM provisioning
+* Option to set and forget an endorsement password  while TPM provisioning
 * Implemented in bash
 
 Using a splash screen and the TPM + Password option does not work. If that happens you can enter the password blind, it will work.
+
+## Security and privacy options
+
+### Lockout authorization password
+
+Setting the authorization password to a random value without storing it enhances security, because the lockout hierarchy can not be
+modified after TPM provisioning. This hierarchy also prevents accidental use of the tpm2_clear command. If you know that you need
+access to the lockout hierarchy, you should remove the option '--forgetlockout' from the 'sudo sectpmctl tpm provisioning' command in
+the installation section. If this option is not set, the lockout password is stored in '/var/lib/sectpmctl/keys/lockout.pwd'. You
+can change this option also at a later time by reinstalling sectpmctl again (see the recovery section for how to do it).
+
+### Endorsement authorization password
+
+Setting the endorsement authorization password to a random value without storing it enhances privacy, because the endorsement hierarchy
+can be used to uniquely identify your device. If you know that you need access to the endorsement hierarchy, you should remove the
+option '--setforgetendorsement' from the 'sudo sectpmctl tpm provisioning' command in the installation section. When this option is
+not set, the endorsement authorization password will be empty. You can change this option also at a later time by reinstalling
+sectpmctl again (see the recovery section for how to do it).
 
 ## Build and install tpmsbsigntool
 
@@ -200,7 +220,7 @@ sudo apt install -f
 
 
 # 2. TPM Provisioning
-sudo sectpmctl tpm provisioning
+sudo sectpmctl tpm provisioning --forgetlockout --setforgetendorsement
 
 
 # 3. Cleanup leftovers from grub, shim and windows stuff from efibootmgr

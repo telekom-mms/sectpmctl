@@ -204,7 +204,7 @@ OPTIONS
     and check if SecureBoot is enabled.
 
 
-  provisioning [--lockout-auth <password>]
+  provisioning
 
     Perform the TPM provioning process. The TPM will be
     _cleared_ with this command and a new lockoutAuth is set.
@@ -221,13 +221,26 @@ OPTIONS
     lockoutAuth is required. Otherwise it has to be cleared
     in the BIOS.
 
-  --lockout-auth <password>
 
-      A valid lockout auth password is needed if set in TPM. 
+    --lockout-auth <password>
+
+      The current lockout auth password is needed if one is already set in the TPM.
 
       If the password is lost, clear the TPM in the BIOS or try:
       $ echo 5 | sudo tee /sys/class/tpm/tpm0/ppi/request
       $ reboot
+
+
+    --forgetlockout
+
+      Do not store the lockout authorization password. If this option is not set the
+      password is stored in '/var/lib/sectpmctl/keys/lockout.pwd'.
+
+
+    --setforgetendorsement
+
+      Set the endorsement authorization password to a random value which is not
+      stored. If this option is not set the endorsement hierarchy is not changed.
 
 
   help
