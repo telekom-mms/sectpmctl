@@ -64,7 +64,7 @@ requirement like laptops with integrated graphics gain the protection that no ot
 also increase security on another end. When sectpmctl is installed without a TPM password, the device will boot unattended (if there is no
 BIOS startup password or if it has been removed). When the system would be able to execute bootloaders signed by Microsoft, it could be
 possible that an attacker can boot a software which tries to read out the memory from the last boot to get access to the LUKS key which is
-still in the DDR RAM still for some seconds. Disabeling booting any other bootloader will prevent this relative simple attack. And even if
+still in the DDR RAM still for some seconds. Disabling booting any other bootloader will prevent this relative simple attack. And even if
 the attacker is able to put his own or Microsoft key's into the Secure Boot database, sectpmctl rejects to boot automatically in first place
 because PCR 7 would be invalid. When this option is used and also a TPM password together with an BIOS administration password has been set,
 this should also increase protection from the RAM attack if the laptop is stolen when in standby and provided the attacker is not able break
