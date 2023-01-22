@@ -524,6 +524,8 @@ traverse_boot ()
 
 install ()
 {
+  ommit_ms_keys="${1}"
+
   secureboot_mode="clearmode"
   mokutil --sb-state | grep 'Platform is in Setup Mode' || (echo 'Platform is not in Setup Mode' ; exit 3)
 
@@ -537,6 +539,11 @@ install ()
   fi
 
   echo "Assuming Secure Boot mode: ${secureboot_mode}"
+
+  if [[ "x${secureboot_mode}" = "xsetupmode" && "x${ommit_ms_keys}" = "x1" ]]; then
+    echo "'--withoutmicrosoftkeys' requires the Secure Boot database to be in Clear Mode"
+    exit 3
+  fi
 
   if [ -d "${SECTPMCTL_EFI_DIR}" ]; then
     echo "sectpmctl boot active. Please run 'sectpmctl boot deactivate' first."
@@ -636,18 +643,24 @@ install ()
   chmod 0600 ${SECTPMCTL_KEYS}/*.obj ${SECTPMCTL_KEYS}/*.cer ${SECTPMCTL_KEYS}/*.crt
 
   if [ "x${secureboot_mode}" = "xclearmode" ]; then
-    sbsiglist --owner 77fa9abd-0359-4d32-bd60-28f4e78f784b --type x509 --output MS_Win_db.esl "${VENDOR_KEYS}/MicWinProPCA2011_2011-10-19.crt"
-    sbsiglist --owner 77fa9abd-0359-4d32-bd60-28f4e78f784b --type x509 --output MS_UEFI_db.esl "${VENDOR_KEYS}/MicCorUEFCA2011_2011-06-27.crt"
-    cat MS_Win_db.esl MS_UEFI_db.esl > MS_db.esl
-    sign-efi-sig-list -t "$(date -u --date='1 second' +'%Y-%m-%d %H:%M:%S')" \
-      -a -g 77fa9abd-0359-4d32-bd60-28f4e78f784b -k KEK.key -c KEK.crt db MS_db.esl add_MS_db.auth
+    if [ "x${ommit_ms_keys}" = "x0" ]]; then
+      sbsiglist --owner 77fa9abd-0359-4d32-bd60-28f4e78f784b --type x509 --output MS_Win_db.esl "${VENDOR_KEYS}/MicWinProPCA2011_2011-10-19.crt"
+      sbsiglist --owner 77fa9abd-0359-4d32-bd60-28f4e78f784b --type x509 --output MS_UEFI_db.esl "${VENDOR_KEYS}/MicCorUEFCA2011_2011-06-27.crt"
+      cat MS_Win_db.esl MS_UEFI_db.esl > MS_db.esl
+      sign-efi-sig-list -t "$(date -u --date='1 second' +'%Y-%m-%d %H:%M:%S')" \
+        -a -g 77fa9abd-0359-4d32-bd60-28f4e78f784b -k KEK.key -c KEK.crt db MS_db.esl add_MS_db.auth
 
-    efi-updatevar -f add_MS_db.auth db
+      efi-updatevar -f add_MS_db.auth db
+    fi
     efi-updatevar -f "${VENDOR_KEYS}/dbxupdate_x64.bin" -k KEK.key dbx
   fi
 
   chattr -i /sys/firmware/efi/efivars/db-d719b2cb-3d3a-4596-a3bc-dad00e67656f
-  efi-updatevar -a -f db.auth db
+  if [ "x${ommit_ms_keys}" = "x0" ]]; then
+    efi-updatevar -a -f db.auth db
+  else
+    efi-updatevar -f db.auth db
+  fi
   efi-updatevar -f KEK.auth KEK
   efi-updatevar -f PK.auth PK
   chattr +i /sys/firmware/efi/efivars/db-d719b2cb-3d3a-4596-a3bc-dad00e67656f
@@ -793,9 +806,11 @@ COMMANDS
 
     Show this help message.
 
-  install
+  install [--withoutmicrosoftkeys]
      
-    Install setpmctl bootloader.
+    Install setpmctl bootloader. Read the documentation before using
+    '--withoutmicrosoftkeys' as it most probably damage your system:
+    less /usr/share/sectpmctl/README.md
 
   remove --kernel <version>
 
@@ -862,7 +877,7 @@ argument=""
 
 test $# -eq 0 && _usage && exit 0
 
-if [ $# -ge 2 ]; then
+if [[ $# -ge 2 && "${1}" != "install" ]]; then
   case "${2}" in
     --kernel)
       if [ $# -eq 3 ]; then
@@ -890,7 +905,32 @@ case "${1}" in
     test_state
     ;;
   install)
-    install
+    if [ $# -ge 2 ]; then
+      case "${2}" in
+        --withoutmicrosoftkeys)
+          if [ $# -eq 3 ]; then
+            case "${3}" in
+              --iamresponsiblefordamage)
+                install "1"
+                ;;
+              *)
+                echo "You also need to give this option: --iamresponsiblefordamage"
+                exit 1
+                ;;
+            esac
+          else
+            echo "You also need to give this option: --iamresponsiblefordamage"
+            exit 1
+          fi
+          ;;
+        *)
+          _usage
+          exit 1
+          ;;
+      esac
+    else
+      install "0"
+    fi
     ;;
   remove)
     if [ "x${argument}" = "x" ]; then

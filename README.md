@@ -12,10 +12,6 @@ screen to recover the LUKS key.
 
 Either way you should also supply a BIOS admin password.
 
-When installing the sectpmct bootloader, Microsoft UEFI keys are automatically uploaded to the Secure Boot database for your own safety.
-In a future release an option will be included to suppress installing the Microsoft keys. Together with an BIOS admin password, hardware
-without an crucial UEFI OptionROM requirement like laptops with integrated graphics would benefit from doing so.
-
 Dual booting Windows is not recommended and has never been tested with sectpmctl. The risk is that Windows will update the Secure Boot DBX
 database which will prevent the successfull unlocking of the LUKS key. In such case you need the recovery key and need to redo the sectpmctl
 installation, see 'Recovery' for more information.
@@ -55,9 +51,51 @@ implementation, they are simply not needed for anything.
   + The only upfront action is to clear TPM and Secure Boot
 * The secureboot datase is completly rebuild with own keys and Microsoft keys for safety reasons
 * Uses and integrates systemd-stub and systemd-boot as bootloader, does not invent a new one
+* Optional ommitting of Microsoft Secure Boot keys on supported hardware
 * Implemented in bash
 
 Using a splash screen and the TPM + Password option does not work. If that happens you can enter the password blind, it will work.
+
+## One optional setting is dangerous (disabled by default)
+
+When installing the sectpmct bootloader, Microsoft UEFI keys are automatically uploaded to the Secure Boot database for your own safety.
+An option exist to suppress uploading of the Microsoft keys. Together with an BIOS admin password, hardware without an crucial UEFI OptionROM
+requirement like laptops with integrated graphics gain the protection that no other operating system is able to boot. This should probably
+also increase security on another end. When sectpmctl is installed without a TPM password, the device will boot unattended (if there is no
+BIOS startup password or if it has been removed). When the system would be able to execute bootloaders signed by Microsoft, it could be
+possible that an attacker can boot a software which tries to read out the memory from the last boot to get access to the LUKS key which is
+still in the DDR RAM still for some seconds. Disabeling booting any other bootloader will prevent this relative simple attack. And even if
+the attacker is able to put his own or Microsoft key's into the Secure Boot database, sectpmctl rejects to boot automatically in first place
+because PCR 7 would be invalid. When this option is used and also a TPM password together with an BIOS administration password has been set,
+the security gain is limitted. The only benefit, when the device is stolen, is that the theft can not sell the device anymore as it won't boot
+any other operating system.
+
+But this option is highly dangerous. When it is used on a device (typically servers and desktops or laptoips with a dedicated PCI graphic card)
+where the hardware strictly requires the Microsoft keys you will for sure at least semi brick or completly brick the device.
+
+**Do NOT use the --withoutmicrosoftkeys option of the sectpmctl boot install tool when:**
+
+ * You don't know what the Microsoft keys are used for
+ * You have a dedicated NVidia RTX/GTX or AMD Radeon graphic card in a desktop or laptop
+ * You have PCI card's in use which are related to booting (storage, network, etc)
+
+Do use the option with care when:
+
+ * You know the implications and have a supported device
+
+In case of graphic cards for example, when ommitting the Microsoft keys, the screen will stay black when you power on the device. It will
+not even work when the operating system is finished booting. If you are (very) lucky, you could maybe navigate blindly in the BIOS to disable
+Secure Boot. Then, on the next start, the graphic card will function again. You can then restore the Secure Boot factory keys and enable Secure Boot
+again. Another option is maybe to buy a very old graphic card or a CPU with integrated graphics to recover. On laptops it is not possible
+to switch to another graphic card for booting and the brick could be final, immutable and can maybe never be recovered.
+
+The sbctl project has a FAQ for the Microsoft keys: https://github.com/Foxboron/sbctl/wiki/FAQ#option-rom
+
+This option will only work when you enter the Clear Mode in the Secure Boot BIOS settings, that is when the complete Secure Boot database
+is empty. If you enter the Setup Mode (only the PK key is cleared instead of the complete Secure Boot database) this option won't work.
+
+**You have been warned, it is highly possible to destroy your system without being able to fix it! Do an internet search before using this
+option and ask somebody who might know if it could work. If you brik your device you are on your own. Use on your own risc!**
 
 ## Build and install tpmsbsigntool
 
