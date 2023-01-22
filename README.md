@@ -67,7 +67,8 @@ possible that an attacker can boot a software which tries to read out the memory
 still in the DDR RAM still for some seconds. Disabeling booting any other bootloader will prevent this relative simple attack. And even if
 the attacker is able to put his own or Microsoft key's into the Secure Boot database, sectpmctl rejects to boot automatically in first place
 because PCR 7 would be invalid. When this option is used and also a TPM password together with an BIOS administration password has been set,
-the security gain is limitted. The only benefit, when the device is stolen, is that the theft can not sell the device anymore as it won't boot
+this should also increase protection from the RAM attack if the laptop is stolen when in standby and provided the attacker is not able break
+the BIOS administrator password. Another benefit is, when the device is stolen, that the thief can not sell the device anymore as it won't boot
 any other operating system.
 
 But this option is highly dangerous. When it is used on a device (typically servers and desktops or laptoips with a dedicated PCI graphic card)
