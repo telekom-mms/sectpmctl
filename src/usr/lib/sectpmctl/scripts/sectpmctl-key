@@ -760,59 +760,43 @@ _check_input_and_state() {
     return 1
   fi
   
-  # if the command is running into a timeout, the loop will be quit with
-  # error code 2. if the command executed successfully, the loop will be
-  # quit with error code 0. the loop is retried for 30 seconds in case of an
-  # error. this is specificaly done to recover from an pcr changed error:
-  # Esys_Unseal(0x128) - tpm:error(2.0): PCR have changed since checked
-  # if the error still exist, the loop is quit with error code 1.
+  # if the command is running into a timeout, the tool will quit with
+  # error code 2. in case of an error, it will quit with error code 1.
+  # if the command executed successfully, it will quit with error code 0.
 
-  # errors produced by a session overflow need to be handled outside of the
-  # key tool. The typical error message would be:
-  # Esys_StartAuthSession(0xA000A) - tcti:IO failure
-  # to flush all stored sessions, the tpm2_flushcontext command may be used.
-  # to prevent breaking of unsealing in the initrd caused by a session
-  # overflow, the flush command is always executed at boot time before the
-  # unsealing.
-  i=1
-  n=10
+  # it could be possible that all tpm sessions are filled up. then any
+  # attempt to start a new session will fail even after a reboot. therefore
+  # all sessions are flushed before unsealing while the device is booted. to
+  # manually clean all sessions at runtime, the tpm2_flushcontext command
+  # may be used.
   ret=0
-  for i in $(seq 1 ${n}); do
-    TIMEOUT=0
-    case "${CMD}" in
-      extend)
-        _extend
-        ;;
-      remove)
-        _remove
-        ;;
-      seal)
-        _seal
-        ;;
-      unseal)
-        _unseal
-        ;;
-      changepassword)
-        _changepassword
-        ;;
-      *)
-        _print_error "${ME} ${CMD}: Unknown command"
-        return 1
-        ;;
-    esac
-    ret=${?}
+  TIMEOUT=0
+  case "${CMD}" in
+    extend)
+      _extend
+      ;;
+    remove)
+      _remove
+      ;;
+    seal)
+      _seal
+      ;;
+    unseal)
+      _unseal
+      ;;
+    changepassword)
+      _changepassword
+      ;;
+    *)
+      _print_error "${ME} ${CMD}: Unknown command"
+      return 1
+      ;;
+  esac
+  ret=${?}
 
-    if [[ "${TIMEOUT}" != "0" ]]; then
-      return 2
-    elif [[ "${ret}" != "0" ]]; then
-      echo "${ME} ${CMD}: Command failed, retry ${i}/${n}"
-      sleep 3
-    else
-      break
-    fi
-  done
-  
-  if [[ "${ret}" == "0" ]]; then
+  if [[ "${TIMEOUT}" != "0" ]]; then
+    return 2
+  elif [[ "${ret}" == "0" ]]; then
     return 0
   else
     return 1
