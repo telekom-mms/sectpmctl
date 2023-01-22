@@ -770,6 +770,8 @@ _usage() {
   cat <<__END
 Usage: ${ME/-/ } COMMAND [OPTIONS]
 
+Use the help command to read about other install options
+
 COMMANDS
   activate
   deactivate
@@ -809,7 +811,7 @@ COMMANDS
   install [--withoutmicrosoftkeys]
      
     Install setpmctl bootloader. Read the documentation before using
-    '--withoutmicrosoftkeys' as it most probably damage your system:
+    '--withoutmicrosoftkeys' as it most probably damages your hardware:
     less /usr/share/sectpmctl/README.md
 
   remove --kernel <version>
