@@ -375,7 +375,7 @@ entry. You can do it also permanently by using the efibootmgr command although i
 
 ### BIOS Updates, eventually even with an Secure Boot database update
 
-It seems that BIOS updates on Lenovo Thinkpads won't cause problems, as they seem to keep the Secure Boot database and won't reset the TPM.
+It seems that BIOS updates on Lenovo Thinkpads won't cause problems as they seem to keep the Secure Boot database and won't reset the TPM.
 All tested BIOS updates done so far did not result in preventing unsealing.
 
 On one Gigabyte motherboards on the other hand, the Secure Boot database seemed to be reset on BIOS update, with the result that the recovery
@@ -621,11 +621,11 @@ the need for a recovery key.
 When many TPM (policy) sessions are created and not freed after use, a kernel bug could be triggered. When that happens, the TPM will not
 answer anymore to any commands. A dmesg output will then show problems. The expected behavior is that tpm2 commands will return an error code.
 Therefore a timeout has been implemented in the key tool to prevent endless waiting. To prevent this problem at boot time (the sessions seem
-not be be cleard automatically on booting) all TPM sessions are flushed infront of the unsealing in the initrd.
+not be be cleared automatically on booting) all TPM sessions are flushed infront of the unsealing in the initrd.
 
 On unsealing at boot time it is possible that the kernel will load kernel modules while unsealing. When the module loading result in
 modifications to the TPM PCR registers while sectpmctl is doing the unseal, the TPM will return the error code TPM_RC_PCR_CHANGED. To solve
-this problem at boot time, a loop had been implemented to simply retry unsealing 5 times with a sleep of 2 seconds in between. It seems to be
+this problem at boot time a loop had been implemented to simply retry unsealing 5 times with a sleep of 2 seconds in between. It seems to be
 difficult to have a stable parsing of this specific error code, therefore the loop is triggered on all TPM errors at boot time.
 
 ### Acer laptops quirks
