@@ -46,6 +46,7 @@ function rand8base64()
 
   echo "${getrand}" | base64 -w 0
 }
+
 _usage() {
   ME=$(basename "$0")
   #SCRIPTPATH="${FULLPATH%%/$ME}"
@@ -310,6 +311,8 @@ _check_input() {
   export PROVISIONING_LOCKOUT_AUTH=""
   export KNOWN_UNKNOWN=""
   export TPM_PASSWORD=""
+  export FORGET_LOCKOUT="false"
+  export SET_FORGET_ENDORSEMENT="false"
 
   ME=$(basename "$0")
   while [ $# != 0 ]; do
@@ -395,6 +398,12 @@ _check_input() {
           exit 1
         fi
         ;;
+      --forgetlockout)
+        export FORGET_LOCKOUT="true"
+        ;;
+      --setforgetendorsement)
+        export SET_FORGET_ENDORSEMENT="true"
+        ;;
       --help|help|-h)
         _usage_long "${VERSION}"
         ;;
@@ -460,7 +469,9 @@ _check_input() {
       "${SECTPMCTL_KEYS}" \
       "${PROVISIONING_LOCKOUT_AUTH}" \
       "${PERSISTANT_OWNER_SRK}" \
-      "${PERSISTANT_OWNER_SRK_NODA}"
+      "${PERSISTANT_OWNER_SRK_NODA}" \
+      "${FORGET_LOCKOUT}" \
+      "${SET_FORGET_ENDORSEMENT}"
 
   exit 0
 }
@@ -470,6 +481,8 @@ do_provisioning() {
   PROVISIONING_LOCKOUT_AUTH="${2}"
   PERSISTANT_OWNER_SRK="${3}"
   PERSISTANT_OWNER_SRK_NODA="${4}"
+  FORGET_LOCKOUT="${5}"
+  SET_FORGET_ENDORSEMENT="${6}"
   
   if [[ "x${PROVISIONING_LOCKOUT_AUTH}" == "x" ]] && [[ $(tpm2_getcap properties-variable | grep -c "lockoutAuthSet:.*1") == 1 ]]; then
     echo "lockoutAuth set in TPM. use --lockout-auth <password> to set it."
