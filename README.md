@@ -50,14 +50,14 @@ implementation, they are simply not needed for anything.
 * Zero TPM administrative overhead by managing Secure Boot instead of the TPM
   + Secure Boot is more easy to manage
   + FDE key is only bound to the Secure Boot state, not to userspace
-  + Immune to BIOS updates
+  + Maybe immune to BIOS updates
   + Immune to operating system upgrades
-  + No postprocessing other then the kernel and initrd signing required
+  + No postprocessing other then kernel and initrd signing required
   + Interrupted update of new kernels should still keep old kernels bootable
   + Additional installation of other bootloaders will not overwrite sectpmctl, they are placed alongside
-* Can be integrated in a nealy fullly automated preseed installation
+* Can be integrated in a nearly fullly automated preseed installation
   + The only upfront action is to clear TPM and Secure Boot
-* The secureboot datase is completly rebuild with own keys and Microsoft keys for safety reasons
+* The secureboot datase is completly rebuild with own keys and (by default) Microsoft keys for safety reasons
 * Uses and integrates systemd-stub and systemd-boot as bootloader, does not invent a new one
 * Implemented in bash
 
@@ -107,7 +107,8 @@ Your BIOS has to be in Secure Boot Setup Mode. That means that your BIOS need to
 can do so by entering your BIOS, enable Secure Boot and find inside the Secure Boot section the button to "Clear all keys".
 
 We never came across a BIOS which does not offer a way to enter Secure Boot Setup Mode. If your BIOS supports listing all keys, after entering
-the setup mode, the amount of keys of all databases should be listed as zero.
+the setup mode, the amount of keys of all databases should be listed as zero. If your Secure Boot settings are grayed out, you most probably
+have to set a BIOS administrator first.
 
 First check if your Secure Boot is enabled and cleared by executing this two commands:
 
