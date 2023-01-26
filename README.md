@@ -666,6 +666,7 @@ Be carefull with BIOS updates. They may delete the Secure Boot database which th
   + Fixed TPM_RC_PCR_CHANGED problem while unsealing without password at boot time
   + Added check to stop quickly when a wrong LUKS password has been provided
   + Added documentation and fixed build instructions
+  + Fixed Esys_CreateLoaded error
 
 * 1.1.2
   + Added Debian protected flag and added linking for the signing wrappers

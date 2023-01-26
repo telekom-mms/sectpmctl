@@ -3,8 +3,9 @@ sectpmctl (1.1.3-1) jammy; urgency=medium
   * Fixed TPM_RC_PCR_CHANGED problem while unsealing without password at boot time
   * Added check to stop quickly when a wrong LUKS password has been provided
   * Added documentation and fixed build instructions
+  * Fixed Esys_CreateLoaded error
 
- -- Richard Robert Reitz <richard-robert.reitz@t-systems.com>  Sun, 22 Jan 2023 13:38:34 +0100
+ -- Richard Robert Reitz <richard-robert.reitz@t-systems.com>  Thu, 26 Jan 2023 22:38:06 +0100
 
 sectpmctl (1.1.2-1) jammy; urgency=medium
 
