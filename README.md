@@ -71,7 +71,7 @@ cd tpmsbsigntool
 gbp buildpackage --git-export-dir=../build_tpmsbsigntool -uc -us
 cd ..
 
-sudo dpkg -i build_tpmsbsigntool/tpmsbsigntool_0.9.4-1_amd64.deb
+sudo dpkg -i build_tpmsbsigntool/tpmsbsigntool_0.9.4-2_amd64.deb
 sudo apt install -f
 ```
 
@@ -195,7 +195,7 @@ All generated keys, passwords or serialized keys are stored in '/var/lib/sectpmc
 ```
 # 1. Point of no return, you need to complete at least until the following reboot command
 sudo apt remove --allow-remove-essential "grub*" "shim*"
-sudo dpkg -i sectpmctl_1.1.1-1_amd64.deb
+sudo dpkg -i sectpmctl_1.1.2-1_amd64.deb
 sudo apt install -f
 
 
