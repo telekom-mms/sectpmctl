@@ -643,7 +643,7 @@ install ()
   chmod 0600 ${SECTPMCTL_KEYS}/*.obj ${SECTPMCTL_KEYS}/*.cer ${SECTPMCTL_KEYS}/*.crt
 
   if [ "x${secureboot_mode}" = "xclearmode" ]; then
-    if [ "x${ommit_ms_keys}" = "x0" ]]; then
+    if [ "x${ommit_ms_keys}" = "x0" ]; then
       sbsiglist --owner 77fa9abd-0359-4d32-bd60-28f4e78f784b --type x509 --output MS_Win_db.esl "${VENDOR_KEYS}/MicWinProPCA2011_2011-10-19.crt"
       sbsiglist --owner 77fa9abd-0359-4d32-bd60-28f4e78f784b --type x509 --output MS_UEFI_db.esl "${VENDOR_KEYS}/MicCorUEFCA2011_2011-06-27.crt"
       cat MS_Win_db.esl MS_UEFI_db.esl > MS_db.esl
@@ -653,10 +653,11 @@ install ()
       efi-updatevar -f add_MS_db.auth db
     fi
     efi-updatevar -f "${VENDOR_KEYS}/dbxupdate_x64.bin" -k KEK.key dbx
+    chattr +i /sys/firmware/efi/efivars/dbx-d719b2cb-3d3a-4596-a3bc-dad00e67656f
   fi
 
-  chattr -i /sys/firmware/efi/efivars/db-d719b2cb-3d3a-4596-a3bc-dad00e67656f
-  if [ "x${ommit_ms_keys}" = "x0" ]]; then
+  if [ "x${ommit_ms_keys}" = "x0" ]; then
+    chattr -i /sys/firmware/efi/efivars/db-d719b2cb-3d3a-4596-a3bc-dad00e67656f
     efi-updatevar -a -f db.auth db
   else
     efi-updatevar -f db.auth db
@@ -664,6 +665,8 @@ install ()
   efi-updatevar -f KEK.auth KEK
   efi-updatevar -f PK.auth PK
   chattr +i /sys/firmware/efi/efivars/db-d719b2cb-3d3a-4596-a3bc-dad00e67656f
+  chattr +i /sys/firmware/efi/efivars/KEK-8be4df61-93ca-11d2-aa0d-00e098032b8c
+  chattr +i /sys/firmware/efi/efivars/PK-8be4df61-93ca-11d2-aa0d-00e098032b8c
 
   shred -f -z -u ./*.auth ./*.cer ./*.crt ./*.esl ./*.key ./*.priv ./*.pub ./*.ctx ./*.obj
   cd - > /dev/null || exit
