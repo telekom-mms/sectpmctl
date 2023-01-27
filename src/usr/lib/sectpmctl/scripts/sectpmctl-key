@@ -262,7 +262,7 @@ _check_input_and_state() {
   CMD="${1}"
   
   case "${CMD}" in
-    changepassword | extend | remove | seal | unseal)
+    changepassword | extend | remove | seal | testsession | unseal)
       ;;
     help)
       _usage_long
@@ -787,6 +787,9 @@ _check_input_and_state() {
     changepassword)
       _changepassword
       ;;
+    testsession)
+      _testsession
+      ;;
     *)
       _print_error "${ME} ${CMD}: Unknown command"
       return 1
@@ -1202,6 +1205,46 @@ _unseal() {
     fi
   fi
 
+  _ex "${ME} ${CMD}: Could not leave temporary ramfs directory" \
+    cd - > /dev/null
+
+  _ex "${ME} ${CMD}: Could not remove temporary ramfs directory" \
+    rmdir "${tempdir}"
+
+  if [[ $ERR == true ]]; then
+    return 1
+  fi
+}
+
+_testsession() {
+  ERR=false
+
+  tempdir="$( _ex "${ME} ${CMD}: Could not create temporary ramfs directory" \
+    mktemp -d -p /dev/shm )" || return 1
+
+  _ex "${ME} ${CMD}: Could not enter temporary ramfs directory" \
+    cd "${tempdir}" || return 1
+
+  for _ in {1..1}; do
+    # connect encrypted to the TPM with key enforcement (TOFU)
+    _tx "${ME} ${CMD}: Could not connect to known TPM" \
+      tpm2_startauthsession -Q --policy-session -S session.ctx -c "${PARENT_PUBLIC}" || break
+
+    p1="$( _tx "${ME} ${CMD}: Could not read session config" \
+      tpm2_sessionconfig session.ctx )" || _xt $? || break
+    if [[ "$( grep -c '[ |]encrypt' <<< "$p1" )" != "1" ]] || [[ "$( grep -c '[ |]decrypt' <<< "$p1" )" != "1" ]]; then
+      _print_error "${ME} ${CMD}: Session could not be encrypted"
+      ERR=true
+      break
+    fi
+  done
+
+  if [[ -f session.ctx ]]; then
+    tpm2_flushcontext -Q session.ctx 2> /dev/null > /dev/null
+    _ex "${ME} ${CMD}: Could not remove session context" \
+      shred -f -z -u session.ctx
+  fi
+  
   _ex "${ME} ${CMD}: Could not leave temporary ramfs directory" \
     cd - > /dev/null
 
