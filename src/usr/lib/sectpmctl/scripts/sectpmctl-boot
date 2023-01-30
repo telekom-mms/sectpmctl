@@ -23,6 +23,7 @@ VENDOR_KEYS="/usr/lib/sectpmctl/keys"
 SECTPMCTL_BOOT="/boot/efi"
 SECTPMCTL_EFI="/EFI/sectpmctl"
 SECTPMCTL_EFI_DIR="${SECTPMCTL_BOOT}${SECTPMCTL_EFI}"
+SECTPMCTL_KERNEL_EXTRA_OPTIONS="/etc/sectpmctl/kernel_extra_options"
 
 # TPM NODA handle
 PERSISTANT_OWNER_SRK_NODA="0x81000101"
@@ -259,6 +260,15 @@ create_efi_blob ()
   chmod 700 "${tempbootdir}"
   cd "${tempbootdir}" || exit
 
+  extra_kernel_cmds=""
+  if [ -f "${SECTPMCTL_KERNEL_EXTRA_OPTIONS}" ]; then
+    while read line; do
+      if [[ "${line}" =~ ^\s*[^#] ]]; then
+        extra_kernel_cmds+="${line// = /=} ";
+      fi
+    done < test_extra_commands
+  fi
+
   kernel_cmdline="${DEFAULT_KERNEL_CMDLINE}"
 
   if [ "$position" -eq 1 ]; then
@@ -271,7 +281,7 @@ create_efi_blob ()
       kernel_cmdline="${KERNEL_CMDLINE_MAP[${version}]}"
   fi
 
-  echo "${kernel_cmdline}" | head -c 65530 > "${tempbootdir}/cmdline"
+  echo "${extra_kernel_cmds}${kernel_cmdline}" | head -c 65530 > "${tempbootdir}/cmdline"
 
   # @TODO Useless cat 
   cat /usr/lib/os-release | sed -e "s/^PRETTY_NAME=.*$/PRETTY_NAME=\"${BOOT_ENTRY_PREFIX} ${version}\"/" | head -c 65530 > "${tempbootdir}/os-release"
