@@ -6,7 +6,7 @@ install:
 	install -d $(DESTDIR)/usr/share/bash-completion/completions
 	install -m 0755 src/usr/share/bash-completion/completions/_sectpmctl $(DESTDIR)/usr/share/bash-completion/completions
 	install -d $(DESTDIR)/usr/share/sectpmctl/examples
-	install -m 0755 src/usr/share/sectpmctl/examples/kernel_extra_options.example $(DESTDIR)/usr/share/sectpmctl/examples/kernel_extra_options.example
+	install -m 0644 src/usr/share/sectpmctl/examples/kernel_extra_options.example $(DESTDIR)/usr/share/sectpmctl/examples/kernel_extra_options.example
 	install -d $(DESTDIR)/usr/lib/sectpmctl
 	install -m 0755 src/usr/lib/sectpmctl/boot.conf $(DESTDIR)/usr/lib/sectpmctl
 	install -d $(DESTDIR)/usr/lib/sectpmctl/keys
