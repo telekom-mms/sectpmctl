@@ -246,7 +246,7 @@ create_efi_blob ()
   linux="${4}"
   initrd="${5}"
   rebuild="${6}"
-  sectpmctl_kernel_extra_options="/etc/sectpmctl/kernel_extra_options"
+  sectpmctl_kernel_extra_options="/var/lib/sectpmctl/kernel_extra_options"
 
   if [ "x${default}" = "x" ] && [ "$position" -eq 1 ]; then
     echo -n "Found (default): ${linux}, ${initrd}"

@@ -7,9 +7,9 @@ case "$1" in
     install -d /var/lib/sectpmctl/scripts
     install -d /etc/sectpmctl
     install -m 0755 /usr/lib/sectpmctl/boot.conf /etc/sectpmctl/boot.conf
-    if [ ! -f /etc/sectpmctl/kernel_extra_options ]; then
-      install -m 1640 /usr/share/sectpmctl/examples/kernel_extra_options.example /etc/sectpmctl/kernel_extra_options
-      chattr +i /etc/sectpmctl/kernel_extra_options
+    if [ ! -f /var/lib/sectpmctl/kernel_extra_options ]; then
+      install -m 1640 /usr/share/sectpmctl/examples/kernel_extra_options.example /var/lib/sectpmctl/kernel_extra_options
+      chattr +i /var/lib/sectpmctl/kernel_extra_options
     fi
     ;;
 esac
