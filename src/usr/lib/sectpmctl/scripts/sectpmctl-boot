@@ -23,7 +23,6 @@ VENDOR_KEYS="/usr/lib/sectpmctl/keys"
 SECTPMCTL_BOOT="/boot/efi"
 SECTPMCTL_EFI="/EFI/sectpmctl"
 SECTPMCTL_EFI_DIR="${SECTPMCTL_BOOT}${SECTPMCTL_EFI}"
-SECTPMCTL_KERNEL_EXTRA_OPTIONS="/etc/sectpmctl/kernel_extra_options"
 
 # TPM NODA handle
 PERSISTANT_OWNER_SRK_NODA="0x81000101"
@@ -247,6 +246,7 @@ create_efi_blob ()
   linux="${4}"
   initrd="${5}"
   rebuild="${6}"
+  sectpmctl_kernel_extra_options="/etc/sectpmctl/kernel_extra_options"
 
   if [ "x${default}" = "x" ] && [ "$position" -eq 1 ]; then
     echo -n "Found (default): ${linux}, ${initrd}"
@@ -261,12 +261,12 @@ create_efi_blob ()
   cd "${tempbootdir}" || exit
 
   extra_kernel_cmds=""
-  if [ -f "${SECTPMCTL_KERNEL_EXTRA_OPTIONS}" ]; then
+  if [ -f "${sectpmctl_kernel_extra_options}" ]; then
     while read line; do
       if [[ "${line}" =~ ^\s*[^#] ]]; then
         extra_kernel_cmds+="${line// = /=} ";
       fi
-    done < test_extra_commands
+    done < "${sectpmctl_kernel_extra_options}"
   fi
 
   kernel_cmdline="${DEFAULT_KERNEL_CMDLINE}"
