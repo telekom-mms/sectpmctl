@@ -452,7 +452,7 @@ entry. You can do it also permanently by using the efibootmgr command although i
 It seems that BIOS updates on Lenovo Thinkpads won't cause problems as they seem to keep the Secure Boot database and won't reset the TPM.
 All tested BIOS updates done so far did not result in preventing unsealing.
 
-On one Gigabyte motherboards on the other hand, the Secure Boot database seemed to be reset on BIOS update, with the result that the recovery
+On the other hand on Gigabyte  X570S AERO motherboards,  the Secure Boot database seems to be reset during BIOS update, with the result that the recovery
 password needs to be entered on the next boot and sectpmctl needs to be installed again.
 
 If you know that Secure Boot and TPM stay stable there should be no problem in updating, otherwise keep your recovery password in reach. In
