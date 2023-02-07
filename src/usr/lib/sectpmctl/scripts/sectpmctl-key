@@ -760,7 +760,7 @@ _check_input_and_state() {
     return 1
   fi
   
-  # if the command is running into a timeout, the tool will quit with
+  # if the command is running into timeout, the tool will quit with
   # error code 2. in case of an error, it will quit with error code 1.
   # if the command executed successfully, it will quit with error code 0.
 
