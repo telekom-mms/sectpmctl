@@ -53,7 +53,7 @@ implementation, they are simply not needed for anything.
   + Additional installation of other bootloaders will not overwrite sectpmctl, they are placed alongside
 * Can be integrated in a nearly fullly automated preseed installation
   + The only upfront action is to clear TPM and Secure Boot
-* The secureboot datase is completly rebuild with own keys and (by default) Microsoft keys for safety reasons
+* The secureboot database is completly rebuild with own keys and (by default) Microsoft keys for safety reasons
 * Uses and integrates systemd-stub and systemd-boot as bootloader, does not invent a new one
 * Optional ommitting of Microsoft Secure Boot keys on supported hardware
 * Option to forget the lockout authorization password set while TPM provisioning
