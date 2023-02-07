@@ -52,11 +52,31 @@ implementation, they are simply not needed for anything.
 * The secureboot datase is completly rebuild with own keys and Microsoft keys for safety reasons
 * Uses and integrates systemd-stub and systemd-boot as bootloader, does not invent a new one
 * Optional ommitting of Microsoft Secure Boot keys on supported hardware
+* Option to forget the lockout authorization password set while TPM provisioning
+* Option to set and forget an endorsement password while TPM provisioning
 * Implemented in bash
 
 Using a splash screen and the TPM + Password option does not work. If that happens you can enter the password blind, it will work.
 
-## One optional setting is dangerous (disabled by default)
+## Security and privacy options
+
+### Lockout authorization password
+
+Setting the authorization password to a random value without storing it enhances security, because the lockout hierarchy can not be
+modified without password after TPM provisioning. This hierarchy also prevents accidental use of the tpm2_clear command. If you know
+that you need access to the lockout hierarchy, you should remove the option '--forgetlockout' from the 'sudo sectpmctl tpm provisioning'
+command in the installation section. If this option is not set, the lockout password is stored in '/var/lib/sectpmctl/keys/lockout.pwd'.
+You can change this option also at a later time by reinstalling sectpmctl again (see the recovery section for how to do it).
+
+### Endorsement authorization password
+
+Setting the endorsement authorization password to a random value without storing it enhances privacy, because the endorsement hierarchy
+can be used to uniquely identify your device. If you know that you need access to the endorsement hierarchy, you should remove the
+option '--setforgetendorsement' from the 'sudo sectpmctl tpm provisioning' command in the installation section. When this option is
+not set, the endorsement authorization password will be empty. You can change this option also at a later time by reinstalling
+sectpmctl again (see the recovery section for how to do it).
+
+### One optional setting is dangerous (disabled by default)
 
 When installing the sectpmct bootloader, the Microsoft keys are automatically uploaded to the Secure Boot database for your own safety.
 An option exist to suppress uploading of the Microsoft keys. Together with an BIOS admin password, hardware without an crucial UEFI OptionROM
@@ -112,7 +132,7 @@ cd tpmsbsigntool
 gbp buildpackage --git-export-dir=../build_tpmsbsigntool -uc -us
 cd ..
 
-sudo dpkg -i build_tpmsbsigntool/tpmsbsigntool_0.9.4-1_amd64.deb
+sudo dpkg -i build_tpmsbsigntool/tpmsbsigntool_0.9.4-2_amd64.deb
 sudo apt install -f
 ```
 
@@ -236,12 +256,14 @@ All generated keys, passwords or serialized keys are stored in '/var/lib/sectpmc
 ```
 # 1. Point of no return, you need to complete at least until the following reboot command
 sudo apt remove --allow-remove-essential "grub*" "shim*"
-sudo dpkg -i sectpmctl_1.1.1-1_amd64.deb
+sudo dpkg -i sectpmctl_1.1.2-1_amd64.deb
 sudo apt install -f
 
+# optionally disable swap while keys are created
+sudo swapoff -a
 
 # 2. TPM Provisioning
-sudo sectpmctl tpm provisioning
+sudo sectpmctl tpm provisioning --forgetlockout --setforgetendorsement
 
 
 # 3. Cleanup leftovers from grub, shim and windows stuff from efibootmgr
@@ -310,6 +332,9 @@ sudo reboot
 
 
 # 6. Install the LUKS TPM implementation
+# optionally disable swap while keys are created
+sudo swapoff -a
+
 # Now your machine has its own set of Secure Boot keys, test it
 sudo sectpmctl boot test
 
@@ -334,6 +359,9 @@ chmod +x install_tpm.sh
 
 # STORE THE PRINTED RECOVERY KEY NOW!!!
 # SCROLL UP A BIT IF IT GET'S OUT OF SIGHT!!!
+
+# Reboot to test the installation
+sudo reboot
 ```
 
 The 'sectpmctl tpm install' command will print out the recovery key. It is highly recommended to store this key in a safe location. Without this
