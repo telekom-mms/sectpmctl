@@ -246,6 +246,7 @@ create_efi_blob ()
   linux="${4}"
   initrd="${5}"
   rebuild="${6}"
+  sectpmctl_kernel_extra_options="/var/lib/sectpmctl/kernel_extra_options"
 
   if [ "x${default}" = "x" ] && [ "$position" -eq 1 ]; then
     echo -n "Found (default): ${linux}, ${initrd}"
@@ -259,6 +260,15 @@ create_efi_blob ()
   chmod 700 "${tempbootdir}"
   cd "${tempbootdir}" || exit
 
+  extra_kernel_cmds=""
+  if [ -f "${sectpmctl_kernel_extra_options}" ]; then
+    while read line; do
+      if [[ "${line}" =~ ^\s*[^#] ]]; then
+        extra_kernel_cmds+="${line// = /=} ";
+      fi
+    done < "${sectpmctl_kernel_extra_options}"
+  fi
+
   kernel_cmdline="${DEFAULT_KERNEL_CMDLINE}"
 
   if [ "$position" -eq 1 ]; then
@@ -271,7 +281,7 @@ create_efi_blob ()
       kernel_cmdline="${KERNEL_CMDLINE_MAP[${version}]}"
   fi
 
-  echo "${kernel_cmdline}" | head -c 65530 > "${tempbootdir}/cmdline"
+  echo "${extra_kernel_cmds}${kernel_cmdline}" | head -c 65530 > "${tempbootdir}/cmdline"
 
   # @TODO Useless cat 
   cat /usr/lib/os-release | sed -e "s/^PRETTY_NAME=.*$/PRETTY_NAME=\"${BOOT_ENTRY_PREFIX} ${version}\"/" | head -c 65530 > "${tempbootdir}/os-release"
