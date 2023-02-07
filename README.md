@@ -705,7 +705,7 @@ To solve this problem a loop is implemented to simply retry unsealing 5 times wi
 
 ### Acer laptops quirks
 
-The first thing to know is that you need to set a BIOS administrator password first. Otherwise the Secure Boot setting are grayed out.
+First  to know is that you have to set a BIOS administrator password. Otherwise the Secure Boot settings are grayed out and cannot be changed. 
 
 An installation on an Acer Swift 3 SF314-42 laptop caused some problems which needed changes of the source code to enable an installation:
 
