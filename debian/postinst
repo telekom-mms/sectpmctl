@@ -2,11 +2,19 @@
 
 case "$1" in
   'configure')
+    if [ ! -f /usr/lib/sectpmctl/scripts/kmodsign.sh ]; then
+      ln -s /usr/lib/sectpmctl/scripts/kmodsign_obj.sh /usr/lib/sectpmctl/scripts/kmodsign.sh
+    fi
+    if [ ! -f /usr/lib/sectpmctl/scripts/sbsign.sh ]; then
+      ln -s /usr/lib/sectpmctl/scripts/sbsign_obj.sh /usr/lib/sectpmctl/scripts/sbsign.sh
+    fi
     install -d -m 0600 /var/lib/sectpmctl/objects
     install -d -m 0600 /var/lib/sectpmctl/keys
     install -d /var/lib/sectpmctl/scripts
     install -d /etc/sectpmctl
-    install -m 0755 /usr/lib/sectpmctl/boot.conf /etc/sectpmctl/boot.conf
+    if [ ! -f /etc/sectpmctl/boot.conf ]; then
+      install -m 0755 /usr/lib/sectpmctl/boot.conf /etc/sectpmctl/boot.conf
+    fi
     if [ ! -f /var/lib/sectpmctl/kernel_extra_options ]; then
       install -m 1640 /usr/share/sectpmctl/examples/kernel_extra_options.example /var/lib/sectpmctl/kernel_extra_options
       chattr +i /var/lib/sectpmctl/kernel_extra_options

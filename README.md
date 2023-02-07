@@ -1,4 +1,8 @@
-# sectpmctl 1.1.2
+# sectpmctl 1.1.3
+
+**Warning: It is highly recommended to install sectpmctl on a fresh Ubuntu installation as you could run into problems when the tpm2-tools
+or efitools can't be executed successfully on your device. Create at least a backup of your data before installation. If you already
+installed DKMS modules, it is probably neccessary to rebuild them after installing sectpmctl to have then signed.**
 
 We want to secure the Ubuntu 22.04 installation with LUKS and TPM2. Please read this README carefully before installation.
 
@@ -42,14 +46,14 @@ implementation, they are simply not needed for anything.
 * Zero TPM administrative overhead by managing Secure Boot instead of the TPM
   + Secure Boot is more easy to manage
   + FDE key is only bound to the Secure Boot state, not to userspace
-  + Immune to BIOS updates
+  + Maybe immune to BIOS updates
   + Immune to operating system upgrades
-  + No postprocessing other then the kernel and initrd signing required
+  + No postprocessing other then kernel and initrd signing required
   + Interrupted update of new kernels should still keep old kernels bootable
   + Additional installation of other bootloaders will not overwrite sectpmctl, they are placed alongside
-* Can be integrated in a nealy fullly automated preseed installation
+* Can be integrated in a nearly fullly automated preseed installation
   + The only upfront action is to clear TPM and Secure Boot
-* The secureboot datase is completly rebuild with own keys and Microsoft keys for safety reasons
+* The secureboot database is completly rebuild with own keys and (by default) Microsoft keys for safety reasons
 * Uses and integrates systemd-stub and systemd-boot as bootloader, does not invent a new one
 * Optional ommitting of Microsoft Secure Boot keys on supported hardware
 * Option to forget the lockout authorization password set while TPM provisioning
@@ -123,7 +127,7 @@ option and ask somebody who might know if it could work. If you brik your device
 ## Build and install tpmsbsigntool
 
 ```
-sudo apt install git git-buildpackage debhelper-compat gcc-multilib binutils-dev libssl-dev \
+sudo apt install -y git git-buildpackage debhelper-compat gcc-multilib binutils-dev libssl-dev \
   openssl pkg-config automake uuid-dev help2man gnu-efi tpm2-openssl
 
 git clone https://github.com/T-Systems-MMS/tpmsbsigntool.git
@@ -133,7 +137,7 @@ gbp buildpackage --git-export-dir=../build_tpmsbsigntool -uc -us
 cd ..
 
 sudo dpkg -i build_tpmsbsigntool/tpmsbsigntool_0.9.4-2_amd64.deb
-sudo apt install -f
+sudo apt install -yf
 ```
 
 ## Build sectpmctl
@@ -141,7 +145,7 @@ sudo apt install -f
 You can ignore the 'debsign: gpg error occurred!  Aborting....' error when building yourself.
 
 ```
-sudo apt install debhelper efibootmgr efitools sbsigntool binutils mokutil dkms systemd udev \
+sudo apt install -y debhelper efibootmgr efitools sbsigntool binutils mokutil dkms systemd udev \
   util-linux gdisk openssl uuid-runtime tpm2-tools fdisk
 
 git clone https://github.com/T-Systems-MMS/sectpmctl.git
@@ -164,7 +168,8 @@ Your BIOS has to be in Secure Boot Setup Mode. That means that your BIOS need to
 can do so by entering your BIOS, enable Secure Boot and find inside the Secure Boot section the button to "Clear all keys".
 
 We never came across a BIOS which does not offer a way to enter Secure Boot Setup Mode. If your BIOS supports listing all keys, after entering
-the setup mode, the amount of keys of all databases should be listed as zero.
+the setup mode, the amount of keys of all databases should be listed as zero. If your Secure Boot settings are grayed out, you most probably
+have to set a BIOS administrator first.
 
 First check if your Secure Boot is enabled and cleared by executing this two commands:
 
@@ -256,8 +261,8 @@ All generated keys, passwords or serialized keys are stored in '/var/lib/sectpmc
 ```
 # 1. Point of no return, you need to complete at least until the following reboot command
 sudo apt remove --allow-remove-essential "grub*" "shim*"
-sudo dpkg -i sectpmctl_1.1.2-1_amd64.deb
-sudo apt install -f
+sudo dpkg -i sectpmctl_1.1.3-1_amd64.deb
+sudo apt install -yf
 
 # optionally disable swap while keys are created
 sudo swapoff -a
@@ -266,17 +271,17 @@ sudo swapoff -a
 sudo sectpmctl tpm provisioning --forgetlockout --setforgetendorsement
 
 
-# 3. Cleanup leftovers from grub, shim and windows stuff from efibootmgr
-entryId=""
-entryId=$(efibootmgr -v | grep -i "Windows Boot Manager" | sed -e 's/^Boot\([0-9]\+\)\(.*\)$/\1/')
-if [[ "x${entryId}" != "x" ]]; then
+# 3. Cleanup leftovers from grub, shim and windows with efibootmgr
+while [[ $(efibootmgr | grep -c -m 1 "Windows Boot Manager") -gt 0 ]]
+do
+  entryId=$(efibootmgr -v | grep -m 1 -i "Windows Boot Manager" | sed -e 's/^Boot\([0-9]\+\)\(.*\)$/\1/')
   sudo efibootmgr -q -b "${entryId}" -B
-fi
-entryId=""
-entryId=$(efibootmgr -v | grep -i "ubuntu" | sed -e 's/^Boot\([0-9]\+\)\(.*\)$/\1/')
-if [[ "x${entryId}" != "x" ]]; then
+done
+while [[ $(efibootmgr | grep -c -m 1 "ubuntu") -gt 0 ]]
+do
+  entryId=$(efibootmgr -v | grep -m 1 -i "ubuntu" | sed -e 's/^Boot\([0-9]\+\)\(.*\)$/\1/')
   sudo efibootmgr -q -b "${entryId}" -B
-fi
+done
 while [[ $(efibootmgr | grep -c -m 1 "SECTPMCTL Bootloader") -gt 0 ]]
 do
   entryId=$(efibootmgr -v | grep -m 1 -i "SECTPMCTL Bootloader" | sed -e 's/^Boot\([0-9]\+\)\(.*\)$/\1/')
@@ -444,10 +449,15 @@ entry. You can do it also permanently by using the efibootmgr command although i
 
 ### BIOS Updates, eventually even with an Secure Boot database update
 
-BIOS updates should be no problem as sectpmctl is not sealing the LUKS key to a specific BIOS version, but only to a specific Secure Boot
-database and state while enforcing the use of it's own Secure Boot db keys for successfully unlocking the LUKS key while booting. On some BIOS
-types it is even safe to install BIOS updates which contain updates to the Secure Boot Database (most probably to supply an updated DBX list).
-It is safe to install such BIOS update as wells as the new database is only provided but not applied automatically by the BIOS update.
+It seems that BIOS updates on Lenovo Thinkpads won't cause problems as they seem to keep the Secure Boot database and won't reset the TPM.
+All tested BIOS updates done so far did not result in preventing unsealing.
+
+On the other hand on Gigabyte  X570S AERO motherboards,  the Secure Boot database seems to be reset during BIOS update, with the result that the recovery
+password needs to be entered on the next boot and sectpmctl needs to be installed again.
+
+If you know that Secure Boot and TPM stay stable there should be no problem in updating, otherwise keep your recovery password in reach. In
+a future version, binding to PCR 0 and handling BIOS updates could be implemented. That requires either integration with fwupdatemgr or the
+execution of a command infront of the BIOS update.
 
 ### Custom kernels or kernel modules
 
@@ -680,21 +690,57 @@ tpm2_evictcontrol --object-context="new.ctx" "0x81000202" --hierarchy=o
 The current implementation doen't need authorized policies. The next release will most probably include them to do advanced updates without
 the need for a recovery key.
 
-## Bugs found
+## Bugs and problems found
 
-When TPM (policy) sessions are created and not freed after use, a kernel bug could be triggered. When that happens, the TPM will not awnser
-anymore to any commands. A dmesg output will then show problems. A hotfix, which is already integrated in sectpmctl key (but not yet in
-tpmsbsigntool) will detect that case by using a timeout. When the timeout is detected, a force flush of all sessions is performed. That is
-not very polite but strictly neccessary to deliver functional unsealing. Signing of kernels and kernel modules is currently not protected by
-the force flush. The kernel bug is persistent, so reboots don't solve the problem.
+When many TPM (policy) sessions are created and not freed after use, a kernel bug could be triggered. When that happens, the TPM will not
+answer anymore to any commands. A dmesg output will then show problems. The expected behavior is that tpm2 commands will return an error code.
+Therefore a timeout has been implemented in the key tool to prevent endless waiting. To prevent this problem at boot time (the sessions seem
+not be be cleared automatically on booting) all TPM sessions are flushed before unsealing in the initrd.
 
-On other devices the TPM behaved different and produced error codes. In a future version this error codes should be parsed to trigger the
-required flushing.
+During the unseal at boot time it is possible that the kernel will load (some additional) kernel modules.
+If this module loading results in modification to the TPM PCR registers - especially while sectpmctl is doing the unseal - the TPM will return the error code `TPM_RC_PCR_CHANGED`, which prevents the unsealing of the LUKS partition.
 
-On Ubuntu 22.10 the linux-oem-22.04 5.17 kernel seems to have a bug in the TPM module currently which prevents TPM + Passwort. Use the default
-kernel 5.15 until this is fixed.
+To solve this problem a loop is implemented to simply retry unsealing 5 times with a sleep of 2 seconds in between. It seems to be difficult to have a stable parsing of this specific error code, therefore the loop is triggered on all TPM errors at boot time.
+
+
+### Acer laptops quirks
+
+First  to know is that you have to set a BIOS administrator password. Otherwise the Secure Boot settings are grayed out and cannot be changed. 
+
+An installation on an Acer Swift 3 SF314-42 laptop caused some problems which needed changes of the source code to enable an installation:
+
+* The Secure Boot Signature Database (DB) maybe not cleared by entering Setup Mode. Fix: Clear it before installation with `efi-updatevar -d 0 db`.
+* The Secure Boot Forbidden Signature Database (DBX) could not be cleared by efi-updatevar. Workarround: Comment out clearing and updating of DBX in sectpmctl-boot.
+* tpm2_clear fails. Fix: Clear the TPM inside the BIOS, Windows or by executing `echo 5 | sudo tee /sys/class/tpm/tpm0/ppi/request` and remove
+tpm2_clear in sectpmctl-tpm.
+* tpm2_dictionarylockout fails. That's not good. If the lockout settings are reasonable already, the call can be removed in sectpmctl-tpm.
+
+After a second installation, tpm2_clear and tpm2_dictionarylockout worked unexpectedly. So that could be related to a BIOS or kernel bug
+and maybe fixed already.
+
+These tools can be used to read the current Secure Boot and TPM settings:
+
+```
+mokutil --sb-state
+efi-readvar
+sudo tpm2_getcap properties-variable
+```
+
+### Gigabyte mainboards
+
+Be carefull with BIOS updates. They may delete the Secure Boot database which then makes use of the recovery password neccessary.
 
 ## Changelog
+
+* 1.1.3
+  + Fixed TPM_RC_PCR_CHANGED problem while unsealing without password at boot time
+  + Added check to stop quickly when a wrong LUKS password has been provided
+  + Added documentation and fixed build instructions
+  + Added optional ommitting of Microsoft Secure Boot keys on supported hardware
+  + Added option to forget the lockout authorization password set while TPM provisioning
+  + Added option to set and forget an endorsement password while TPM provisioning
+  + Added kernel global extra command line to bootloader
+  + Fixed Esys_CreateLoaded error
 
 * 1.1.2
   + Added Debian protected flag and added linking for the signing wrappers

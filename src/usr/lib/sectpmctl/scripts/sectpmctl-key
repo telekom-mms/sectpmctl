@@ -262,7 +262,7 @@ _check_input_and_state() {
   CMD="${1}"
   
   case "${CMD}" in
-    changepassword | extend | remove | seal | unseal)
+    changepassword | extend | remove | seal | testsession | unseal)
       ;;
     help)
       _usage_long
@@ -760,53 +760,49 @@ _check_input_and_state() {
     return 1
   fi
   
-  # loop after emergency flushing of all saved session a second time in
-  # case of a TPM timeout. this is not too polite, but self defense.
-  # secbootctl requires a functional kernel signing facility. we can't
-  # risc any disturbance beause of unclean shutdown of any application 
-  # 'tpm2_getcap handles-saved-session' can be used to list all sessions
-  ret=0
-  for _ in {1..2}; do
-    TIMEOUT=0
-    case "${CMD}" in
-      extend)
-        _extend
-        ;;
-      remove)
-        _remove
-        ;;
-      seal)
-        _seal
-        ;;
-      unseal)
-        _unseal
-        ;;
-      changepassword)
-        _changepassword
-        ;;
-      *)
-        _print_error "${ME} ${CMD}: Unknown command"
-        return 1
-        ;;
-    esac
-    ret=${?}
+  # if the command is running into timeout, the tool will quit with
+  # error code 2. in case of an error, it will quit with error code 1.
+  # if the command executed successfully, it will quit with error code 0.
 
-    if [[ "${TIMEOUT}" == "1" ]]; then
-      echo "${ME} ${CMD}: TPM Timeout, kernel bug maybe, flushing all" > /dev/kmsg
-      tpm2_flushcontext -t
-      tpm2_flushcontext -l
-      tpm2_flushcontext -s
-    else
-      break
-    fi
-  done
-  
-  if [[ "${TIMEOUT}" == "1" ]]; then
+  # it could be possible that all tpm sessions are filled up. then any
+  # attempt to start a new session will fail even after a reboot. therefore
+  # all sessions are flushed before unsealing while the device is booted. to
+  # manually clean all sessions at runtime, the tpm2_flushcontext command
+  # may be used.
+  ret=0
+  TIMEOUT=0
+  case "${CMD}" in
+    extend)
+      _extend
+      ;;
+    remove)
+      _remove
+      ;;
+    seal)
+      _seal
+      ;;
+    unseal)
+      _unseal
+      ;;
+    changepassword)
+      _changepassword
+      ;;
+    testsession)
+      _testsession
+      ;;
+    *)
+      _print_error "${ME} ${CMD}: Unknown command"
+      return 1
+      ;;
+  esac
+  ret=${?}
+
+  if [[ "${TIMEOUT}" != "0" ]]; then
     return 2
-  elif [[ "${ret}" != "0" ]]; then
-    return 1
-  else
+  elif [[ "${ret}" == "0" ]]; then
     return 0
+  else
+    return 1
   fi
 }
 
@@ -1209,6 +1205,46 @@ _unseal() {
     fi
   fi
 
+  _ex "${ME} ${CMD}: Could not leave temporary ramfs directory" \
+    cd - > /dev/null
+
+  _ex "${ME} ${CMD}: Could not remove temporary ramfs directory" \
+    rmdir "${tempdir}"
+
+  if [[ $ERR == true ]]; then
+    return 1
+  fi
+}
+
+_testsession() {
+  ERR=false
+
+  tempdir="$( _ex "${ME} ${CMD}: Could not create temporary ramfs directory" \
+    mktemp -d -p /dev/shm )" || return 1
+
+  _ex "${ME} ${CMD}: Could not enter temporary ramfs directory" \
+    cd "${tempdir}" || return 1
+
+  for _ in {1..1}; do
+    # connect encrypted to the TPM with key enforcement (TOFU)
+    _tx "${ME} ${CMD}: Could not connect to known TPM" \
+      tpm2_startauthsession -Q --policy-session -S session.ctx -c "${PARENT_PUBLIC}" || break
+
+    p1="$( _tx "${ME} ${CMD}: Could not read session config" \
+      tpm2_sessionconfig session.ctx )" || _xt $? || break
+    if [[ "$( grep -c '[ |]encrypt' <<< "$p1" )" != "1" ]] || [[ "$( grep -c '[ |]decrypt' <<< "$p1" )" != "1" ]]; then
+      _print_error "${ME} ${CMD}: Session could not be encrypted"
+      ERR=true
+      break
+    fi
+  done
+
+  if [[ -f session.ctx ]]; then
+    tpm2_flushcontext -Q session.ctx 2> /dev/null > /dev/null
+    _ex "${ME} ${CMD}: Could not remove session context" \
+      shred -f -z -u session.ctx
+  fi
+  
   _ex "${ME} ${CMD}: Could not leave temporary ramfs directory" \
     cd - > /dev/null
 
