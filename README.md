@@ -711,7 +711,7 @@ An installation on an Acer Swift 3 SF314-42 laptop caused some problems which ne
 
 * The Secure Boot Signature Database (DB) maybe not cleared by entering Setup Mode. Fix: Clear it before installation with `efi-updatevar -d 0 db`.
 * The Secure Boot Forbidden Signature Database (DBX) could not be cleared by efi-updatevar. Workarround: Comment out clearing and updating of DBX in sectpmctl-boot.
-* tpm2_clear fails. Fix: Clear the TPM inside the BIOS, Windows or by executing "echo 5 | sudo tee /sys/class/tpm/tpm0/ppi/request" and remove
+* tpm2_clear fails. Fix: Clear the TPM inside the BIOS, Windows or by executing `echo 5 | sudo tee /sys/class/tpm/tpm0/ppi/request` and remove
 tpm2_clear in sectpmctl-tpm.
 * tpm2_dictionarylockout fails. That's not good. If the lockout settings are reasonable already, the call can be removed in sectpmctl-tpm.
 
