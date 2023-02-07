@@ -735,6 +735,10 @@ Be carefull with BIOS updates. They may delete the Secure Boot database which th
   + Fixed TPM_RC_PCR_CHANGED problem while unsealing without password at boot time
   + Added check to stop quickly when a wrong LUKS password has been provided
   + Added documentation and fixed build instructions
+  + Added optional ommitting of Microsoft Secure Boot keys on supported hardware
+  + Added option to forget the lockout authorization password set while TPM provisioning
+  + Added option to set and forget an endorsement password while TPM provisioning
+  + Added kernel global extra command line to bootloader
   + Fixed Esys_CreateLoaded error
 
 * 1.1.2
