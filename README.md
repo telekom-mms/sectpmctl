@@ -697,10 +697,11 @@ answer anymore to any commands. A dmesg output will then show problems. The expe
 Therefore a timeout has been implemented in the key tool to prevent endless waiting. To prevent this problem at boot time (the sessions seem
 not be be cleared automatically on booting) all TPM sessions are flushed before unsealing in the initrd.
 
-On unsealing at boot time it is possible that the kernel will load kernel modules while unsealing. When the module loading result in
-modifications to the TPM PCR registers while sectpmctl is doing the unseal, the TPM will return the error code TPM_RC_PCR_CHANGED. To solve
-this problem at boot time a loop had been implemented to simply retry unsealing 5 times with a sleep of 2 seconds in between. It seems to be
-difficult to have a stable parsing of this specific error code, therefore the loop is triggered on all TPM errors at boot time.
+During the unseal at boot time it is possible that the kernel will load (some additional) kernel modules.
+If this module loading results in modification to the TPM PCR registers - especially while sectpmctl is doing the unseal - the TPM will return the error code `TPM_RC_PCR_CHANGED`, which prevents the unsealing of the LUKS partition.
+
+To solve this problem a loop is implemented to simply retry unsealing 5 times with a sleep of 2 seconds in between. It seems to be difficult to have a stable parsing of this specific error code, therefore the loop is triggered on all TPM errors at boot time.
+
 
 ### Acer laptops quirks
 
