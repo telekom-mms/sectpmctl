@@ -15,6 +15,10 @@ case "$1" in
     if [ ! -f /etc/sectpmctl/boot.conf ]; then
       install -m 0755 /usr/lib/sectpmctl/boot.conf /etc/sectpmctl/boot.conf
     fi
+    if [ ! -f /var/lib/sectpmctl/kernel_extra_options ]; then
+      install -m 1640 /usr/share/sectpmctl/examples/kernel_extra_options.example /var/lib/sectpmctl/kernel_extra_options
+      chattr +i /var/lib/sectpmctl/kernel_extra_options
+    fi
     ;;
 esac
 

@@ -1,0 +1,14 @@
+# SECTPMCTL EXTRA KERNEL OPTIONS
+# This file is used for global extra kernel options wich should always be enforced
+# The extra kernel commands should be written on one line seperated by whitespace
+# otherwise on command per line
+#
+# WARNING
+# Be aware what you are doing here. It is possible that if you use wrong options
+# your system won't boot.
+# consider to use immutable flag and only root permissions. Don't chmod 777 this file!
+
+# EXAMPLE 
+# uncomment next line to enable the audit sub-system
+#audit=1
+

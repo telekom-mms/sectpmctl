@@ -246,6 +246,7 @@ create_efi_blob ()
   linux="${4}"
   initrd="${5}"
   rebuild="${6}"
+  sectpmctl_kernel_extra_options="/var/lib/sectpmctl/kernel_extra_options"
 
   if [ "x${default}" = "x" ] && [ "$position" -eq 1 ]; then
     echo -n "Found (default): ${linux}, ${initrd}"
@@ -259,6 +260,15 @@ create_efi_blob ()
   chmod 700 "${tempbootdir}"
   cd "${tempbootdir}" || exit
 
+  extra_kernel_cmds=""
+  if [ -f "${sectpmctl_kernel_extra_options}" ]; then
+    while read line; do
+      if [[ "${line}" =~ ^\s*[^#] ]]; then
+        extra_kernel_cmds+="${line// = /=} ";
+      fi
+    done < "${sectpmctl_kernel_extra_options}"
+  fi
+
   kernel_cmdline="${DEFAULT_KERNEL_CMDLINE}"
 
   if [ "$position" -eq 1 ]; then
@@ -271,7 +281,7 @@ create_efi_blob ()
       kernel_cmdline="${KERNEL_CMDLINE_MAP[${version}]}"
   fi
 
-  echo "${kernel_cmdline}" | head -c 65530 > "${tempbootdir}/cmdline"
+  echo "${extra_kernel_cmds}${kernel_cmdline}" | head -c 65530 > "${tempbootdir}/cmdline"
 
   # @TODO Useless cat 
   cat /usr/lib/os-release | sed -e "s/^PRETTY_NAME=.*$/PRETTY_NAME=\"${BOOT_ENTRY_PREFIX} ${version}\"/" | head -c 65530 > "${tempbootdir}/os-release"
@@ -524,6 +534,8 @@ traverse_boot ()
 
 install ()
 {
+  ommit_ms_keys="${1}"
+
   secureboot_mode="clearmode"
   mokutil --sb-state | grep 'Platform is in Setup Mode' || (echo 'Platform is not in Setup Mode' ; exit 3)
 
@@ -537,6 +549,11 @@ install ()
   fi
 
   echo "Assuming Secure Boot mode: ${secureboot_mode}"
+
+  if [[ "x${secureboot_mode}" = "xsetupmode" && "x${ommit_ms_keys}" = "x1" ]]; then
+    echo "'--withoutmicrosoftkeys' requires the Secure Boot database to be in Clear Mode"
+    exit 3
+  fi
 
   if [ -d "${SECTPMCTL_EFI_DIR}" ]; then
     echo "sectpmctl boot active. Please run 'sectpmctl boot deactivate' first."
@@ -607,9 +624,10 @@ install ()
   openssl req -new -x509 -newkey rsa:2048 -subj "/CN=SECTPMCTL Key Exchange Key/" -keyout KEK.key \
     -out KEK.crt -days 3650 -nodes -sha256 2> /dev/null
   
-  tpm2_create -Q -C "${PERSISTANT_OWNER_SRK_NODA}" -c db.ctx -g sha256 -a \
+  tpm2_create -Q -C "${PERSISTANT_OWNER_SRK_NODA}" -g sha256 -a \
     "fixedtpm|fixedparent|sensitivedataorigin|userwithauth|decrypt|sign|noda" -p "str:$(cat "${SECTPMCTL_KEYS}/db.pwd")" \
     -u db.pub -r db.priv
+  tpm2_load -Q -C "${PERSISTANT_OWNER_SRK_NODA}" -u db.pub -r db.priv -c db.ctx
   tpm2_evictcontrol -Q -C o -c db.ctx -o db.obj
   openssl req -provider tpm2 -provider default -new -x509 -subj "/CN=SECTPMCTL Database Key/" -key object:db.obj?pass \
     -passin "pass:$(cat "${SECTPMCTL_KEYS}/db.pwd")" -out db.crt -days 3650 -sha256
@@ -636,21 +654,30 @@ install ()
   chmod 0600 ${SECTPMCTL_KEYS}/*.obj ${SECTPMCTL_KEYS}/*.cer ${SECTPMCTL_KEYS}/*.crt
 
   if [ "x${secureboot_mode}" = "xclearmode" ]; then
-    sbsiglist --owner 77fa9abd-0359-4d32-bd60-28f4e78f784b --type x509 --output MS_Win_db.esl "${VENDOR_KEYS}/MicWinProPCA2011_2011-10-19.crt"
-    sbsiglist --owner 77fa9abd-0359-4d32-bd60-28f4e78f784b --type x509 --output MS_UEFI_db.esl "${VENDOR_KEYS}/MicCorUEFCA2011_2011-06-27.crt"
-    cat MS_Win_db.esl MS_UEFI_db.esl > MS_db.esl
-    sign-efi-sig-list -t "$(date -u --date='1 second' +'%Y-%m-%d %H:%M:%S')" \
-      -a -g 77fa9abd-0359-4d32-bd60-28f4e78f784b -k KEK.key -c KEK.crt db MS_db.esl add_MS_db.auth
+    if [ "x${ommit_ms_keys}" = "x0" ]; then
+      sbsiglist --owner 77fa9abd-0359-4d32-bd60-28f4e78f784b --type x509 --output MS_Win_db.esl "${VENDOR_KEYS}/MicWinProPCA2011_2011-10-19.crt"
+      sbsiglist --owner 77fa9abd-0359-4d32-bd60-28f4e78f784b --type x509 --output MS_UEFI_db.esl "${VENDOR_KEYS}/MicCorUEFCA2011_2011-06-27.crt"
+      cat MS_Win_db.esl MS_UEFI_db.esl > MS_db.esl
+      sign-efi-sig-list -t "$(date -u --date='1 second' +'%Y-%m-%d %H:%M:%S')" \
+        -a -g 77fa9abd-0359-4d32-bd60-28f4e78f784b -k KEK.key -c KEK.crt db MS_db.esl add_MS_db.auth
 
-    efi-updatevar -f add_MS_db.auth db
+      efi-updatevar -f add_MS_db.auth db
+    fi
     efi-updatevar -f "${VENDOR_KEYS}/dbxupdate_x64.bin" -k KEK.key dbx
+    chattr +i /sys/firmware/efi/efivars/dbx-d719b2cb-3d3a-4596-a3bc-dad00e67656f
   fi
 
-  chattr -i /sys/firmware/efi/efivars/db-d719b2cb-3d3a-4596-a3bc-dad00e67656f
-  efi-updatevar -a -f db.auth db
+  if [ "x${ommit_ms_keys}" = "x0" ]; then
+    chattr -i /sys/firmware/efi/efivars/db-d719b2cb-3d3a-4596-a3bc-dad00e67656f
+    efi-updatevar -a -f db.auth db
+  else
+    efi-updatevar -f db.auth db
+  fi
   efi-updatevar -f KEK.auth KEK
   efi-updatevar -f PK.auth PK
   chattr +i /sys/firmware/efi/efivars/db-d719b2cb-3d3a-4596-a3bc-dad00e67656f
+  chattr +i /sys/firmware/efi/efivars/KEK-8be4df61-93ca-11d2-aa0d-00e098032b8c
+  chattr +i /sys/firmware/efi/efivars/PK-8be4df61-93ca-11d2-aa0d-00e098032b8c
 
   shred -f -z -u ./*.auth ./*.cer ./*.crt ./*.esl ./*.key ./*.priv ./*.pub ./*.ctx ./*.obj
   cd - > /dev/null || exit
@@ -757,6 +784,8 @@ _usage() {
   cat <<__END
 Usage: ${ME/-/ } COMMAND [OPTIONS]
 
+Use the help command to read about other install options
+
 COMMANDS
   activate
   deactivate
@@ -793,9 +822,11 @@ COMMANDS
 
     Show this help message.
 
-  install
+  install [--withoutmicrosoftkeys]
      
-    Install setpmctl bootloader.
+    Install setpmctl bootloader. Read the documentation before using
+    '--withoutmicrosoftkeys' as it most probably damages your hardware:
+    less /usr/share/sectpmctl/README.md
 
   remove --kernel <version>
 
@@ -862,7 +893,7 @@ argument=""
 
 test $# -eq 0 && _usage && exit 0
 
-if [ $# -ge 2 ]; then
+if [[ $# -ge 2 && "${1}" != "install" ]]; then
   case "${2}" in
     --kernel)
       if [ $# -eq 3 ]; then
@@ -890,7 +921,32 @@ case "${1}" in
     test_state
     ;;
   install)
-    install
+    if [ $# -ge 2 ]; then
+      case "${2}" in
+        --withoutmicrosoftkeys)
+          if [ $# -eq 3 ]; then
+            case "${3}" in
+              --iamresponsiblefordamage)
+                install "1"
+                ;;
+              *)
+                echo "You also need to give this option: --iamresponsiblefordamage"
+                exit 1
+                ;;
+            esac
+          else
+            echo "You also need to give this option: --iamresponsiblefordamage"
+            exit 1
+          fi
+          ;;
+        *)
+          _usage
+          exit 1
+          ;;
+      esac
+    else
+      install "0"
+    fi
     ;;
   remove)
     if [ "x${argument}" = "x" ]; then
