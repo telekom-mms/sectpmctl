@@ -695,7 +695,7 @@ the need for a recovery key.
 When many TPM (policy) sessions are created and not freed after use, a kernel bug could be triggered. When that happens, the TPM will not
 answer anymore to any commands. A dmesg output will then show problems. The expected behavior is that tpm2 commands will return an error code.
 Therefore a timeout has been implemented in the key tool to prevent endless waiting. To prevent this problem at boot time (the sessions seem
-not be be cleared automatically on booting) all TPM sessions are flushed infront of the unsealing in the initrd.
+not be be cleared automatically on booting) all TPM sessions are flushed before unsealing in the initrd.
 
 On unsealing at boot time it is possible that the kernel will load kernel modules while unsealing. When the module loading result in
 modifications to the TPM PCR registers while sectpmctl is doing the unseal, the TPM will return the error code TPM_RC_PCR_CHANGED. To solve
