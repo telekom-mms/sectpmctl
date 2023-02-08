@@ -58,7 +58,7 @@ COMMANDS
   help
   install
     [--dont-extend] [--key <file>] [--password <tpm password>]
-    [--preseed-pcr] [[--setrecoverykey][[--recoveryfile <file>]|[--recoveryscripthelper <file>]]]
+    [--preseed-pcr] [--post-preseed] [[--setrecoverykey][[--recoveryfile <file>]|[--recoveryscripthelper <file>]]]
     [--recoverygroups <num>] [--recoverygrouplength <num>  ]
   provisioning 
     [--lockoutAuth <password>]
@@ -76,6 +76,7 @@ OPTIONS
     --recoverygroups <num>
     --recoverygrouplength <num>  
     --setrecoverykey
+    --post-preseed
 
   provisioning 
     --lockoutAuth <password> 
@@ -103,7 +104,7 @@ COMMANDS
   help
   install
     [--dont-extend] [--key <file>] [--password <TPM password>]
-    [--preseed-pcr] [[--setrecoverykey][[--recoveryfile <file>]|[--recoveryscripthelper <file>]]]
+    [--preseed-pcr] [--post-preseed] [[--setrecoverykey][[--recoveryfile <file>]|[--recoveryscripthelper <file>]]]
     [--recoverygroups <num>] [--recoverygrouplength <num>  ] [--setrecoverykey]
   provisioning 
     [--lockout-auth <password>]
@@ -199,6 +200,10 @@ OPTIONS
     --preseed-pcr
 
       This option is used for automated Ubuntu installation
+
+    --post-preseed
+
+      This option is used after automated Ubuntu installation
 
 
   check
@@ -315,6 +320,7 @@ _check_input() {
   export TPM_PASSWORD=""
   export FORGET_LOCKOUT="false"
   export SET_FORGET_ENDORSEMENT="false"
+  export POSTPRESEED="false"
 
   ME=$(basename "$0")
   while [ $# != 0 ]; do
@@ -384,6 +390,9 @@ _check_input() {
         ;;
       --preseed-pcr)
         export PCR_VALUES_TO_USE="0"
+        ;;
+      --post-preseed)
+        export POSTPRESEED="true"
         ;;
       check)
         export CHECK="true"
@@ -461,7 +470,8 @@ _check_input() {
       "${KNOWN_UNKNOWN}" \
       "${PERSISTANT_OWNER_SRK_NODA}" \
       "${SECTPMCTL_KEYS}" \
-      "${TPM_PASSWORD}"
+      "${TPM_PASSWORD}" \
+      "${POSTPRESEED}"
 
   [[ "${CHECK}" == "true" ]] \
     && check_tpm2_secureboot
@@ -1163,6 +1173,7 @@ initial_tpm2_setup() {
   PERSISTANT_OWNER_SRK_NODA="${18}"
   SECTPMCTL_KEYS="${19}"
   TPM_PASSWORD="${20}"
+  POSTPRESEED="${21}"
 
   check_tpm2_secureboot
 
@@ -1189,23 +1200,25 @@ initial_tpm2_setup() {
     "${KEY_SCRIPT}" \
     "${ROOTCRYPTPARTUUID}"
 
-  generate_tpm2_policy \
-    "${PCR_BANK}" \
-    "${PCR_VALUES_TO_USE}" \
-    "${PERSISTANT_HANDLE_TO_USE}" \
-    "${KEY_FILE}" \
-    "${TPM_KEYSLOT}" \
-    "${CRYPT_PARTITION}" \
-    "${SET_RECOVERY_KEY}" \
-    "${RECOVERY_FILE}" \
-    "${RECOVERY_SCRIPT_HELPER}" \
-    "${RECOVERY_GROUPS}" \
-    "${RECOVERY_GROUP_LENGTH}" \
-    "${RECOVERY_KEYSLOT}" \
-    "${KNOWN_UNKNOWN}" \
-    "${PERSISTANT_OWNER_SRK_NODA}" \
-    "${SECTPMCTL_KEYS}" \
-    "${TPM_PASSWORD}"
+  if [ "${POSTPRESEED}" == "false" ]; then
+    generate_tpm2_policy \
+      "${PCR_BANK}" \
+      "${PCR_VALUES_TO_USE}" \
+      "${PERSISTANT_HANDLE_TO_USE}" \
+      "${KEY_FILE}" \
+      "${TPM_KEYSLOT}" \
+      "${CRYPT_PARTITION}" \
+      "${SET_RECOVERY_KEY}" \
+      "${RECOVERY_FILE}" \
+      "${RECOVERY_SCRIPT_HELPER}" \
+      "${RECOVERY_GROUPS}" \
+      "${RECOVERY_GROUP_LENGTH}" \
+      "${RECOVERY_KEYSLOT}" \
+      "${KNOWN_UNKNOWN}" \
+      "${PERSISTANT_OWNER_SRK_NODA}" \
+      "${SECTPMCTL_KEYS}" \
+      "${TPM_PASSWORD}"
+  fi
 
   generate_unseal_script \
     "${PCR_BANK}" \
