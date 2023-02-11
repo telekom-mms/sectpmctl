@@ -790,14 +790,15 @@ COMMANDS
   activate
   deactivate
   help
-  install
-  remove <--kernel version>
-  update [--kernel <version>]
+  install [--withoutmicrosoftkeys]
+  remove --kernel <version>
   test
+  update [--kernel <version>]
 
 
 OPTIONS
     --kernel <version>
+    --withoutmicrosoftkeys
 
 __END
 
@@ -835,15 +836,6 @@ COMMANDS
     In most cases it is not necessary to call the remove
     command manually.
 
-  update
-
-    Called without option for all available kernels 
-    the EFI Blob will be updated.
-
-    If --kernel <version> is used the update
-    will only be performed for the specified kernel.
-
-
   test
     
     Test if SecureBoot and TPM2 are in expected state.
@@ -861,11 +853,25 @@ COMMANDS
     * tpm2_selftest
     * Check Secure Boot State
 
+  update [--kernel <version>]
+
+    Called without option for all available kernels
+    the EFI Blob will be updated.
+
+    If --kernel <version> is used the update
+    will only be performed for the specified kernel.
+
 
 OPTIONS
     --kernel <version>
 
     Used to remove or update specified kernel.
+    
+    --withoutmicrosoftkeys
+    
+    Read the documentation before using this option as it
+    most probably damages your hardware:
+    less /usr/share/sectpmctl/README.md
  
 EXAMPLES
 
@@ -931,11 +937,17 @@ case "${1}" in
                 ;;
               *)
                 echo "You also need to give this option: --iamresponsiblefordamage"
+                echo "Read the documentation before using this option as it most"
+                echo "probably damages your hardware:"
+                echo "less /usr/share/sectpmctl/README.md"
                 exit 1
                 ;;
             esac
           else
             echo "You also need to give this option: --iamresponsiblefordamage"
+            echo "Read the documentation before using this option as it most"
+            echo "probably damages your hardware:"
+            echo "less /usr/share/sectpmctl/README.md"
             exit 1
           fi
           ;;

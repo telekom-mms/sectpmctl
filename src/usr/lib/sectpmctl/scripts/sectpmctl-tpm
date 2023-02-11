@@ -58,7 +58,8 @@ COMMANDS
   help
   install
     [--dont-extend] [--key <file>] [--password <tpm password>]
-    [--preseed-pcr] [--post-preseed] [[--setrecoverykey][[--recoveryfile <file>]|[--recoveryscripthelper <file>]]]
+    [--preseed-pcr] [--post-preseed] [ [--setrecoverykey]
+      [ [--recoveryfile <file>] | [--recoveryscripthelper <file>] ] ]
     [--recoverygroups <num>] [--recoverygrouplength <num>  ]
   provisioning 
     [--lockoutAuth <password>]
@@ -70,16 +71,19 @@ OPTIONS
   install 
     --dont-extend
     --key <file>
+    --password <tpm password>
     --preseed-pcr
+    --post-preseed
+    --setrecoverykey
     --recoveryfile <file>
     --recoveryscripthelper <file>
     --recoverygroups <num>
     --recoverygrouplength <num>  
-    --setrecoverykey
-    --post-preseed
 
   provisioning 
     --lockoutAuth <password> 
+    --forgetlockout
+    --setforgetendorsement
 
 __END
 
@@ -104,12 +108,26 @@ COMMANDS
   help
   install
     [--dont-extend] [--key <file>] [--password <TPM password>]
-    [--preseed-pcr] [--post-preseed] [[--setrecoverykey][[--recoveryfile <file>]|[--recoveryscripthelper <file>]]]
-    [--recoverygroups <num>] [--recoverygrouplength <num>  ] [--setrecoverykey]
+    [--preseed-pcr] [--post-preseed] [ [--setrecoverykey]
+      [ [--recoveryfile <file>] | [--recoveryscripthelper <file>] ] ]
+    [--recoverygroups <num>] [--recoverygrouplength <num> ]
   provisioning 
     [--lockout-auth <password>]
+    [--forgetlockout]
+    [--setforgetendorsement]
 
 OPTIONS
+
+  check
+
+    Currently it checks if TPM2 is found, performs TPM2 selftest
+    and check if SecureBoot is enabled.
+
+
+  help
+
+     Open this help message.
+
 
   install
 
@@ -141,11 +159,20 @@ OPTIONS
       option is not combined with the --noda option to enable DA
       protection. When unsealing while booting, the same TPM password
       has to be provided. The password can be changed at runtime with:
-      sectpmctl key changepassword --handle 0x81000102 \
+      sectpmctl key changepassword --handle 0x81000102 \\
           --oldpassword "myoldpwd" --password "mynewpwd"
       If the current password is lost, a new password can be set with
-      the recovery key by installing again:
-      sectpmctl tpm install --password "mynewpwd" ...
+      the recovery key by doing a recovery, see the documentation.
+
+
+    --preseed-pcr
+
+      This option is used for automated Ubuntu installation
+
+
+    --post-preseed
+
+      This option is used after automated Ubuntu installation
 
 
     --setrecoverykey
@@ -197,21 +224,6 @@ OPTIONS
       generated recovery key. Default: 8
 
 
-    --preseed-pcr
-
-      This option is used for automated Ubuntu installation
-
-    --post-preseed
-
-      This option is used after automated Ubuntu installation
-
-
-  check
-
-    Currently it checks if TPM2 is found, performs TPM2 selftest
-    and check if SecureBoot is enabled.
-
-
   provisioning
 
     Perform the TPM provioning process. The TPM will be
@@ -250,10 +262,6 @@ OPTIONS
       Set the endorsement authorization password to a random value which is not
       stored. If this option is not set the endorsement hierarchy is not changed.
 
-
-  help
-
-     Open this help message.
 
 EXAMPLES
 

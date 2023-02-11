@@ -47,10 +47,15 @@ _sectpmctl_boot()
   cmd="${COMP_WORDS[2]}"
 
   main_opts="activate deactivate help install remove test update"
+  install_opts="--withoutmicrosoftkeys"
   remove_update_opts="--kernel"
 
   case "${cmd}" in
-    activate | deactivate | help | install | test)
+    activate | deactivate | help | test)
+      return 0
+      ;;
+    install)
+      COMPREPLY=($( compgen -W "${install_opts}" -- ${cur} ))
       return 0
       ;;
     remove | update)
@@ -81,7 +86,7 @@ _sectpmctl_key()
   prev="${COMP_WORDS[COMP_CWORD-1]}"
   cmd="${COMP_WORDS[2]}"
 
-  main_opts="changepassword enterlockout extend help leavelockout remove seal unseal"
+  main_opts="changepassword extend help remove seal testsession unseal"
   seal_opts="--handle --key-file --name --name-dir --noda --pcr-extend --pcr-preseed --password --password-hex --password-file"
   unseal_opts="--handle --name --name-dir --noda --pcr-extend --pcr-preseed --password --password-hex --password-file"
   changepassword_opts="--handle --noda --oldpassword --oldpassword-hex --oldpassword-file --password --password-hex --password-file"
@@ -178,7 +183,7 @@ _sectpmctl_key()
   esac
 
   case "${cmd}" in
-    enterlockout | help | leavelockout)
+    help | testsession)
       return 0
       ;;
     changepassword)
@@ -274,8 +279,8 @@ _sectpmctl_tpm()
   cmd="${COMP_WORDS[2]}"
 
   main_opts="check help install provisioning"
-  install_opts="--dont-createkey --dont-extend --dont-setlukskey --key --password --pcr-preseed --recoveryfile --recoverygrouplength --recoverygroups --recoveryscripthelper --setrecoverykey"
-  provisioning_opts="--lockout-auth"
+  install_opts="--dont-extend --key --password --preseed-pcr --post-preseed --recoveryfile --recoverygrouplength --recoverygroups --recoveryscripthelper --setrecoverykey"
+  provisioning_opts="--forgetlockout --lockout-auth --setforgetendorsement"
 
   case "${cmd}" in
     check | help)
