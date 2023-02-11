@@ -47,10 +47,15 @@ _sectpmctl_boot()
   cmd="${COMP_WORDS[2]}"
 
   main_opts="activate deactivate help install remove test update"
+  install_opts="--withoutmicrosoftkeys"
   remove_update_opts="--kernel"
 
   case "${cmd}" in
-    activate | deactivate | help | install | test)
+    activate | deactivate | help | test)
+      return 0
+      ;;
+    install)
+      COMPREPLY=($( compgen -W "${install_opts}" -- ${cur} ))
       return 0
       ;;
     remove | update)
@@ -178,7 +183,7 @@ _sectpmctl_key()
   esac
 
   case "${cmd}" in
-    enterlockout | help | leavelockout)
+    help | testsession)
       return 0
       ;;
     changepassword)

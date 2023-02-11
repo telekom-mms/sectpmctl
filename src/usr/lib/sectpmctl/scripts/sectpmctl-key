@@ -98,6 +98,7 @@ Commands
   seal
     <handle | name [name-dir]> [key-file] [noda] [pcr-extend] [pcr-preseed]
     [password | password-hex | password-file]
+  testsession
   unseal
     <handle | name [name-dir]> [noda] [pcr-extend] [pcr-preseed]
     [password | password-hex | password-file]
@@ -151,6 +152,11 @@ Commands
   seal
     <handle | name [name-dir]> [key-file] [noda] [pcr-extend] [pcr-preseed]
     [password | password-hex | password-file]
+
+  testsession
+    Opens a session with the public key created by the provisioning. The
+    command will check that the TPM contains the private key which belongs
+    to the public key.
 
   unseal
     <handle | name [name-dir]> [noda] [pcr-extend] [pcr-preseed]
