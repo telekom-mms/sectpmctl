@@ -159,11 +159,10 @@ OPTIONS
       option is not combined with the --noda option to enable DA
       protection. When unsealing while booting, the same TPM password
       has to be provided. The password can be changed at runtime with:
-      sectpmctl key changepassword --handle 0x81000102 \
+      sectpmctl key changepassword --handle 0x81000102 \\
           --oldpassword "myoldpwd" --password "mynewpwd"
       If the current password is lost, a new password can be set with
-      the recovery key by installing again:
-      sectpmctl tpm install --password "mynewpwd" ...
+      the recovery key by doing a recovery, see the documentation.
 
 
     --preseed-pcr
