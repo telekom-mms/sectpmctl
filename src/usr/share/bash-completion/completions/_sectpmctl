@@ -86,7 +86,7 @@ _sectpmctl_key()
   prev="${COMP_WORDS[COMP_CWORD-1]}"
   cmd="${COMP_WORDS[2]}"
 
-  main_opts="changepassword enterlockout extend help leavelockout remove seal unseal"
+  main_opts="changepassword extend help remove seal testsession unseal"
   seal_opts="--handle --key-file --name --name-dir --noda --pcr-extend --pcr-preseed --password --password-hex --password-file"
   unseal_opts="--handle --name --name-dir --noda --pcr-extend --pcr-preseed --password --password-hex --password-file"
   changepassword_opts="--handle --noda --oldpassword --oldpassword-hex --oldpassword-file --password --password-hex --password-file"

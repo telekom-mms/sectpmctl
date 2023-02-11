@@ -865,6 +865,12 @@ OPTIONS
     --kernel <version>
 
     Used to remove or update specified kernel.
+    
+    --withoutmicrosoftkeys
+    
+    Read the documentation before using this option as it
+    most probably damages your hardware:
+    less /usr/share/sectpmctl/README.md
  
 EXAMPLES
 
