@@ -938,6 +938,9 @@ case "${1}" in
             esac
           else
             echo "You also need to give this option: --iamresponsiblefordamage"
+            echo "Read the documentation before using this option as it most"
+            echo "probably damages your hardware:"
+            echo "less /usr/share/sectpmctl/README.md"
             exit 1
           fi
           ;;
