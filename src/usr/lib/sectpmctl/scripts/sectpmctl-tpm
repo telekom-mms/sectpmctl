@@ -118,6 +118,17 @@ COMMANDS
 
 OPTIONS
 
+  check
+
+    Currently it checks if TPM2 is found, performs TPM2 selftest
+    and check if SecureBoot is enabled.
+
+
+  help
+
+     Open this help message.
+
+
   install
 
     Installs sectpmctl TPM2-LUKS-Encryption for Ubuntu.
@@ -214,12 +225,6 @@ OPTIONS
       generated recovery key. Default: 8
 
 
-  check
-
-    Currently it checks if TPM2 is found, performs TPM2 selftest
-    and check if SecureBoot is enabled.
-
-
   provisioning
 
     Perform the TPM provioning process. The TPM will be
@@ -258,10 +263,6 @@ OPTIONS
       Set the endorsement authorization password to a random value which is not
       stored. If this option is not set the endorsement hierarchy is not changed.
 
-
-  help
-
-     Open this help message.
 
 EXAMPLES
 
