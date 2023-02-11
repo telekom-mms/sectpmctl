@@ -279,8 +279,8 @@ _sectpmctl_tpm()
   cmd="${COMP_WORDS[2]}"
 
   main_opts="check help install provisioning"
-  install_opts="--dont-createkey --dont-extend --dont-setlukskey --key --password --pcr-preseed --recoveryfile --recoverygrouplength --recoverygroups --recoveryscripthelper --setrecoverykey"
-  provisioning_opts="--lockout-auth"
+  install_opts="--dont-extend --key --password --preseed-pcr --post-preseed --recoveryfile --recoverygrouplength --recoverygroups --recoveryscripthelper --setrecoverykey"
+  provisioning_opts="--forgetlockout --lockout-auth --setforgetendorsement"
 
   case "${cmd}" in
     check | help)

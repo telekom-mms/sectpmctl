@@ -58,7 +58,8 @@ COMMANDS
   help
   install
     [--dont-extend] [--key <file>] [--password <tpm password>]
-    [--preseed-pcr] [--post-preseed] [[--setrecoverykey][[--recoveryfile <file>]|[--recoveryscripthelper <file>]]]
+    [--preseed-pcr] [--post-preseed] [ [--setrecoverykey]
+      [ [--recoveryfile <file>] | [--recoveryscripthelper <file>] ] ]
     [--recoverygroups <num>] [--recoverygrouplength <num>  ]
   provisioning 
     [--lockoutAuth <password>]
@@ -70,16 +71,19 @@ OPTIONS
   install 
     --dont-extend
     --key <file>
+    --password <tpm password>
     --preseed-pcr
+    --post-preseed
+    --setrecoverykey
     --recoveryfile <file>
     --recoveryscripthelper <file>
     --recoverygroups <num>
     --recoverygrouplength <num>  
-    --setrecoverykey
-    --post-preseed
 
   provisioning 
     --lockoutAuth <password> 
+    --forgetlockout
+    --setforgetendorsement
 
 __END
 
@@ -104,10 +108,13 @@ COMMANDS
   help
   install
     [--dont-extend] [--key <file>] [--password <TPM password>]
-    [--preseed-pcr] [--post-preseed] [[--setrecoverykey][[--recoveryfile <file>]|[--recoveryscripthelper <file>]]]
-    [--recoverygroups <num>] [--recoverygrouplength <num>  ] [--setrecoverykey]
+    [--preseed-pcr] [--post-preseed] [ [--setrecoverykey]
+      [ [--recoveryfile <file>] | [--recoveryscripthelper <file>] ] ]
+    [--recoverygroups <num>] [--recoverygrouplength <num> ]
   provisioning 
     [--lockout-auth <password>]
+    [--forgetlockout]
+    [--setforgetendorsement]
 
 OPTIONS
 
@@ -146,6 +153,16 @@ OPTIONS
       If the current password is lost, a new password can be set with
       the recovery key by installing again:
       sectpmctl tpm install --password "mynewpwd" ...
+
+
+    --preseed-pcr
+
+      This option is used for automated Ubuntu installation
+
+
+    --post-preseed
+
+      This option is used after automated Ubuntu installation
 
 
     --setrecoverykey
@@ -195,15 +212,6 @@ OPTIONS
         
       Specifies the amount of characters used in each group for the
       generated recovery key. Default: 8
-
-
-    --preseed-pcr
-
-      This option is used for automated Ubuntu installation
-
-    --post-preseed
-
-      This option is used after automated Ubuntu installation
 
 
   check
