@@ -798,6 +798,7 @@ COMMANDS
 
 OPTIONS
     --kernel <version>
+    --withoutmicrosoftkeys
 
 __END
 
