@@ -27,8 +27,8 @@ You can easily test the installation with virt-manager on a Ubuntu 22.04 host an
 configure the VM before it starts automatically. In the overview select 'OVMF_CODE_4M.secboot.fd' as firmware and then add a new 'TPM
 emulated TIS 2.0' device. After installation of Ubuntu, you can start installing sectpmctl.
 
-For transparency, the tpm2-tools commands for session encryption, provisioning, TOFU, seal, unseal and password change are documented at the end
-of this README. The commands for using Secure Boot are standard except for using the TPM as a key store for the db signing key. Take a
+For transparency, the tpm2-tools commands for session encryption, provisioning, TOFU, seal, unseal, and password change are documented at the
+end of this README. The commands for using Secure Boot are standard except for using the TPM as a key store for the db signing key. Take a
 look at the source code to see how that works. If you are wondering, yes the PK and KEK keys are not stored at all in the current
 implementation, they are simply not needed for anything.
 
@@ -83,8 +83,8 @@ sectpmctl again (see the recovery section for how to do it).
 ### One optional setting is dangerous (disabled by default)
 
 When installing the sectpmct bootloader, the Microsoft keys are automatically uploaded to the Secure Boot database for your safety.
-An option exists to suppress the uploading of the Microsoft keys. Together with a BIOS admin password, hardware without a crucial UEFI OptionROM
-requirement like laptops with integrated graphics gains the protection that no other operating system can boot. This should probably
+An option exists to suppress the uploading of the Microsoft keys. Together with a BIOS admin password, hardware without a crucial UEFI
+OptionROM requirement like laptops with integrated graphics gains the protection that no other operating system can boot. This should probably
 also increase security on another end. When sectpmctl is installed without a TPM password, the device will boot unattended (if there is no
 BIOS startup password or if it has been removed). When the system would be able to execute bootloaders signed by Microsoft, it could be
 possible that an attacker can boot software that tries to read out the memory from the last boot to get access to the LUKS key which is
@@ -110,9 +110,9 @@ Do use the option with care when:
 
 In the case of graphic cards for example, when omitting the Microsoft keys, the screen will stay black when you power on the device. It will
 not even work when the operating system is finished booting. If you are (very) lucky, you could maybe navigate blindly in the BIOS to disable
-Secure Boot. Then, on the next start, the graphic card will function again. You can then restore the Secure Boot factory keys and enable Secure Boot
-again. Another option is maybe to buy a very old graphics card or a CPU with integrated graphics to recover. On laptops, it is not possible
-to switch to another graphic card for booting and the brick could be final, immutable, and can maybe never be recovered.
+Secure Boot. Then, on the next start, the graphic card will function again. You can then restore the Secure Boot factory keys and enable Secure
+Boot again. Another option is maybe to buy a very old graphics card or a CPU with integrated graphics to recover. On laptops, it is not
+possible to switch to another graphic card for booting and the brick could be final, immutable, and can maybe never be recovered.
 
 The sbctl project has a FAQ for the Microsoft keys: https://github.com/Foxboron/sbctl/wiki/FAQ#option-rom
 
@@ -195,19 +195,19 @@ user@laptop:~$
 
 #### TPM preparations
 
-As sectpmctl will provision your TPM in a minimal way it is required to start the installation with a cleared TPM. That can be achieved in three
-ways:
+As sectpmctl will provision your TPM in a minimal way it is required to start the installation with a cleared TPM. That can be achieved in
+three ways:
 
-- Clear the TPM (sometimes also called Security Chip) in the BIOS if available. Some BIOS types require you to press a key after a reboot to clear
-the TPM.
+- Clear the TPM (sometimes also called Security Chip) in the BIOS if available. Some BIOS types require you to press a key after a reboot to
+clear the TPM.
 - Use Windows to disable TPM auto-provisioning and clear the TPM by using PowerShell commands, followed by a reboot.
 - Execute in Linux: "echo 5 | sudo tee /sys/class/tpm/tpm0/ppi/request" and reboot.
 
 Be warned that if you put already keys into the TPM, they will be lost by the clearing.
 
-Be also warned that when a TPM lockout password is set and you try to clear the TPM with software commands by entering a wrong lockout password,
-there will be a time penalty until you can try again. The above three ways to clear should allow you to clear the TPM even when you entered a wrong
-lockout password.
+Be also warned that when a TPM lockout password is set and you try to clear the TPM with software commands by entering a wrong lockout
+password, there will be a time penalty until you can try again. The above three ways to clear should allow you to clear the TPM even when you
+entered a wrong lockout password.
 
 To check if the TPM is in a good state enter:
 
@@ -241,8 +241,8 @@ START PROVISIONING
 user@laptop:~$
 ```
 
-The provisioning will set a random lockout password which is stored in '/var/lib/sectpmctl/keys/lockout.pwd', set sane dictionary attack lockout
-time penalty settings and create two TPM primary keys, one with the dictionary attack lockout flag (DA) and one without (NODA).
+The provisioning will set a random lockout password which is stored in '/var/lib/sectpmctl/keys/lockout.pwd', set sane dictionary attack
+lockout time penalty settings and create two TPM primary keys, one with the dictionary attack lockout flag (DA) and one without (NODA).
 
 The following DA lockout values are set:
 
@@ -369,8 +369,8 @@ chmod +x install_tpm.sh
 sudo reboot
 ```
 
-The 'sectpmctl tpm install' command will print out the recovery key. It is highly recommended to store this key in a safe location. Without this
-key, you can lose all your data when the TPM breaks or when accessing your hard disk on another machine. You have been warned!
+The 'sectpmctl tpm install' command will print out the recovery key. It is highly recommended to store this key in a safe location. Without
+this key, you can lose all your data when the TPM breaks or when accessing your hard disk on another machine. You have been warned!
 
 The recovery key will be printed first, then the bootloader is updated. It can happen that the recovery key is not visible after the
 installation. Then you need to scroll up a bit to see it. The recovery key is built by eight groups with eight characters from 0 to 9 and a to
@@ -437,7 +437,8 @@ for how to fix it.
 ### Kernel or kernel module updates
 
 Kernel or kernel module updates will not create any problems.  Whenever a kernel is installed or a DKMS module is updated or installed,
-the corresponding hooks are called to automatically sign the kernel and/or kernel modules in a very similar way as DKMS and grub are doing updates.
+the corresponding hooks are called to automatically sign the kernel and/or kernel modules in a very similar way as DKMS and grub are doing
+updates.
 
 ### Userspace updates
 
@@ -451,11 +452,11 @@ entry. You can do it also permanently by using the efibootmgr command although i
 It seems that BIOS updates on Lenovo Thinkpads won't cause problems as they seem to keep the Secure Boot database and won't reset the TPM.
 All tested BIOS updates done so far did not result in preventing unsealing.
 
-On the other hand on Gigabyte  X570S AERO motherboards,  the Secure Boot database seems to be reset during BIOS update, with the result that the recovery
-password needs to be entered on the next boot and sectpmctl needs to be installed again.
+On the other hand on Gigabyte  X570S AERO motherboards,  the Secure Boot database seems to be reset during BIOS update, with the result that
+the recovery password needs to be entered on the next boot and sectpmctl needs to be installed again.
 
-If you know that Secure Boot and TPM stay stable there should be no problem in updating, otherwise, keep your recovery password within reach. In
-a future version, binding to PCR 0 and handling BIOS updates could be implemented. That requires either integration with fwupdatemgr or the
+If you know that Secure Boot and TPM stay stable there should be no problem in updating, otherwise, keep your recovery password within reach.
+In a future version, binding to PCR 0 and handling BIOS updates could be implemented. That requires either integration with fwupdatemgr or the
 execution of a command in front of the BIOS update.
 
 ### Custom kernels or kernel modules
@@ -487,8 +488,8 @@ tpmsbsigntool can be merged upstream in sbsigntool in the future.
 ## Recovery
 
 In case of a changed Secure Boot database, sectpmctl will not unlock anymore. In that case, you can simply repeat the sectpmctl installation.
-First, clear the Secure Boot database, then clear the TPM and finally repeat all steps except 1. and 4. from the installation. It is possible to
-do it more fine-grained which will be documented in a later release.
+First, clear the Secure Boot database, then clear the TPM and finally repeat all steps except 1. and 4. from the installation. It is possible
+to do it more fine-grained which will be documented in a later release.
 
 You could then omit the '--setrecoverykey' option in the 'sectpmctl tpm install' command to keep your current recovery key.
 
@@ -547,16 +548,16 @@ meaningful like PCR7.
 ### Provisioning
 
 Performing TPM provisioning is required for advanced usage. The TPM has to be partitioned and secured. This implementation does not make use
-of the endorsement key, some users want to disable this hierarchy anyway for privacy reasons. It also doesn't set passwords for the owner hierarchy
-because that will sooner or later create problems with software that simply would not allow using an owner password, tpm2-topt for example.
-The root user would be able to create new primary keys or even delete them, but that should not break security.
+of the endorsement key, some users want to disable this hierarchy anyway for privacy reasons. It also doesn't set passwords for the owner
+hierarchy because that will sooner or later create problems with software that simply would not allow using an owner password, tpm2-topt for
+example. The root user would be able to create new primary keys or even delete them, but that should not break security.
 
-The two public keys 'tpm_owner.pub' and 'tpm_owner_noda.pub' play an important role. They are used for session encryption, but more importantly,
-they build the foundation of the TOFU principle. These public keys are used to establish a TPM session when unsealing in the initrd. If
-the corresponding private key is not inside the TPM, then the communication is directly rejected. The public key is copied into the initrd and
-of course signed by Secure Boot so that manipulation of the public key won't boot. Deleting the private key in the TPM or using a different TPM
-also won't boot. Only when the initrd finds the private keys created at provisioning time together with the initrds public key, the encrypted
-session is established.
+The two public keys 'tpm_owner.pub' and 'tpm_owner_noda.pub' play an important role. They are used for session encryption, but more
+importantly, they build the foundation of the TOFU principle. These public keys are used to establish a TPM session when unsealing in the
+initrd. If the corresponding private key is not inside the TPM, then the communication is directly rejected. The public key is copied into the
+initrd and of course signed by Secure Boot so that manipulation of the public key won't boot. Deleting the private key in the TPM or using a
+different TPM also won't boot. Only when the initrd finds the private keys created at provisioning time together with the initrds public key,
+the encrypted session is established.
 
 ```
 # Clear the TPM
@@ -693,9 +694,11 @@ Therefore a timeout has been implemented in the key tool to prevent endless wait
 not be cleared automatically on booting) all TPM sessions are flushed before unsealing in the initrd.
 
 During the unseal at boot time the kernel may load (some additional) kernel modules.
-If this module loading results in a modification to the TPM PCR registers - especially while sectpmctl is doing the unseal - the TPM will return the error code `TPM_RC_PCR_CHANGED`, which prevents the unsealing of the LUKS partition.
+If this module loading results in a modification to the TPM PCR registers - especially while sectpmctl is doing the unseal - the TPM will
+return the error code `TPM_RC_PCR_CHANGED`, which prevents the unsealing of the LUKS partition.
 
-To solve this problem a loop is implemented to simply retry unsealing 5 times with a sleep of 2 seconds in between. It seems to be difficult to have a stable parsing of this specific error code, therefore the loop is triggered on all TPM errors at boot time.
+To solve this problem a loop is implemented to simply retry unsealing 5 times with a sleep of 2 seconds in between. It seems to be difficult to
+have a stable parsing of this specific error code, therefore the loop is triggered on all TPM errors at boot time.
 
 
 ### Acer laptops quirks
@@ -704,8 +707,10 @@ First to know is that you have to set a BIOS administrator password. Otherwise, 
 
 An installation on an Acer Swift 3 SF314-42 laptop caused some problems which needed changes in the source code to enable an installation:
 
-* The Secure Boot Signature Database (DB) maybe not be cleared by entering Setup Mode. Fix: Clear it before installation with `efi-updatevar -d 0 db`.
-* The Secure Boot Forbidden Signature Database (DBX) could not be cleared by efi-updatevar. Workaround: Comment out clearing and updating of DBX in sectpmctl-boot.
+* The Secure Boot Signature Database (DB) maybe not be cleared by entering Setup Mode. Fix: Clear it before installation with
+`efi-updatevar -d 0 db`.
+* The Secure Boot Forbidden Signature Database (DBX) could not be cleared by efi-updatevar. Workaround: Comment out clearing and updating of
+DBX in sectpmctl-boot.
 * tpm2_clear fails. Fix: Clear the TPM inside the BIOS, Windows, or by executing `echo 5 | sudo tee /sys/class/tpm/tpm0/ppi/request` and remove
 tpm2_clear in sectpmctl-tpm.
 * tpm2_dictionarylockout fails. That's not good. If the lockout settings are reasonable already, the call can be removed in sectpmctl-tpm.
