@@ -32,16 +32,14 @@ install:
 	install -d $(DESTDIR)/etc/initramfs/post-update.d
 	ln -s ../../kernel/postinst.d/zz-update-sectpmctl-boot $(DESTDIR)/etc/initramfs/post-update.d/zz-update-sectpmctl-boot
 
-package_build: package_clean package_dist
-	debuild -i
+package_build: package_clean generate_changelog
+	debuild -i -uc -us -b
+
+generate_changelog:
+	curl -sL https://raw.githubusercontent.com/telekom-mms/deb-builder-base/main/git-dch.sh | /usr/bin/bash -s -- $(DIST) $(TAG)
 
 package_clean:
 	-rm -Rf debian/.debhelper
 	-rm -Rf debian/$(firstword $(subst _, ,$(lastword $(subst /, ,$(shell pwd)))))*
 	-rm debian/debhelper-build-stamp debian/files
 	-rm ../$(lastword $(subst /, ,$(shell pwd)))?*
-
-package_dist:
-	cd .. && \
-	DIR=$(lastword $(subst /, ,$(shell pwd))) && \
-	tar cvzf "$${DIR}_1.1.3.orig.tar.gz" "$$DIR"

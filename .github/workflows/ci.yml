@@ -1,0 +1,43 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    runs-on: ubuntu-22.04
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v3
+        with:
+          fetch-depth: 0
+
+      - name: Install build tools
+        run: sudo apt-get update && sudo apt-get install debhelper build-essential devscripts -y
+        env:
+          DEBIAN_FRONTEND: noninteractive
+
+      - name: Build package
+        run: |+
+          make package_build
+          cd ..
+          echo "Result: $(ls *.deb)"
+          sha512sum *.deb > checksums.txt
+          cp *.deb checksums.txt ${{ github.workspace }}/
+        env:
+          GH_TOKEN: ${{ github.token }}
+      - name: Store package
+        uses: actions/upload-artifact@v3
+        with:
+          name: deb-package
+          path: |
+            *.deb
+            checksums.txt
+          retention-days: 10
+# yaml-language-server: $schema=https://raw.githubusercontent.com/SchemaStore/schemastore/master/src/schemas/json/github-workflow.json
