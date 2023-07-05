@@ -1,7 +1,5 @@
 Format: https://www.debian.org/doc/packaging-manuals/copyright-format/1.0/
-Upstream-Name: sectpmctl
-Source: <https://t-systems-mms.com>
-
-Files: *
-Copyright: 2022 T-Systems MMS <info@t-systems.com>
+Files:
+ *
+Copyright: 2023 Deutsche Telekom MMS GmbH
 License: GPLv2

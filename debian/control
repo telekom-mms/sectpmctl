@@ -4,17 +4,14 @@ Priority: optional
 Maintainer: Richard Robert Reitz <richard-robert.reitz@t-systems.com>
 Build-Depends: debhelper (>= 10)
 Standards-Version: 4.1.2
-Homepage:
 
 Package: sectpmctl
 Architecture: any
-Depends: ${misc:Depends}, efibootmgr, efitools, sbsigntool, tpmsbsigntool, binutils, mokutil, dkms, systemd, udev, util-linux (>= 2.34), gdisk, openssl, uuid-runtime, tpm2-tools, coreutils, bash
+Depends: ${misc:Depends}, efibootmgr, efitools, sbsigntool, tpmsbsigntool, binutils, mokutil, dkms, systemd, udev, util-linux (>= 2.34), gdisk, openssl, uuid-runtime, tpm2-tools, coreutils (>= 8.32), bash (>= 5.1)
 Provides: grub, grub2, grub2-common, grub-common, grub-efi, grub-efi-amd64, grub-efi-amd64-bin, grub-efi-amd64-signed, grub-pc, grub-pc-bin, lilo, os-prober, shim, shim-signed
 Conflicts: grub, grub2, grub2-common, grub-common, grub-efi, grub-efi-amd64, grub-efi-amd64-bin, grub-efi-amd64-signed, grub-pc, grub-pc-bin, lilo, os-prober, shim, shim-signed
 Replaces: grub, grub2, grub2-common, grub-common, grub-efi, grub-efi-amd64, grub-efi-amd64-bin, grub-efi-amd64-signed, grub-pc, grub-pc-bin, lilo, os-prober, shim, shim-signed
-XB-Important: yes
-Protected: yes
-Description: sectpmctl - Secure Boot and TPM2 backed LUKS full disc encryption
+Description: Secure Boot and TPM2 backed LUKS full disc encryption
  The default of most Linux distributions is to use a password and eventually
  a recovery key to decrypt the encrypted root partition of a drive. sectpmctl
  stores the LUKS key inside the TPM2 and only releases it if the system is in
