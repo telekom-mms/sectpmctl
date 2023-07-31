@@ -25,7 +25,7 @@ jobs:
       - name: Release package
         run: |+
           TAG=${{ github.ref_name }}
-          make package_build TAG=$TAG
+          make package_build TAG="-t ${TAG}" DIST="-d jammy"
           cd ..
           echo "Result: $(ls *.deb)"
           sha512sum *.deb > checksums.txt
