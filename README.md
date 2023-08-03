@@ -127,17 +127,30 @@ option and ask somebody who might know if it could work. If you brick your devic
 ## Build and install tpmsbsigntool
 
 ```
-sudo apt install -y git git-buildpackage debhelper-compat gcc-multilib binutils-dev libssl-dev \
+sudo apt install -y git devscripts debhelper-compat gcc-multilib binutils-dev libssl-dev \
   openssl pkg-config automake uuid-dev help2man gnu-efi tpm2-openssl
 
 git clone https://github.com/T-Systems-MMS/tpmsbsigntool.git
 
 cd tpmsbsigntool
-gbp buildpackage --git-export-dir=../build_tpmsbsigntool -uc -us
+debuild -b -uc -us
 cd ..
 
-sudo dpkg -i build_tpmsbsigntool/tpmsbsigntool_0.9.4-2_amd64.deb
+sudo dpkg -i ./tpmsbsigntool_0.9.4-2_amd64.deb
 sudo apt install -yf
+```
+
+Alternatively you can build the package with docker (which needs to be able to run with user permissions):
+
+```
+git clone https://github.com/T-Systems-MMS/tpmsbsigntool.git
+
+cd tpmsbsigntool
+./docker.sh
+
+sudo dpkg -i ./tpmsbsigntool_0.9.4-2_amd64.deb
+sudo apt install -yf
+cd ..
 ```
 
 ## Build sectpmctl
