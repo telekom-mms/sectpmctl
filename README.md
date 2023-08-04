@@ -1,4 +1,4 @@
-# sectpmctl 1.1.4-1
+# sectpmctl 1.1.4
 
 ## Notes
 
@@ -798,7 +798,7 @@ Be careful with BIOS updates. They may delete the Secure Boot database which the
 
 ## Changelog
 
-* 1.1.4-1
+* 1.1.4
   + Added support for release pipeline
 
 * 1.1.3
