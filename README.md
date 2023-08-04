@@ -1,4 +1,21 @@
-# sectpmctl 1.1.3
+# sectpmctl 1.1.4-1
+
+## Notes
+
+### Ubuntu >= 22.10
+
+Please choose the branch ubuntu_22_10_support for Ubuntu >= 22.10. The branch is stable and tested up to Ubuntu 23.04 but is missing an upgrade
+path from the older version 22.04. The reason are changes to the TPM2 PCR allocations which are incompatible. The recommondation is to perform
+a clean installation of Ubuntu >= 22.10 and then install sectpmctl from the ubuntu_22_10_support branch, without doing a dist-upgrade.
+Alternatively you can wait until it is completely supported by sectpmctl. A solution to do successfull dist-upgrades is to have an automated
+upgrade boot, in which the LUKS key is resealed inside the initrd to the new set of PCR values. Such solution is expected to be provided for
+the next LTS release 24.04.
+
+### FaulTPM attack
+
+Support for the key derivation function (KDF) argon2 is currently in work. It will be integrated into the TPM + password option.
+
+## Introduction
 
 **Warning: It is highly recommended to install sectpmctl on a fresh Ubuntu installation as you could run into problems when the tpm2-tools
 or efitools can't be executed successfully on your device. Create at least a backup of your data before installation. If you already
@@ -126,11 +143,23 @@ option and ask somebody who might know if it could work. If you brick your devic
 
 ## Build and install tpmsbsigntool
 
+You can either install the prebuild version or follow the build instructions:
+
+### Prebuild installation
+
+```
+wget https://github.com/telekom-mms/tpmsbsigntool/releases/download/0.9.4-2/tpmsbsigntool_0.9.4-2_amd64.deb
+sudo dpkg -i tpmsbsigntool_0.9.4-2_amd64.deb
+sudo apt install -yf
+```
+
+### Build instructions
+
 ```
 sudo apt install -y git devscripts debhelper-compat gcc-multilib binutils-dev libssl-dev \
   openssl pkg-config automake uuid-dev help2man gnu-efi tpm2-openssl
 
-git clone https://github.com/T-Systems-MMS/tpmsbsigntool.git
+git clone https://github.com/telekom-mms/tpmsbsigntool.git
 
 cd tpmsbsigntool
 debuild -b -uc -us
@@ -744,6 +773,9 @@ sudo tpm2_getcap properties-variable
 Be careful with BIOS updates. They may delete the Secure Boot database which then makes use of the recovery password necessary.
 
 ## Changelog
+
+* 1.1.4
+  + Added support for release pipeline
 
 * 1.1.3
   + Fixed TPM_RC_PCR_CHANGED problem while unsealing without password at boot time
