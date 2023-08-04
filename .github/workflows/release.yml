@@ -29,9 +29,10 @@ jobs:
           cd ..
           echo "Result: $(ls *.deb)"
           sha256sum *.deb > checksums.txt
+          sha512sum *.deb > checksums512.txt
           cd ${{ github.workspace }}
           gh release delete $TAG || true
-          gh release create $TAG --generate-notes ../*.deb ../checksums.txt
+          gh release create $TAG --generate-notes ../*.deb ../checksums.txt ../checksums512.txt
         env:
           GH_TOKEN: ${{ github.token }}
 
