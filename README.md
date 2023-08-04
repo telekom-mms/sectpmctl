@@ -64,7 +64,6 @@ implementation, they are simply not needed for anything.
   + Secure Boot is easier to manage
   + FDE key is only bound to the Secure Boot state, not to userspace
   + Maybe immune to BIOS updates
-  + Immune to operating system upgrades
   + No postprocessing other than kernel and initrd signing required
   + Interrupted update of new kernels should still keep old kernels bootable
   + Additional installation of other bootloaders will not overwrite sectpmctl, they are placed alongside
@@ -153,7 +152,7 @@ sudo dpkg -i tpmsbsigntool_0.9.4-2_amd64.deb
 sudo apt install -yf
 ```
 
-### Build instructions
+### Build instructions and installation
 
 ```
 sudo apt install -y git devscripts debhelper-compat gcc-multilib binutils-dev libssl-dev \
@@ -162,6 +161,7 @@ sudo apt install -y git devscripts debhelper-compat gcc-multilib binutils-dev li
 git clone https://github.com/telekom-mms/tpmsbsigntool.git
 
 cd tpmsbsigntool
+git checkout 0.9.4-2
 debuild -b -uc -us
 cd ..
 
@@ -172,9 +172,10 @@ sudo apt install -yf
 Alternatively you can build the package with docker (which needs to be able to run with user permissions):
 
 ```
-git clone https://github.com/T-Systems-MMS/tpmsbsigntool.git
+git clone https://github.com/telekom-mms/tpmsbsigntool.git
 
 cd tpmsbsigntool
+git checkout 0.9.4-2
 ./docker.sh
 
 sudo dpkg -i ./tpmsbsigntool_0.9.4-2_amd64.deb
@@ -184,17 +185,39 @@ cd ..
 
 ## Build sectpmctl
 
-You can ignore the 'debsign: gpg error occurred!  Aborting....' error when building yourself.
+You can either download the prebuild version or follow the build instructions. The installation happens in the `Installation`section.
+
+### Prebuild download
+
+```
+wget https://github.com/telekom-mms/sectpmctl/releases/download/1.1.4-1/sectpmctl_1.1.4-1_amd64.deb
+```
+
+### Build instructions
 
 ```
 sudo apt install -y debhelper efibootmgr efitools sbsigntool binutils mokutil dkms systemd udev \
   util-linux gdisk openssl uuid-runtime tpm2-tools fdisk
 
-git clone https://github.com/T-Systems-MMS/sectpmctl.git
+git clone https://github.com/telekom-mms/sectpmctl.git
 
 cd sectpmctl
+git checkout 1.1.4-1
 make package_build
 cd ..
+```
+
+Alternatively you can build the package with docker (which needs to be able to run with user permissions):
+
+```
+git clone https://github.com/telekom-mms/sectpmctl.git
+
+cd sectpmctl
+git checkout 1.1.4-1
+./docker.sh
+
+cd ..
+mv sectpmctl/sectpmctl_1.1.4-1_amd64.deb .
 ```
 
 ## Install sectpmctl
@@ -303,13 +326,14 @@ All generated keys, passwords, or serialized keys are stored in '/var/lib/sectpm
 ```
 # 1. Point of no return, you need to complete at least until the following reboot command
 sudo apt remove --allow-remove-essential "grub*" "shim*"
-sudo dpkg -i sectpmctl_1.1.3-1_amd64.deb
+sudo dpkg -i sectpmctl_1.1.4-1_amd64.deb
 sudo apt install -yf
 
+
+# 2. TPM Provisioning
 # optionally disable swap while keys are created
 sudo swapoff -a
 
-# 2. TPM Provisioning
 sudo sectpmctl tpm provisioning --forgetlockout --setforgetendorsement
 
 
@@ -774,7 +798,7 @@ Be careful with BIOS updates. They may delete the Secure Boot database which the
 
 ## Changelog
 
-* 1.1.4
+* 1.1.4-1
   + Added support for release pipeline
 
 * 1.1.3
