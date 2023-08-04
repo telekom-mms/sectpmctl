@@ -29,7 +29,8 @@ jobs:
           cd ..
           echo "Result: $(ls *.deb)"
           sha256sum *.deb > checksums.txt
-          cp *.deb checksums.txt ${{ github.workspace }}/
+          sha512sum *.deb > checksums512.txt
+          cp *.deb checksums.txt checksums512.txt ${{ github.workspace }}/
         env:
           GH_TOKEN: ${{ github.token }}
       - name: Store package
@@ -39,5 +40,6 @@ jobs:
           path: |
             *.deb
             checksums.txt
+            checksums512.txt
           retention-days: 10
 # yaml-language-server: $schema=https://raw.githubusercontent.com/SchemaStore/schemastore/master/src/schemas/json/github-workflow.json
