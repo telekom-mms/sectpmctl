@@ -190,7 +190,7 @@ You can either download the prebuild version or follow the build instructions. T
 ### Prebuild download
 
 ```
-wget https://github.com/telekom-mms/sectpmctl/releases/download/1.1.4-1/sectpmctl_1.1.4-1_amd64.deb
+wget https://github.com/telekom-mms/sectpmctl/releases/download/1.1.4/sectpmctl_1.1.4-1_amd64.deb
 ```
 
 ### Build instructions
