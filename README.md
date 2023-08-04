@@ -202,7 +202,7 @@ sudo apt install -y debhelper efibootmgr efitools sbsigntool binutils mokutil dk
 git clone https://github.com/telekom-mms/sectpmctl.git
 
 cd sectpmctl
-git checkout 1.1.4-1
+git checkout 1.1.4
 make package_build
 cd ..
 ```
@@ -213,7 +213,7 @@ Alternatively you can build the package with docker (which needs to be able to r
 git clone https://github.com/telekom-mms/sectpmctl.git
 
 cd sectpmctl
-git checkout 1.1.4-1
+git checkout 1.1.4
 ./docker.sh
 
 cd ..
