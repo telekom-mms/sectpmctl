@@ -1,4 +1,4 @@
-# sectpmctl 1.1.4
+# sectpmctl 1.1.5
 
 ## Notes
 
@@ -11,9 +11,23 @@ Alternatively you can wait until it is completely supported by sectpmctl. A solu
 upgrade boot, in which the LUKS key is resealed inside the initrd to the new set of PCR values. Such solution is expected to be provided for
 the next LTS release 24.04.
 
-### FaulTPM attack
+### faulTPM attack
 
-Support for the key derivation function (KDF) argon2 is currently in work. It will be integrated into the TPM + password option.
+Devices which use a discrete TPM (dTPM) are not affected by this attack. See https://arxiv.org/abs/2304.14717 for more information.
+
+To better mitigate the faulTPM attack it is recommended to use the TPM + password option with a relatively strong password. But even that is not
+enough to protect the LUKS key in the current implementation of sectpmctl. The authors of the attack recommend adding the password to the key
+which is stored in the TPM and unsealed while booting and supplying that extended key (unsealed key from the TPM with the password) to decrypt
+LUKS. The reason behind this is that the attack will break the TPM in such a way that it is not necessary to deliver the password to the TPM
+which renders the TPM + password option completely useless. Therefore adding the password to the unsealed output of the TPM and using that as
+the LUKS key will ensure that at least the brute-force resistant key-derivation mechanism of LUKS (argon2) is in place. That will then provide a
+security similar LUKS security then if no TPM is used at all, like in the standard installation of Ubuntu with disc encryption for example.
+
+Supporting such a feature in the current implementation is easy by itself but gets more complicated when the user wants to change the password
+of the TPM + password option. Solutions which won't require the recovery key for the password change are possible, but either exhibit the
+recovery key to user space with root access, like in Windows, or require changing the password inside the initrd boot phase. The more easy
+solution, which will be implemented in the next release, will ask for the recovery key if the password needs to be changed to support extending
+the LUKS key with the password.
 
 ## Introduction
 
@@ -190,7 +204,7 @@ You can either download the prebuild version or follow the build instructions. T
 ### Prebuild download
 
 ```
-wget https://github.com/telekom-mms/sectpmctl/releases/download/1.1.4/sectpmctl_1.1.4-1_amd64.deb
+wget https://github.com/telekom-mms/sectpmctl/releases/download/1.1.5/sectpmctl_1.1.5-1_amd64.deb
 ```
 
 ### Build instructions
@@ -202,7 +216,7 @@ sudo apt install -y debhelper efibootmgr efitools sbsigntool binutils mokutil dk
 git clone https://github.com/telekom-mms/sectpmctl.git
 
 cd sectpmctl
-git checkout 1.1.4
+git checkout 1.1.5
 make package_build
 cd ..
 ```
@@ -213,11 +227,11 @@ Alternatively you can build the package with docker (which needs to be able to r
 git clone https://github.com/telekom-mms/sectpmctl.git
 
 cd sectpmctl
-git checkout 1.1.4
+git checkout 1.1.5
 ./docker.sh
 
 cd ..
-mv sectpmctl/sectpmctl_1.1.4-1_amd64.deb .
+mv sectpmctl/sectpmctl_1.1.5-1_amd64.deb .
 ```
 
 ## Install sectpmctl
@@ -323,10 +337,15 @@ All generated keys, passwords, or serialized keys are stored in '/var/lib/sectpm
 
 ### Installation
 
+** Important note: The current implementation seals the LUKS key not only to the Secure Boot PCR values and optionally to a password as well
+but also to the LUKS header. That means that if the LUKS header is modified after installation, the system will not boot anymore without the
+recovery key. That is for example the case when another secret key is added to the encryted root partition. It is highly reccommended to not
+add anyther keys after installation, otherwise a `Recovery` has to done.**
+
 ```
 # 1. Point of no return, you need to complete at least until the following reboot command
 sudo apt remove --allow-remove-essential "grub*" "shim*"
-sudo dpkg -i sectpmctl_1.1.4-1_amd64.deb
+sudo dpkg -i sectpmctl_1.1.5-1_amd64.deb
 sudo apt install -yf
 
 
@@ -797,6 +816,9 @@ sudo tpm2_getcap properties-variable
 Be careful with BIOS updates. They may delete the Secure Boot database which then makes use of the recovery password necessary.
 
 ## Changelog
+
+* 1.1.5
+  + Added notes for the faulTPM attack
 
 * 1.1.4
   + Added support for release pipeline
