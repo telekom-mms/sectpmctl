@@ -21,7 +21,7 @@ which is stored in the TPM and unsealed while booting and supplying that extende
 LUKS. The reason behind this is that the attack will break the TPM in such a way that it is not necessary to deliver the password to the TPM
 which renders the TPM + password option completely useless. Therefore adding the password to the unsealed output of the TPM and using that as
 the LUKS key will ensure that at least the brute-force resistant key-derivation mechanism of LUKS (argon2) is in place. That will then provide a
-security similar LUKS security then if no TPM is used at all, like in the standard installation of Ubuntu with disc encryption for example.
+LUKS security similar to if no TPM is used at all, like in the standard installation of Ubuntu with disc encryption for example.
 
 Supporting such a feature in the current implementation is easy by itself but gets more complicated when the user wants to change the password
 of the TPM + password option. Solutions which won't require the recovery key for the password change are possible, but either exhibit the
@@ -340,7 +340,7 @@ All generated keys, passwords, or serialized keys are stored in '/var/lib/sectpm
 ** Important note: The current implementation seals the LUKS key not only to the Secure Boot PCR values and optionally to a password as well
 but also to the LUKS header. That means that if the LUKS header is modified after installation, the system will not boot anymore without the
 recovery key. That is for example the case when another secret key is added to the encryted root partition. It is highly reccommended to not
-add anyther keys after installation, otherwise a `Recovery` has to done.**
+add anyther keys after installation, otherwise a recovery has to be done which is described in the recovery section below.**
 
 ```
 # 1. Point of no return, you need to complete at least until the following reboot command
