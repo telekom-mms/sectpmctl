@@ -4,7 +4,7 @@
 
 ### Ubuntu >= 22.10
 
-Please choose the branch ubuntu_22_10_support for Ubuntu >= 22.10. The branch is stable and tested up to Ubuntu 23.04 but is missing an upgrade
+Please choose the branch ubuntu_22_10_support for Ubuntu >= 22.10. The branch is stable and tested up to Ubuntu 23.10 but is missing an upgrade
 path from the older version 22.04. The reason are changes to the TPM2 PCR allocations which are incompatible. The recommondation is to perform
 a clean installation of Ubuntu >= 22.10 and then install sectpmctl from the ubuntu_22_10_support branch, without doing a dist-upgrade.
 Alternatively you can wait until it is completely supported by sectpmctl. A solution to do successfull dist-upgrades is to have an automated
@@ -37,9 +37,10 @@ installed DKMS modules, it is probably necessary to rebuild them after installin
 
 We want to secure the Ubuntu 22.04 installation with LUKS and TPM2. Please read this README carefully before installation.
 
-We assume a normal installation of Ubuntu 22.04 desktop by erasing the disk and using LVM and encryption. Don't select to create a recovery
-key, only the LUKS password. A preseed installation is possible but currently undocumented. Other Linux distributions can probably be supported
-in future releases.
+We assume a normal installation of Ubuntu Desktop by erasing the disk and using LVM and encryption. Don't select to create a recovery
+key, only the LUKS password. An automated Ubuntu Server preseed installation is supported (but currently undocumented) in which the Secure Boot
+keys are applied in the subiquity phase while the LUKS key is sealed into the TPM in the boot after. Other Linux distributions can probably
+be supported in future releases.
 
 If you are not using the TPM + password option you should supply a BIOS start password. Without either a BIOS start password or
 TPM + password, the device would boot up to the login screen and someone could try to read out the memory or find a bug in the login
@@ -54,7 +55,7 @@ installation, see 'Recovery' for more information.
 It is recommended to only have one LUKS slot in use before installation, which is mostly slot 0. sectpmctl will additionally use slot 5 to
 store the TPM key.
 
-You can easily test the installation with virt-manager on a Ubuntu 22.04 host and a Ubuntu 22.04 guest. When creating a new VM you need to
+You can easily test the installation with virt-manager on a Ubuntu 22.04 host and a supported Ubuntu guest. When creating a new VM you need to
 configure the VM before it starts automatically. In the overview select 'OVMF_CODE_4M.secboot.fd' as firmware and then add a new 'TPM
 emulated TIS 2.0' device. After installation of Ubuntu, you can start installing sectpmctl.
 
@@ -62,6 +63,11 @@ For transparency, the tpm2-tools commands for session encryption, provisioning, 
 end of this README. The commands for using Secure Boot are standard except for using the TPM as a key store for the db signing key. Take a
 look at the source code to see how that works. If you are wondering, yes the PK and KEK keys are not stored at all in the current
 implementation, they are simply not needed for anything.
+
+## Requirements
+
+* Ubuntu 22.04
+* LUKS encrypted LVM installation
 
 ## Features
 
@@ -211,7 +217,7 @@ wget https://github.com/telekom-mms/sectpmctl/releases/download/1.1.5/sectpmctl_
 
 ```
 sudo apt install -y debhelper efibootmgr efitools sbsigntool binutils mokutil dkms systemd udev \
-  util-linux gdisk openssl uuid-runtime tpm2-tools fdisk
+  util-linux gdisk openssl uuid-runtime tpm2-tools fdisk git devscripts
 
 git clone https://github.com/telekom-mms/sectpmctl.git
 
@@ -425,7 +431,9 @@ sudo reboot
 # optionally disable swap while keys are created
 sudo swapoff -a
 
-# Now your machine has its own set of Secure Boot keys, test it
+# Now your machine has its own set of Secure Boot keys, test it. The test may
+# fail if the TPM support is incomplete, like on some ACER devices. See
+# 'Bugs and problems found' in this README.
 sudo sectpmctl boot test
 
 # Install the LUKS TPM key. Enter your current LUKS key when asked.
@@ -446,12 +454,19 @@ fi
 __EOT
 chmod +x install_tpm.sh
 ./install_tpm.sh
+rm install_tpm.sh
 
 # STORE THE PRINTED RECOVERY KEY NOW!!!
 # SCROLL UP A BIT IF IT GET'S OUT OF SIGHT!!!
 
 # Reboot to test the installation
 sudo reboot
+
+# If the BIOS won't boot sectpmctl or shows "Secure Boot violation",
+# please try to select sectpmctl from the BIOS boot menu (F12, ESC).
+# If that works, but the system won't boot automatically, enter the BIOS
+# and try to modify the boot order. Maybe another hard disk has priority.
+# If you can't find sectpmctl, try all boot entries.
 ```
 
 The 'sectpmctl tpm install' command will print out the recovery key. It is highly recommended to store this key in a safe location. Without
@@ -811,9 +826,37 @@ efi-readvar
 sudo tpm2_getcap properties-variable
 ```
 
+Inside the BIOS, sectpmctl might be shown as the boot entry '"*"'.
+
 ### Gigabyte mainboards
 
 Be careful with BIOS updates. They may delete the Secure Boot database which then makes use of the recovery password necessary.
+
+### Lenovo P15 Gen 2 laptop NVidia problem
+
+This device provides a BIOS option to let the primary graphics be provided by the internal or the dedicated NVidia card. The PCR 7 measurement
+is different with this two options:
+
+| PCR 7 measurements with internal graphics |
+| ----------------------------------------- |
+| Secure Boot state |
+| Secure Boot db |
+| EV_SEPARATOR |
+| db cert of sectpmctl |
+
+| PCR 7 measurements with dedicated graphics |
+| ------------------------------------------ |
+| Secure Boot state |
+| Secure Boot db |
+| EV_SEPARATOR |
+| Microsoft UEFI CA |
+| db cert of sectpmctl |
+
+In case of the dedicated graphics a problem arises: It is not possible to distinguish between booting the sectpmctl bootloader and booting a
+compromised bootloader which is signed with the Microsoft UEFI CA first and then the sectpmctl bootloader, as the NVidia card option forces
+the Microsoft UEFI CA into the boot chain. This problem can be solved in a feture version by binding to PCR 7 together with PCR 4. For now
+it is suggested to select the internal graphics option before using the 'sectpmctl tpm install' command. The command `prime-select` can then
+be used to select the dedicated graphic card.
 
 ## Changelog
 
