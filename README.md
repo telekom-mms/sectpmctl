@@ -167,8 +167,8 @@ You can either install the prebuild version or follow the build instructions:
 ### Prebuild installation
 
 ```
-wget https://github.com/telekom-mms/tpmsbsigntool/releases/download/0.9.4-2/tpmsbsigntool_0.9.4-2_amd64.deb
-sudo dpkg -i tpmsbsigntool_0.9.4-2_amd64.deb
+wget https://github.com/telekom-mms/tpmsbsigntool/releases/download/0.9.4-2-1/tpmsbsigntool_0.9.4-2-1_amd64.deb
+sudo dpkg -i tpmsbsigntool_0.9.4-2-1_amd64.deb
 sudo apt install -yf
 ```
 
@@ -181,11 +181,11 @@ sudo apt install -y git devscripts debhelper-compat gcc-multilib binutils-dev li
 git clone https://github.com/telekom-mms/tpmsbsigntool.git
 
 cd tpmsbsigntool
-git checkout 0.9.4-2
+git checkout 0.9.4-2-1
 debuild -b -uc -us
 cd ..
 
-sudo dpkg -i ./tpmsbsigntool_0.9.4-2_amd64.deb
+sudo dpkg -i ./tpmsbsigntool_0.9.4-2-1_amd64.deb
 sudo apt install -yf
 ```
 
@@ -195,10 +195,10 @@ Alternatively you can build the package with docker (which needs to be able to r
 git clone https://github.com/telekom-mms/tpmsbsigntool.git
 
 cd tpmsbsigntool
-git checkout 0.9.4-2
+git checkout 0.9.4-2-1
 ./docker.sh
 
-sudo dpkg -i ./tpmsbsigntool_0.9.4-2_amd64.deb
+sudo dpkg -i ./tpmsbsigntool_0.9.4-2-1_amd64.deb
 sudo apt install -yf
 cd ..
 ```
