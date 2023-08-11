@@ -336,7 +336,7 @@ _sectpmctl()
   COMPREPLY=()
   cur="${COMP_WORDS[1]}"
 
-  main_opts="boot help key tpm version"
+  main_opts="boot help key tpm version hash"
 
   case "${cur}" in
     boot)
@@ -351,8 +351,7 @@ _sectpmctl()
       _sectpmctl_tpm
       return 0
       ;;
-    help | version)
-      _sectpmctl_tpm
+    help | version | hash)
       return 0
       ;;
     *)

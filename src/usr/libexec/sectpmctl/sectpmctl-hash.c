@@ -17,7 +17,15 @@ int main(int argc, char **argv)
     uint8_t salt[saltlen];
     FILE *ptr;
     ptr = fopen(argv[2],"rb");
-    fread(salt,saltlen,1,ptr); 
+    if (ptr == NULL) {
+        fprintf(stderr, "error: could not read salt file %s\n", argv[2]);
+        return 1;
+    }
+    if (fread(salt, 1, saltlen, ptr) != saltlen) {
+        fprintf(stderr, "error: expected length of salt is %d\n", saltlen);
+        fclose(ptr);
+        return 1;
+    }
     fclose(ptr);
 
     uint32_t iterations = 4;
@@ -42,13 +50,13 @@ int main(int argc, char **argv)
     int rc = argon2id_ctx(&context);
     if (rc != ARGON2_OK) {
         fprintf(stderr, "error: %s\n", argon2_error_message(rc));
-        return 0
+        return 1;
     }
 
     for (unsigned int i=0; i < hashlen; i++) {
         printf("%02x", hash[i]);
     }
-    printf( "\n" );
+    printf("\n");
     
     return 0;
 }

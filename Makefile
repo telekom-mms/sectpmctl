@@ -31,6 +31,9 @@ install:
 	ln -s ../postinst.d/zz-update-sectpmctl-boot $(DESTDIR)/etc/kernel/postrm.d/zz-update-sectpmctl-boot
 	install -d $(DESTDIR)/etc/initramfs/post-update.d
 	ln -s ../../kernel/postinst.d/zz-update-sectpmctl-boot $(DESTDIR)/etc/initramfs/post-update.d/zz-update-sectpmctl-boot
+	install -d $(DESTDIR)/usr/libexec/sectpmctl
+	gcc -O2 -g0 src/usr/libexec/sectpmctl/sectpmctl-hash.c -o $(DESTDIR)/usr/libexec/sectpmctl/sectpmctl-hash -largon2 -lrt -ldl
+	chmod 755 $(DESTDIR)/usr/libexec/sectpmctl/sectpmctl-hash
 
 package_build: package_clean generate_changelog
 	debuild -i -uc -us -b

@@ -175,8 +175,8 @@ sudo apt install -yf
 ### Build instructions and installation
 
 ```
-sudo apt install -y git devscripts debhelper-compat gcc-multilib binutils-dev libssl-dev \
-  openssl pkg-config automake uuid-dev help2man gnu-efi tpm2-openssl
+sudo apt install -y git devscripts debhelper-compat gcc binutils-dev libssl-dev \
+  openssl pkg-config automake uuid-dev help2man gnu-efi tpm2-openssl build-essential libargon2-dev
 
 git clone https://github.com/telekom-mms/tpmsbsigntool.git
 

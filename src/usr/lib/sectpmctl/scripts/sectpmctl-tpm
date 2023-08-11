@@ -1129,9 +1129,13 @@ copy_exec /usr/bin/tr /usr/bin
 copy_exec /usr/bin/wc /usr/bin
 
 copy_exec /usr/sbin/sectpmctl /usr/sbin
+copy_exec /usr/sbin/cryptsetup /usr/sbin
 
 copy_exec /usr/libexec/sectpmctl/sectpmctl-hash /usr/libexec/sectpmctl/sectpmctl-hash
+
 copy_exec /usr/lib/sectpmctl/scripts/sectpmctl-key /usr/lib/sectpmctl/scripts/sectpmctl-key
+copy_exec /usr/lib/sectpmctl/scripts/sectpmctl-tpm /usr/lib/sectpmctl/scripts/sectpmctl-tpm
+
 copy_exec /usr/lib/x86_64-linux-gnu/libtss2-tcti-device.so.0 /usr/lib/x86_64-linux-gnu
 
 force_load tpm_tis
