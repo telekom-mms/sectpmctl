@@ -660,7 +660,7 @@ echo -n "Enter TPM or LUKS Password: "
 read -sr password || true
 echo
 
-pwdhashed="\$(sectpmctl hash --salt "${SECTPMCTL_KEYS}/pwd.salt" "\${password}")"
+pwdhashed="\$(sectpmctl hash `cat "${SECTPMCTL_KEYS}/pwd.opts"` "\${password}")"
 sectpmctl key unseal --handle "${PERSISTANT_HANDLE_TO_USE}" --password-hex "0x\${pwdhashed}" --pcr-extend 1>&3 3>&-
 retValUnseal=\$?
 
@@ -1025,7 +1025,20 @@ generate_tpm2_policy() {
     USE_PRESEED_PCR="--pcr-preseed"
   fi
   if [[ -n ${TPM_PASSWORD} ]]; then
-    TPM_HASHED_PASSWORD="$(sectpmctl hash --salt "${SECTPMCTL_KEYS}/pwd.salt" "${TPM_PASSWORD}")"
+    KDF="$(sudo cryptsetup luksDump --dump-json-metadata "${CRYPT_PARTITION}" | jq -r ".keyslots.\""${RECOVERY_KEYSLOT}"\".kdf.type")"
+    if [[ "x${KDF}" != "xargon2id" ]]; then
+      echo "Unexpected KDF of LUKS partition ${CRYPT_PARTITION}: ${KDF}"
+      echo "Expected: argon2id. Exit"
+      exit 1
+    fi
+
+    TIME="$(sudo cryptsetup luksDump --dump-json-metadata "${CRYPT_PARTITION}" | jq -r ".keyslots.\""${RECOVERY_KEYSLOT}"\".kdf.time")"
+    MEMORY="$(sudo cryptsetup luksDump --dump-json-metadata "${CRYPT_PARTITION}" | jq -r ".keyslots.\""${RECOVERY_KEYSLOT}"\".kdf.memory")"
+    CPUS="$(sudo cryptsetup luksDump --dump-json-metadata "${CRYPT_PARTITION}" | jq -r ".keyslots.\""${RECOVERY_KEYSLOT}"\".kdf.cpus")"
+    rm "${SECTPMCTL_KEYS}/pwd.opts" 2> /dev/null > /dev/null
+    echo --salt "${SECTPMCTL_KEYS}/pwd.opts" --time ${TIME} --memory ${MEMORY} --cpus ${CPUS} > "${SECTPMCTL_KEYS}/pwd.opts"
+
+    TPM_HASHED_PASSWORD="$(sectpmctl hash `cat "${SECTPMCTL_KEYS}/pwd.opts"` "${TPM_PASSWORD}")"
     sectpmctl key seal --handle "${PERSISTANT_HANDLE_TO_USE}" --key-file "${TPM_SECRET_LUKS_KEY}" --password-hex "0x${TPM_HASHED_PASSWORD}" --pcr-extend ${USE_PRESEED_PCR}
   else
     sectpmctl key seal --handle "${PERSISTANT_HANDLE_TO_USE}" --key-file "${TPM_SECRET_LUKS_KEY}" --noda --pcr-extend ${USE_PRESEED_PCR}
@@ -1099,6 +1112,7 @@ copy_exec /bin/bash /bin
 copy_exec ${SECTPMCTL_KEYS}/tpm_owner.pub ${SECTPMCTL_KEYS}/tpm_owner.pub
 copy_exec ${SECTPMCTL_KEYS}/tpm_owner_noda.pub ${SECTPMCTL_KEYS}/tpm_owner_noda.pub
 copy_exec ${SECTPMCTL_KEYS}/pwd.salt ${SECTPMCTL_KEYS}/pwd.salt
+copy_exec ${SECTPMCTL_KEYS}/pwd.opts ${SECTPMCTL_KEYS}/pwd.opts
 
 copy_exec /usr/bin/awk /usr/bin
 copy_exec /usr/bin/basename /usr/bin

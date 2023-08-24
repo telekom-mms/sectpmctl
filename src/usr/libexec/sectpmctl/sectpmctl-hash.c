@@ -7,7 +7,7 @@
 
 void showHelp() {
     fprintf(stderr, "sectpmctl-hash tool to generate argon2id hashes\n");
-    fprintf(stderr, "options:\n");
+    fprintf(stderr, "options (see the argon2 tool for more informations about the values):\n");
     fprintf(stderr, "sectpmctl hash --salt <32 byte file> --time <number> --memory <kilobytes> --cpus <number> <password>\n");
 }
 
