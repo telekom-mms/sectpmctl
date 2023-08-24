@@ -65,7 +65,7 @@ int main(int argc, char **argv)
     argon2_context context = {
         hash,
         hashlen,
-        password,
+        (uint8_t*)password,
         strlen(password),
         salt,
         saltlen,

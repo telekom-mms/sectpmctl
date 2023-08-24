@@ -2,7 +2,7 @@ Source: sectpmctl
 Section: misc
 Priority: optional
 Maintainer: Richard Robert Reitz <richard-robert.reitz@t-systems.com>
-Build-Depends: debhelper (>= 10), build-essential, libargon2-dev
+Build-Depends: debhelper (>= 10), build-essential, pkg-config, libargon2-dev
 Standards-Version: 4.1.2
 
 Package: sectpmctl
