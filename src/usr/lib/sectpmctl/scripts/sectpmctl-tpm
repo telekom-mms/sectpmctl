@@ -660,7 +660,7 @@ echo -n "Enter TPM or LUKS Password: "
 read -sr password || true
 echo
 
-pwdhashed="\$(sectpmctl hash `cat "${SECTPMCTL_KEYS}/pwd.opts"` "\${password}")"
+pwdhashed="\$(sectpmctl hash \`cat "${SECTPMCTL_KEYS}/pwd.opts"\` "\${password}")"
 sectpmctl key unseal --handle "${PERSISTANT_HANDLE_TO_USE}" --password-hex "0x\${pwdhashed}" --pcr-extend 1>&3 3>&-
 retValUnseal=\$?
 
@@ -906,7 +906,9 @@ generate_tpm2_policy() {
     echo "CREATE SALT FOR ARGON2"
     rand8file 4 "${SECTPMCTL_KEYS}/pwd.salt"
   else
-    rm "${SECTPMCTL_KEYS}/pwd.salt" 2> /dev/null > /dev/null
+    if [[ -f "${SECTPMCTL_KEYS}/pwd.salt" ]]; then
+      rm "${SECTPMCTL_KEYS}/pwd.salt"
+    fi
   fi
 
   if [[ $( cryptsetup luksDump "${CRYPT_PARTITION}" | grep -c "${TPM_KEYSLOT}: luks2") != 0 ]]; then
@@ -1025,17 +1027,20 @@ generate_tpm2_policy() {
     USE_PRESEED_PCR="--pcr-preseed"
   fi
   if [[ -n ${TPM_PASSWORD} ]]; then
-    KDF="$(sudo cryptsetup luksDump --dump-json-metadata "${CRYPT_PARTITION}" | jq -r ".keyslots.\""${RECOVERY_KEYSLOT}"\".kdf.type")"
+    KDF="$(cryptsetup luksDump --dump-json-metadata "${CRYPT_PARTITION}" | jq -r ".keyslots.\""${RECOVERY_KEYSLOT}"\".kdf.type")"
     if [[ "x${KDF}" != "xargon2id" ]]; then
       echo "Unexpected KDF of LUKS partition ${CRYPT_PARTITION}: ${KDF}"
       echo "Expected: argon2id. Exit"
       exit 1
     fi
 
-    TIME="$(sudo cryptsetup luksDump --dump-json-metadata "${CRYPT_PARTITION}" | jq -r ".keyslots.\""${RECOVERY_KEYSLOT}"\".kdf.time")"
-    MEMORY="$(sudo cryptsetup luksDump --dump-json-metadata "${CRYPT_PARTITION}" | jq -r ".keyslots.\""${RECOVERY_KEYSLOT}"\".kdf.memory")"
-    CPUS="$(sudo cryptsetup luksDump --dump-json-metadata "${CRYPT_PARTITION}" | jq -r ".keyslots.\""${RECOVERY_KEYSLOT}"\".kdf.cpus")"
-    rm "${SECTPMCTL_KEYS}/pwd.opts" 2> /dev/null > /dev/null
+    TIME="$(cryptsetup luksDump --dump-json-metadata "${CRYPT_PARTITION}" | jq -r ".keyslots.\""${RECOVERY_KEYSLOT}"\".kdf.time")"
+    MEMORY="$(cryptsetup luksDump --dump-json-metadata "${CRYPT_PARTITION}" | jq -r ".keyslots.\""${RECOVERY_KEYSLOT}"\".kdf.memory")"
+    CPUS="$(cryptsetup luksDump --dump-json-metadata "${CRYPT_PARTITION}" | jq -r ".keyslots.\""${RECOVERY_KEYSLOT}"\".kdf.cpus")"
+
+    if [[ -f "${SECTPMCTL_KEYS}/pwd.opts" ]]; then
+      rm "${SECTPMCTL_KEYS}/pwd.opts"
+    fi
     echo --salt "${SECTPMCTL_KEYS}/pwd.opts" --time ${TIME} --memory ${MEMORY} --cpus ${CPUS} > "${SECTPMCTL_KEYS}/pwd.opts"
 
     TPM_HASHED_PASSWORD="$(sectpmctl hash `cat "${SECTPMCTL_KEYS}/pwd.opts"` "${TPM_PASSWORD}")"
