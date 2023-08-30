@@ -26,17 +26,17 @@ HANDLE_O_SRK_NODA="0x81000101"
 # pcr settings
 PCR_BIOS="0"
 PCR_SECUREBOOT="7"
-PCR_EXTENDED="11"
+PCR_EXTENDED="14"
 PCR_BANK="sha256"
 PCR_HASH_LENGTH="32"
 KEYED_HASH="sha256"
 MAX_PASSWORD_LENGTH="64"
-PCR_VAR="${PCR_EXTENDED},"
-PCRLIST_PRESEED_ONCE="${PCR_BANK}:${PCR_BIOS},8,9,${PCR_VAR}14"
-PCRLIST_PRIMARY_ONCE="${PCR_BANK}:${PCR_SECUREBOOT},8,9,${PCR_VAR}14"
+PCR_VAR=",${PCR_EXTENDED}"
+PCRLIST_PRESEED_ONCE="${PCR_BANK}:${PCR_BIOS}${PCR_VAR}"
+PCRLIST_PRIMARY_ONCE="${PCR_BANK}:${PCR_SECUREBOOT}${PCR_VAR}"
 PCR_VAR=""
-PCRLIST_PRESEED_MANY="${PCR_BANK}:${PCR_BIOS},8,9,${PCR_VAR}14"
-PCRLIST_PRIMARY_MANY="${PCR_BANK}:${PCR_SECUREBOOT},8,9,${PCR_VAR}14"
+PCRLIST_PRESEED_MANY="${PCR_BANK}:${PCR_BIOS}${PCR_VAR}"
+PCRLIST_PRIMARY_MANY="${PCR_BANK}:${PCR_SECUREBOOT}${PCR_VAR}"
 
 # path to keys
 KEY_PATH="/var/lib/sectpmctl/keys"
@@ -50,7 +50,7 @@ O_SRK_PUB_NODA="${KEY_PATH}/tpm_owner_noda.pub"
 
 # pcr values stored by by 'sectpmctl tpm install'
 PROVISIONED_PCR7_VALUE="${KEY_PATH}/pcr7.dat"
-PROVISIONED_PCR11_VALUE="${KEY_PATH}/pcr11.dat"
+PROVISIONED_PCR14_VALUE="${KEY_PATH}/pcr14.dat"
 PROVISIONED_ZERO_VALUE="${KEY_PATH}/pcrNull.dat"
 
 # input data
@@ -1000,29 +1000,21 @@ _seal() {
       _ex "${ME} ${CMD}: Could not copy PCR 7 to PCR value list" \
         cp "${PROVISIONED_PCR7_VALUE}" pcr_values.dat || break
     fi
-    # pcr 8 and 9
-    _ex "${ME} ${CMD}: Could not copy zero value PCR 8 to PCR value list" \
-      cat "${PROVISIONED_ZERO_VALUE}" >> pcr_values.dat || break
-    _ex "${ME} ${CMD}: Could not copy zero value PCR 9 to PCR value list" \
-      cat "${PROVISIONED_ZERO_VALUE}" >> pcr_values.dat || break
-    # pcr 11 depends on PCR_EXTEND true
+    # pcr 14 depends on PCR_EXTEND true
     if [[ ${PCR_EXTEND} == true ]]; then
-      _ex "${ME} ${CMD}: Stored PCR 11 value not found ${PROVISIONED_PCR11_VALUE@Q}, run 'sectpmctl tpm install'" \
-        test -f "${PROVISIONED_PCR11_VALUE}" || break
+      _ex "${ME} ${CMD}: Stored PCR 14 value not found ${PROVISIONED_PCR14_VALUE@Q}, run 'sectpmctl tpm install'" \
+        test -f "${PROVISIONED_PCR14_VALUE}" || break
       
-      _ex "${ME} ${CMD}: Could not copy PCR 11 to PCR value list" \
-        cat "${PROVISIONED_PCR11_VALUE}" >> pcr_values.dat || break
+      _ex "${ME} ${CMD}: Could not copy PCR 14 to PCR value list" \
+        cat "${PROVISIONED_PCR14_VALUE}" >> pcr_values.dat || break
     fi
-    # pcr 14
-    _ex "${ME} ${CMD}: Could not copy zero value PCR 14 to PCR value list" \
-      cat "${PROVISIONED_ZERO_VALUE}" >> pcr_values.dat || break
 
     # check size of pcr value list
     expected_pcr_value_size="0"
     if [[ ${PCR_EXTEND} == true ]]; then
-      expected_pcr_value_size="$(( PCR_HASH_LENGTH * 5 ))"
+      expected_pcr_value_size="$(( PCR_HASH_LENGTH * 2 ))"
     else
-      expected_pcr_value_size="$(( PCR_HASH_LENGTH * 4 ))"
+      expected_pcr_value_size="$(( PCR_HASH_LENGTH ))"
     fi
     p1="$( _ex "${ME} ${CMD}: Could not check length of combined PCR values" \
       wc -c pcr_values.dat | awk '{print $1;}' )" || _xt $? || break

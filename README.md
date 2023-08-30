@@ -1,4 +1,4 @@
-# sectpmctl 1.1.5
+# sectpmctl 1.1.5 (ubuntu_22_10_support)
 
 ## Notes
 
@@ -35,7 +35,7 @@ the LUKS key with the password.
 or efitools can't be executed successfully on your device. Create at least a backup of your data before installation. If you already
 installed DKMS modules, it is probably necessary to rebuild them after installing sectpmctl to have them signed.**
 
-We want to secure the Ubuntu 22.04 installation with LUKS and TPM2. Please read this README carefully before installation.
+We want to secure Ubuntu 22.10, 23.04 and 23.10 installationis with LUKS and TPM2. Please read this README carefully before installation.
 
 We assume a normal installation of Ubuntu Desktop by erasing the disk and using LVM and encryption. Don't select to create a recovery
 key, only the LUKS password. An automated Ubuntu Server preseed installation is supported (but currently undocumented) in which the Secure Boot
@@ -66,7 +66,7 @@ implementation, they are simply not needed for anything.
 
 ## Requirements
 
-* Ubuntu 22.04
+* Ubuntu 22.10, 23.04, 23.10
 * LUKS encrypted LVM installation
 
 ## Features
@@ -205,24 +205,14 @@ cd ..
 
 ## Build sectpmctl
 
-You can either download the prebuild version or follow the build instructions. The installation happens in the `Installation`section.
-
-### Prebuild download
-
-```
-wget https://github.com/telekom-mms/sectpmctl/releases/download/1.1.5/sectpmctl_1.1.5-1_amd64.deb
-```
-
-### Build instructions
-
 ```
 sudo apt install -y debhelper efibootmgr efitools sbsigntool binutils mokutil dkms systemd udev \
-  util-linux gdisk openssl uuid-runtime tpm2-tools fdisk git devscripts
+  util-linux gdisk openssl uuid-runtime tpm2-tools fdisk git devscripts curl
 
 git clone https://github.com/telekom-mms/sectpmctl.git
 
 cd sectpmctl
-git checkout 1.1.5
+git checkout ubuntu_22_10_support
 make package_build
 cd ..
 ```
@@ -233,11 +223,11 @@ Alternatively you can build the package with docker (which needs to be able to r
 git clone https://github.com/telekom-mms/sectpmctl.git
 
 cd sectpmctl
-git checkout 1.1.5
+git checkout ubuntu_22_10_support
 ./docker.sh
 
 cd ..
-mv sectpmctl/sectpmctl_1.1.5-1_amd64.deb .
+mv sectpmctl/sectpmctl_1.1.5+*-1_amd64.deb .
 ```
 
 ## Install sectpmctl
@@ -351,7 +341,8 @@ add anyther keys after installation, otherwise a recovery has to be done which i
 ```
 # 1. Point of no return, you need to complete at least until the following reboot command
 sudo apt remove --allow-remove-essential "grub*" "shim*"
-sudo dpkg -i sectpmctl_1.1.5-1_amd64.deb
+sudo apt install -y systemd-boot-efi
+sudo dpkg -i sectpmctl_1.1.5+*-1_amd64.deb
 sudo apt install -yf
 
 
@@ -415,6 +406,7 @@ sudo vi /etc/fstab
   # remove /boot entry from fstab
   # change the old UUID of /boot/efi to the copied new UUID of the blkid output
 sudo mount /boot/efi
+sudo systemctl daemon-reload
 
 
 # 5. Install the bootloader
@@ -620,30 +612,49 @@ The following persistent handles are created after provisioning and installation
 | 5 | GPT Partition Table |
 | 6 | Resume Events (seems not to work on Linux) |
 | 7 | SecureBoot State |
-| 8 | GRUB Bootloader Config |
-| 9 | GRUB Bootloader Files |
-| 10 |  |
-| 11 | sectpmctl |
-| 12 |  |
-| 13 |  |
-| 14 | shim Bootloader MOK |
+| 8-13 | GRUB and systemd Bootloader |
+| 14 | shim Bootloader MOK and sectpmctl |
 
 ### List of PCR values used by sectpmctl
 
 | PCR | value |
 | --- | ----- |
 | 7 | Secureboot state |
-| 8 | zero |
-| 9 | zero |
-| 11 | LUKS header |
-| 14 | zero |
+| 14 | No MOK, LUKS header |
 
-PCR8, 9, and 14 will be zero when sectpmctl is installed. MOK is not and should not be used. This is verified by binding the LUKS key to this
-three zero values.
+The LUKS header is measured into PCR 14 while sealing at installation time and while unsealing by the initrd. It has a special purpose. After
+unsealing the LUKS key in the initrd, PCR14 is extended with a random value. That blocks a second unsealing without having to extend a more
+meaningful register like PCR 7.
 
-PCR11, the LUKS header, is measured while sealing in the installation and while unsealing by the initrd. It has a special purpose. After
-unsealing the LUKS key in the initrd, PCR11 is extended with a random value. That blocks a second unsealing without having to extend a more
-meaningful like PCR7.
+The optimal measurements:
+
+| PCR 7 |
+| ----- |
+| initially zero |
+| Secure Boot state |
+| Secure Boot db |
+| EV_SEPARATOR |
+| db cert of sectpmctl |
+
+| PCR 14 |
+| ------ |
+| initially zero (no shim, no MOK) |
+| LUKS header |
+
+PCR 14 is completely under control, while PCR 7 measurements might vary after the EV_SEPARATOR event, see
+'Lenovo P15 Gen 2 laptop NVidia Problem' for such a problematic case.
+
+To see which measurements have been done for PCR 7, execute 'sudo tpm2_eventlog /sys/kernel/security/tpm0/binary_bios_measurements' and
+search for 'PCRIndex: 7' entries.
+
+Currently the following restrictions are applied:
+
+Allow every kernel to boot -> Allow only, but all, kernels signed by the custom db key (PCR 7).
+
+In a future version more restrictions should be applied:
+
+Allow every kernel to boot -> Allow only, but all, kernels signed by the custom db key (PCR 7) -> Resrict all db signed kernels to a finite
+list of kernels (PCR 7+4) -> Restrict this list to only the latest N kernels to prevent downgrade attacks (probably by using NV).
 
 ### Provisioning
 
@@ -801,22 +812,25 @@ To solve this problem a loop is implemented to simply retry unsealing 5 times wi
 have a stable parsing of this specific error code, therefore the loop is triggered on all TPM errors at boot time.
 
 
-### Acer laptops quirks
+### ACER laptops quirks
 
 First to know is that you have to set a BIOS administrator password. Otherwise, the Secure Boot settings are grayed out and cannot be changed. 
 
-An installation on an Acer Swift 3 SF314-42 laptop caused some problems which needed changes in the source code to enable an installation:
+An installation on an ACER Swift 3 SF314-42 and an ACER Nitro AN515-45 laptop, both caused this problem:
 
-* The Secure Boot Signature Database (DB) maybe not be cleared by entering Setup Mode. Fix: Clear it before installation with
+* The Secure Boot Forbidden Signature Database (DBX) could not be cleared by the Clear Mode in BIOS. Workaround: Use the '--skipdbx' option in the
+'sectpmctl boot install' command. Skipping the DBX db is safe if no multi boot is used and no Microsoft certificate is in the PCR 7 chain.
+See 'Lenovo P15 Gen 2 laptop NVidia Problem' for more information. When the '--skipdbx' option is used and a normal Ubuntu or Windows
+is installed at a later time, restore the Secure Boot factory keys from inside the BIOS to restore the DBX db. 
+
+An installation on an ACER Swift 3 SF314-42 caused this problems only once and then never again:
+
+* The Secure Boot Signature Database (DB) could not be cleared by the Clear Mode in BIOS. Fix: Clear it manually before installation with
 `efi-updatevar -d 0 db`.
-* The Secure Boot Forbidden Signature Database (DBX) could not be cleared by efi-updatevar. Workaround: Comment out clearing and updating of
-DBX in sectpmctl-boot.
 * tpm2_clear fails. Fix: Clear the TPM inside the BIOS, Windows, or by executing `echo 5 | sudo tee /sys/class/tpm/tpm0/ppi/request` and remove
-tpm2_clear in sectpmctl-tpm.
-* tpm2_dictionarylockout fails. That's not good. If the lockout settings are reasonable already, the call can be removed in sectpmctl-tpm.
-
-After a second installation, tpm2_clear and tpm2_dictionarylockout worked unexpectedly. So that could be related to a BIOS or kernel bug
-and maybe fixed already.
+the tpm2_clear call in /usr/lib/sectpmctl/scripts/sectpmctl-tpm.
+* tpm2_dictionarylockout fails. That's not good. If the lockout settings are reasonable already, the call can be removed in
+/usr/lib/sectpmctl/scripts/sectpmctl-tpm.
 
 These tools can be used to read the current Secure Boot and TPM settings:
 
@@ -894,5 +908,5 @@ be used to select the dedicated graphic card.
 
 Every piece of information or code in this repository is written and collected with the best intentions in mind. We do not
 warrant that it is complete, correct, or that it is working on your platform. We provide everything as is and try to fix bugs and
-security issues as soon as possible. Currently, Ubuntu 22.04 is the only supported distribution. Use at your own risk.
+security issues as soon as possible. Currently, Ubuntu is the only supported distribution. Use at your own risk.
 

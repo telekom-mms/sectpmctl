@@ -47,7 +47,7 @@ _sectpmctl_boot()
   cmd="${COMP_WORDS[2]}"
 
   main_opts="activate deactivate help install remove test update"
-  install_opts="--withoutmicrosoftkeys"
+  install_opts="--withoutmicrosoftkeys --skipdbx"
   remove_update_opts="--kernel"
 
   case "${cmd}" in
