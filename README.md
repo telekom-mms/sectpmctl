@@ -301,7 +301,7 @@ START PROVISIONING
 The provisioning will by default set a random lockout password which is stored in `/var/lib/sectpmctl/keys/lockout.pwd`, set sane dictionary
 attack lockout time penalty settings and create two TPM primary keys, one with the dictionary attack lockout flag (DA) and one without (NODA).
 This installation will use the options `--forgetlockout` and `--setforgetendorsement`. See
-[Security and privacy options](#Security%20and%20privacy%20options) for more information.
+[Security and privacy options](#security-and-privacy-options) for more information.
 
 The following DA lockout values are set:
 
@@ -646,7 +646,7 @@ The optimal measurements:
 | LUKS header |
 
 PCR 14 is completely under control, while PCR 7 measurements might vary after the EV_SEPARATOR event, see
-[Lenovo P15 Gen 2 laptop NVidia Problem](#Lenovo%20P15%20Gen%202%20laptop%20NVidia%20Problem) for such a problematic case.
+[Lenovo P15 Gen 2 laptop NVidia Problem](#lenovo-p15-gen-2-laptop-nvidia-problem) for such a problematic case.
 
 To see which measurements have been done for PCR 7, execute `sudo tpm2_eventlog /sys/kernel/security/tpm0/binary_bios_measurements` and
 search for `PCRIndex: 7` entries.
@@ -813,7 +813,7 @@ An installation on an ACER Swift 3 SF314-42 and an ACER Nitro AN515-45 laptop, b
 * The Secure Boot Forbidden Signature Database (DBX) could not be cleared by the Clear Mode in BIOS. Workaround: Use the `--skipdbx` option in
 the `sectpmctl boot install` command. Skipping the DBX db is safe if no multi boot is used and no Microsoft certificate is in the PCR 7 chain or
 if the `--withoutmicrosoftkeys` option is used. See
-[Lenovo P15 Gen 2 laptop NVidia Problem](#Lenovo%20P15%20Gen%202%20laptop%20NVidia%20Problem) for more information. When the `--skipdbx` option
+[Lenovo P15 Gen 2 laptop NVidia Problem](#lenovo-p15-gen-2-laptop-nvidia-problem) for more information. When the `--skipdbx` option
 is used and a normal Ubuntu or Windows is installed at a later time, restore the Secure Boot factory keys from inside the BIOS to restore the
 DBX db before installation of the new OS.
 
