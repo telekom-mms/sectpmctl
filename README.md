@@ -8,10 +8,10 @@ installed DKMS modules, it is probably necessary to rebuild them after installin
 
 We want to secure Ubuntu >= 22.04 installations with LUKS and TPM2. Please read this README carefully before installation.
 
-We assume a normal installation of Ubuntu Desktop by erasing the disk and using LVM and encryption. Don't select to create a recovery
-key, only the LUKS password. An automated Ubuntu Server preseed installation is supported (but currently undocumented) in which the Secure Boot
-keys are applied in the subiquity phase while the LUKS key is sealed into the TPM in the boot after. Other Linux distributions can probably
-be supported in future releases.
+We assume a normal installation of Ubuntu Desktop by erasing the disk and using LVM and encryption. Don't create a recovery key in the Ubuntu
+installation, set only the LUKS password. An automated Ubuntu Server preseed installation is supported (but currently undocumented) in which the
+Secure Boot keys are applied in the subiquity phase while the LUKS key is sealed into the TPM in the boot after. Other Linux distributions can
+probably be supported in future releases.
 
 If you are not using the TPM + password option you should supply a BIOS start password. Without either a BIOS start password or
 TPM + password, the device would boot up to the login screen and someone could try to read out the memory or find a bug in the login
@@ -28,12 +28,12 @@ store the TPM key.
 
 You can easily test the installation with virt-manager on a Ubuntu 22.04 host and a supported Ubuntu guest. When creating a new VM you need to
 configure the VM before it starts automatically. In the overview select `OVMF_CODE_4M.secboot.fd` as firmware and then add a new `TPM
-emulated TIS 2.0` device. After installation of Ubuntu, you can start installing sectpmctl.
+emulated TIS 2.0` device. After the installation of Ubuntu, you can start installing sectpmctl.
 
 For transparency, the tpm2-tools commands for session encryption, provisioning, TOFU, seal, unseal, and password change are documented at the
 end of this README. The commands for using Secure Boot are standard except for using the TPM as a key store for the db signing key. Take a
 look at the source code to see how that works. If you are wondering, yes the PK and KEK keys are not stored at all in the current
-implementation, they are simply not needed for anything.
+implementation, they are simply not needed in this decentralized implementation.
 
 ## Requirements
 
@@ -50,7 +50,7 @@ implementation, they are simply not needed for anything.
   + Passwordless option is not influenced by DA lockout
   + TPM + Password option is influenced by DA lockout
   + Secure Boot signing is not influenced by DA lockout
-* Ubuntu release upgrades are possible, see the [upgrade](#Upgrade) table
+* Ubuntu release upgrades are possible, see the [upgrade](#Upgrade) table for the requirements
 * The Secure Boot signing key is backed by the TPM as well
 * Zero TPM administrative overhead by managing Secure Boot instead of the TPM
   + Secure Boot is easier to manage
@@ -60,15 +60,14 @@ implementation, they are simply not needed for anything.
   + Interrupted update of new kernels should still keep old kernels bootable
   + Additional installation of other bootloaders will not overwrite sectpmctl, they are placed alongside
 * Can be integrated into a nearly fully automated preseed installation
-  + The only upfront action is to clear TPM and Secure Boot
+  + The only upfront action is to clear the TPM and Secure Boot
 * The Secure Boot database is completely rebuilt with own keys and (by default) Microsoft keys for safety reasons
 * Uses and integrates systemd-stub and systemd-boot as bootloader, does not invent a new one
 * Optional omitting of Microsoft Secure Boot keys on supported hardware
 * Option to forget the lockout authorization password set while TPM provisioning
-* Option to set and forget an endorsement password while TPM provisioning
-* Implemented in bash
+* Option to set and forget the endorsement password while TPM provisioning
 
-Using a splash screen and the TPM + Password option does not work. If that happens you can enter the password blindly, it will work.
+Using a splash screen and the TPM + Password option does not work correctly. If that happens you need to enter the password blindly.
 
 ## Security and privacy options
 
@@ -85,9 +84,9 @@ command in the [installation](#Installation) section. If this option is not set,
 
 Setting the endorsement authorization password to a random value without storing it enhances privacy because the endorsement hierarchy
 can be used to uniquely identify your device. If you know that you need access to the endorsement hierarchy, you should remove the
-option '--setforgetendorsement' from the 'sudo sectpmctl tpm provisioning' command in the installation section. When this option is
-not set, the endorsement authorization password will be empty. You can change this option also at a later time by reinstalling
-sectpmctl again (see the recovery section for how to do it).
+option `--setforgetendorsement` from the `sudo sectpmctl tpm provisioning` command in the [installation](#Installation) section. When this
+option is not set, the endorsement authorization password will be empty. You can change this option also at a later time by reinstalling
+sectpmctl again (see the [recovery](#Recovery) section for how to do it).
 
 ### One optional setting is dangerous (disabled by default)
 
@@ -304,9 +303,13 @@ DA key, while keep using the NODA key for signing kernels and kernel modules.
 
 All generated keys, passwords, or serialized keys are stored in '/var/lib/sectpmctl/keys'.
 
+### Upgrade
+
+TBD
+
 ### Installation
 
-** Important note: The current implementation seals the LUKS key not only to the Secure Boot PCR values and optionally to a password as well
+**Important note: The current implementation seals the LUKS key not only to the Secure Boot PCR values and optionally to a password as well
 but also to the LUKS header. That means that if the LUKS header is modified after installation, the system will not boot anymore without the
 recovery key. That is for example the case when another secret key is added to the encryted root partition. It is highly reccommended to not
 add anyther keys after installation, otherwise a recovery has to be done which is described in the recovery section below.**
