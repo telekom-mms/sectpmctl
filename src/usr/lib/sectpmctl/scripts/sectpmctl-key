@@ -232,13 +232,6 @@ _check_state() {
     return 1
   fi
   
-  p1="$( grep -c "/dev/shm" /proc/mounts )" || p1=""
-  p2="$( grep -c "^tmpfs /dev/shm tmpfs" /proc/mounts )" || p2=""
-  if [[ "${p1}" != "1" || "${p2}" != "1" ]]; then
-    _print_error "${ME}: /dev/shm is required"
-    return 1
-  fi
-
   if [[ ! -d "${NAMED_OBJECTS}" ]]; then
     if ! install -m 0700 -d "${NAMED_OBJECTS}"; then
       _print_error "${ME}: Could not create directory '${NAMED_OBJECTS}'"
@@ -919,8 +912,14 @@ _extend() {
 _changepassword() {
   ERR=false
 
+  ramdir="$( _ex "${ME} ${CMD}: Could not create temporary directory" \
+    mktemp -d -p /tmp )" || return 1
+
+  _ex "${ME} ${CMD}: Could not mount temporary ramfs" \
+    mount -t tmpfs tmpfs "${ramdir}" || return 1
+
   tempdir="$( _ex "${ME} ${CMD}: Could not create temporary ramfs directory" \
-    mktemp -d -p /dev/shm )" || return 1
+    mktemp -d -p "${ramdir}" )" || return 1
 
   _ex "${ME} ${CMD}: Could not enter temporary ramfs directory" \
     cd "${tempdir}" || return 1
@@ -969,6 +968,9 @@ _changepassword() {
   _ex "${ME} ${CMD}: Could not remove temporary ramfs directory" \
     rmdir "${tempdir}"
 
+  _ex "${ME} ${CMD}: Could not unmount temporary ramfs" \
+    umount "${ramdir}"
+
   if [[ $ERR == true ]]; then
     return 1
   fi
@@ -977,8 +979,14 @@ _changepassword() {
 _seal() {
   ERR=false
 
+  ramdir="$( _ex "${ME} ${CMD}: Could not create temporary directory" \
+    mktemp -d -p /tmp )" || return 1
+
+  _ex "${ME} ${CMD}: Could not mount temporary ramfs" \
+    mount -t tmpfs tmpfs "${ramdir}" || return 1
+
   tempdir="$( _ex "${ME} ${CMD}: Could not create temporary ramfs directory" \
-    mktemp -d -p /dev/shm )" || return 1
+    mktemp -d -p "${ramdir}" )" || return 1
 
   _ex "${ME} ${CMD}: Could not enter temporary ramfs directory" \
     cd "${tempdir}" || return 1
@@ -1132,6 +1140,9 @@ _seal() {
   _ex "${ME} ${CMD}: Could not remove temporary ramfs directory" \
     rmdir "${tempdir}"
 
+  _ex "${ME} ${CMD}: Could not unmount temporary ramfs" \
+    umount "${ramdir}"
+
   if [[ $ERR == true ]]; then
     return 1
   fi
@@ -1140,8 +1151,14 @@ _seal() {
 _unseal() {
   ERR=false
 
+  ramdir="$( _ex "${ME} ${CMD}: Could not create temporary directory" \
+    mktemp -d -p /tmp )" || return 1
+
+  _ex "${ME} ${CMD}: Could not mount temporary ramfs" \
+    mount -t tmpfs tmpfs "${ramdir}" || return 1
+
   tempdir="$( _ex "${ME} ${CMD}: Could not create temporary ramfs directory" \
-    mktemp -d -p /dev/shm )" || return 1
+    mktemp -d -p "${ramdir}" )" || return 1
 
   _ex "${ME} ${CMD}: Could not enter temporary ramfs directory" \
     cd "${tempdir}" || return 1
@@ -1209,6 +1226,9 @@ _unseal() {
   _ex "${ME} ${CMD}: Could not remove temporary ramfs directory" \
     rmdir "${tempdir}"
 
+  _ex "${ME} ${CMD}: Could not unmount temporary ramfs" \
+    umount "${ramdir}"
+
   if [[ $ERR == true ]]; then
     return 1
   fi
@@ -1217,8 +1237,14 @@ _unseal() {
 _testsession() {
   ERR=false
 
+  ramdir="$( _ex "${ME} ${CMD}: Could not create temporary directory" \
+    mktemp -d -p /tmp )" || return 1
+
+  _ex "${ME} ${CMD}: Could not mount temporary ramfs" \
+    mount -t tmpfs tmpfs "${ramdir}" || return 1
+
   tempdir="$( _ex "${ME} ${CMD}: Could not create temporary ramfs directory" \
-    mktemp -d -p /dev/shm )" || return 1
+    mktemp -d -p "${ramdir}" )" || return 1
 
   _ex "${ME} ${CMD}: Could not enter temporary ramfs directory" \
     cd "${tempdir}" || return 1
@@ -1248,6 +1274,9 @@ _testsession() {
 
   _ex "${ME} ${CMD}: Could not remove temporary ramfs directory" \
     rmdir "${tempdir}"
+
+  _ex "${ME} ${CMD}: Could not unmount temporary ramfs" \
+    umount "${ramdir}"
 
   if [[ $ERR == true ]]; then
     return 1

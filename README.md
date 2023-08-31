@@ -1,33 +1,4 @@
-# sectpmctl 1.1.5 (ubuntu_22_10_support)
-
-## Notes
-
-### Ubuntu >= 22.10
-
-Please choose the branch ubuntu_22_10_support for Ubuntu >= 22.10. The branch is stable and tested up to Ubuntu 23.10 but is missing an upgrade
-path from the older version 22.04. The reason are changes to the TPM2 PCR allocations which are incompatible. The recommondation is to perform
-a clean installation of Ubuntu >= 22.10 and then install sectpmctl from the ubuntu_22_10_support branch, without doing a dist-upgrade.
-Alternatively you can wait until it is completely supported by sectpmctl. A solution to do successfull dist-upgrades is to have an automated
-upgrade boot, in which the LUKS key is resealed inside the initrd to the new set of PCR values. Such solution is expected to be provided for
-the next LTS release 24.04.
-
-### faulTPM attack
-
-Devices which use a discrete TPM (dTPM) are not affected by this attack. See https://arxiv.org/abs/2304.14717 for more information.
-
-To better mitigate the faulTPM attack it is recommended to use the TPM + password option with a relatively strong password. But even that is not
-enough to protect the LUKS key in the current implementation of sectpmctl. The authors of the attack recommend adding the password to the key
-which is stored in the TPM and unsealed while booting and supplying that extended key (unsealed key from the TPM with the password) to decrypt
-LUKS. The reason behind this is that the attack will break the TPM in such a way that it is not necessary to deliver the password to the TPM
-which renders the TPM + password option completely useless. Therefore adding the password to the unsealed output of the TPM and using that as
-the LUKS key will ensure that at least the brute-force resistant key-derivation mechanism of LUKS (argon2) is in place. That will then provide a
-LUKS security similar to if no TPM is used at all, like in the standard installation of Ubuntu with disc encryption for example.
-
-Supporting such a feature in the current implementation is easy by itself but gets more complicated when the user wants to change the password
-of the TPM + password option. Solutions which won't require the recovery key for the password change are possible, but either exhibit the
-recovery key to user space with root access, like in Windows, or require changing the password inside the initrd boot phase. The more easy
-solution, which will be implemented in the next release, will ask for the recovery key if the password needs to be changed to support extending
-the LUKS key with the password.
+# sectpmctl 1.2.0
 
 ## Introduction
 
@@ -35,7 +6,7 @@ the LUKS key with the password.
 or efitools can't be executed successfully on your device. Create at least a backup of your data before installation. If you already
 installed DKMS modules, it is probably necessary to rebuild them after installing sectpmctl to have them signed.**
 
-We want to secure Ubuntu 22.10, 23.04 and 23.10 installationis with LUKS and TPM2. Please read this README carefully before installation.
+We want to secure Ubuntu >= 22.04 installations with LUKS and TPM2. Please read this README carefully before installation.
 
 We assume a normal installation of Ubuntu Desktop by erasing the disk and using LVM and encryption. Don't select to create a recovery
 key, only the LUKS password. An automated Ubuntu Server preseed installation is supported (but currently undocumented) in which the Secure Boot
@@ -66,7 +37,7 @@ implementation, they are simply not needed for anything.
 
 ## Requirements
 
-* Ubuntu 22.10, 23.04, 23.10
+* Ubuntu Desktop 22.04, 22.10, 23.04 or 23.10
 * LUKS encrypted LVM installation
 
 ## Features
@@ -874,6 +845,11 @@ be used to select the dedicated graphic card.
 
 ## Changelog
 
+* 1.2.0
+  + Implemented Ubuntu >= 22.10 support
+  + Implemented Ubuntu release upgrade support
+  + Updated UEFI revocation list to version May 9, 2023
+
 * 1.1.5
   + Added notes for the faulTPM attack
 
@@ -908,5 +884,5 @@ be used to select the dedicated graphic card.
 
 Every piece of information or code in this repository is written and collected with the best intentions in mind. We do not
 warrant that it is complete, correct, or that it is working on your platform. We provide everything as is and try to fix bugs and
-security issues as soon as possible. Currently, Ubuntu is the only supported distribution. Use at your own risk.
+security issues as soon as possible. Use at your own risk.
 

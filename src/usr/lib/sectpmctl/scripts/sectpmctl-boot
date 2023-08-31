@@ -256,7 +256,9 @@ create_efi_blob ()
     echo -n "Found          : ${linux}, ${initrd}"
   fi
 
-  tempbootdir=$(mktemp -d -p /dev/shm)
+  ramdir=$(mktemp -d -p /tmp)
+  mount -t tmpfs tmpfs "${ramdir}"
+  tempbootdir=$(mktemp -d -p "${ramdir}")
   chmod 700 "${tempbootdir}"
   cd "${tempbootdir}" || exit
 
@@ -337,6 +339,7 @@ create_efi_blob ()
   shred -f -z -u cmdline os-release
   cd - > /dev/null || exit
   rmdir "${tempbootdir}"
+  umount "${ramdir}"
 }
 
 get_installed_kernel_list( )
@@ -624,7 +627,9 @@ install ()
 
   cd - > /dev/null || exit
 
-  tempdirname=$(mktemp -d -p /dev/shm)
+  ramdir=$(mktemp -d -p /tmp)
+  mount -t tmpfs tmpfs "${ramdir}"
+  tempdirname=$(mktemp -d -p "${ramdir}")
   chmod 700 "${tempdirname}"
   cd "${tempdirname}" || exit
 
@@ -694,6 +699,7 @@ install ()
   shred -f -z -u ./*.auth ./*.cer ./*.crt ./*.esl ./*.key ./*.priv ./*.pub ./*.ctx ./*.obj
   cd - > /dev/null || exit
   rmdir "${tempdirname}"
+  umount "${ramdir}"
 
   # configure framework.conf of dkms for ubuntu 22.04 if installed to add the sign helper script
   # and framework.conf.d of dkms for ubuntu >= 22.10 in any case to support upgrades
