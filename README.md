@@ -21,14 +21,14 @@ Either way, you should also supply a BIOS admin password.
 
 Dual booting Windows is not recommended and has never been tested with sectpmctl. The risk is that Windows will update the Secure Boot DBX
 database which will prevent the successful unlocking of the LUKS key. In such case, you need the recovery key and need to redo the sectpmctl
-installation, see 'Recovery' for more information.
+installation, see [recovery](#Recovery) for more information.
 
 It is recommended to only have one LUKS slot in use before installation, which is mostly slot 0. sectpmctl will additionally use slot 5 to
 store the TPM key.
 
 You can easily test the installation with virt-manager on a Ubuntu 22.04 host and a supported Ubuntu guest. When creating a new VM you need to
-configure the VM before it starts automatically. In the overview select 'OVMF_CODE_4M.secboot.fd' as firmware and then add a new 'TPM
-emulated TIS 2.0' device. After installation of Ubuntu, you can start installing sectpmctl.
+configure the VM before it starts automatically. In the overview select `OVMF_CODE_4M.secboot.fd` as firmware and then add a new `TPM
+emulated TIS 2.0` device. After installation of Ubuntu, you can start installing sectpmctl.
 
 For transparency, the tpm2-tools commands for session encryption, provisioning, TOFU, seal, unseal, and password change are documented at the
 end of this README. The commands for using Secure Boot are standard except for using the TPM as a key store for the db signing key. Take a
@@ -50,6 +50,7 @@ implementation, they are simply not needed for anything.
   + Passwordless option is not influenced by DA lockout
   + TPM + Password option is influenced by DA lockout
   + Secure Boot signing is not influenced by DA lockout
+* Ubuntu release upgrades are possible, see the [upgrade](#Upgrade) table
 * The Secure Boot signing key is backed by the TPM as well
 * Zero TPM administrative overhead by managing Secure Boot instead of the TPM
   + Secure Boot is easier to manage
@@ -75,9 +76,10 @@ Using a splash screen and the TPM + Password option does not work. If that happe
 
 Setting the authorization password to a random value without storing it enhances security because the lockout hierarchy can not be
 modified without a password after TPM provisioning. This hierarchy also prevents accidental use of the tpm2_clear command. If you know
-that you need access to the lockout hierarchy, you should remove the option '--forgetlockout' from the 'sudo sectpmctl tpm provisioning'
-command in the installation section. If this option is not set, the lockout password is stored in '/var/lib/sectpmctl/keys/lockout.pwd'.
-You can change this option also at a later time by reinstalling sectpmctl again (see the recovery section for how to do it).
+that you need access to the lockout hierarchy, you should remove the option `--forgetlockout` from the `sudo sectpmctl tpm provisioning`
+command in the [installation](#Installation) section. If this option is not set, the lockout password is stored in
+`/var/lib/sectpmctl/keys/lockout.pwd`. You can change this option also at a later time by reinstalling sectpmctl again (see the
+[recovery](#Recovery) section for how to do it).
 
 ### Endorsement authorization password
 
