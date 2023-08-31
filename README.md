@@ -178,7 +178,7 @@ cd ..
 ## Build sectpmctl
 
 You can either download the prebuild version or follow the build instructions. The installation is done later in the
-[installation](Installation) section.
+[installation](#Installation) section.
 
 ### Prebuild download
 
@@ -301,7 +301,7 @@ START PROVISIONING
 The provisioning will by default set a random lockout password which is stored in `/var/lib/sectpmctl/keys/lockout.pwd`, set sane dictionary
 attack lockout time penalty settings and create two TPM primary keys, one with the dictionary attack lockout flag (DA) and one without (NODA).
 This installation will use the options `--forgetlockout` and `--setforgetendorsement`. See
-[Security and privacy options](#Security and privacy options) for more information.
+[Security and privacy options](#Security%20and%20privacy%20options) for more information.
 
 The following DA lockout values are set:
 
@@ -562,7 +562,7 @@ In case of a changed Secure Boot database or a accidentally cleared TPM, sectpmc
 - clear the Secure Boot database
 - clear the TPM
 - boot the system by entering the recovery key
-- repeat all steps except 1. and 4. from the [installation](Installation)
+- repeat all steps except 1. and 4. from the [installation](#Installation)
 
 When the TPM provisioning and the Secure Boot database is still valid and only another `sectpmctl tpm install` options should be used or if
 the TPM password needs to be changed then this command is sufficient:
@@ -646,7 +646,7 @@ The optimal measurements:
 | LUKS header |
 
 PCR 14 is completely under control, while PCR 7 measurements might vary after the EV_SEPARATOR event, see
-[Lenovo P15 Gen 2 laptop NVidia Problem](#Lenovo P15 Gen 2 laptop NVidia Problem) for such a problematic case.
+[Lenovo P15 Gen 2 laptop NVidia Problem](#Lenovo%20P15%20Gen%202%20laptop%20NVidia%20Problem) for such a problematic case.
 
 To see which measurements have been done for PCR 7, execute `sudo tpm2_eventlog /sys/kernel/security/tpm0/binary_bios_measurements` and
 search for `PCRIndex: 7` entries.
@@ -812,9 +812,10 @@ An installation on an ACER Swift 3 SF314-42 and an ACER Nitro AN515-45 laptop, b
 
 * The Secure Boot Forbidden Signature Database (DBX) could not be cleared by the Clear Mode in BIOS. Workaround: Use the `--skipdbx` option in
 the `sectpmctl boot install` command. Skipping the DBX db is safe if no multi boot is used and no Microsoft certificate is in the PCR 7 chain or
-if the `--withoutmicrosoftkeys` option is used. See [Lenovo P15 Gen 2 laptop NVidia Problem](#Lenovo P15 Gen 2 laptop NVidia Problem) for more
-information. When the `--skipdbx` option is used and a normal Ubuntu or Windows is installed at a later time, restore the Secure Boot factory
-keys from inside the BIOS to restore the DBX db before installation of the new OS.
+if the `--withoutmicrosoftkeys` option is used. See
+[Lenovo P15 Gen 2 laptop NVidia Problem](#Lenovo%20P15%20Gen%202%20laptop%20NVidia%20Problem) for more information. When the `--skipdbx` option
+is used and a normal Ubuntu or Windows is installed at a later time, restore the Secure Boot factory keys from inside the BIOS to restore the
+DBX db before installation of the new OS.
 
 An installation on an ACER Swift 3 SF314-42 caused this problems only once and then never again:
 
