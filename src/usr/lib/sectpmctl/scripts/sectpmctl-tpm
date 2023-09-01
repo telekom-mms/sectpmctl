@@ -55,6 +55,7 @@ Usage: ${ME/-/ } COMMAND [OPTIONS]
 
 COMMANDS
   check
+  get-installed-version
   help
   install
     [--dont-extend] [--key <file>] [--password <tpm password>]
@@ -105,6 +106,7 @@ ${ME/-/ } COMMAND [OPTIONS]
 
 COMMANDS
   check
+  get-installed-version
   help
   install
     [--dont-extend] [--key <file>] [--password <TPM password>]
@@ -122,6 +124,11 @@ OPTIONS
 
     Currently it checks if TPM2 is found, performs TPM2 selftest
     and check if SecureBoot is enabled.
+
+
+  get-installed-version
+
+    Get the currently installed version
 
 
   help
@@ -305,6 +312,7 @@ _check_input() {
   export SEAL="false"
   export CHANGEPIN="false"
   export CHECK="false"
+  export GET_VERSION="false"
   export EXTEND="true"
   export PCR_BANK="sha256"
   export PCR_VALUES_TO_USE="7"
@@ -404,6 +412,9 @@ _check_input() {
       check)
         export CHECK="true"
         ;;
+      get-installed-version)
+        export GET_VERSION="true"
+        ;;
       provisioning)
         export DO_PROVISIONING="true"
         ;;
@@ -492,7 +503,27 @@ _check_input() {
       "${FORGET_LOCKOUT}" \
       "${SET_FORGET_ENDORSEMENT}"
 
+  [[ "${GET_VERSION}" == "true" ]] \
+    && get_installed_version \
+      "${SECTPMCTL_KEYS}" \
+      "${KEY_SCRIPT}"
+
   exit 0
+}
+
+get_installed_version() {
+  SECTPMCTL_KEYS="${1}"
+  KEY_SCRIPT="${2}"
+
+  if [[ -f "${SECTPMCTL_KEYS}/installed_version" ]]; then
+    cat "${SECTPMCTL_KEYS}/installed_version"
+  else
+    if [[ -f "${KEY_SCRIPT}" ]]; then
+      echo "sectpmctl <= 1.1.5"
+    else
+      echo "not installed"
+    fi
+  fi
 }
 
 do_provisioning() {
@@ -1000,6 +1031,8 @@ generate_tpm2_policy() {
   else
     sectpmctl key seal --handle "${PERSISTANT_HANDLE_TO_USE}" --key-file "${TPM_SECRET_LUKS_KEY}" --noda --pcr-extend ${USE_PRESEED_PCR}
   fi
+
+  echo "$(sectpmctl version)" > "${SECTPMCTL_KEYS}/installed_version"
 
   shred -f -z -u "${TPM_SECRET_LUKS_KEY}"
   

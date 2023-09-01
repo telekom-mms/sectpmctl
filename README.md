@@ -21,7 +21,7 @@ Either way, you should also supply a BIOS admin password.
 
 Dual booting Windows is not recommended and has never been tested with sectpmctl. The risk is that Windows will update the Secure Boot DBX
 database which will prevent the successful unlocking of the LUKS key. In such case, you need the recovery key and need to redo the sectpmctl
-installation, see [recovery](#Recovery) for more information.
+installation, see [recovery](#recovery) for more information.
 
 It is recommended to only have one LUKS slot in use before installation, which is mostly slot 0. sectpmctl will additionally use slot 5 to
 store the TPM key.
@@ -50,7 +50,7 @@ implementation, they are simply not needed in this decentralized implementation.
   + Passwordless option is not influenced by DA lockout
   + TPM + Password option is influenced by DA lockout
   + Secure Boot signing is not influenced by DA lockout
-* Ubuntu release upgrades are possible, see the [upgrade](#Upgrade) table for the requirements
+* Ubuntu release upgrades are possible, see the [upgrades](#upgrades) section for the requirements
 * The Secure Boot signing key is backed by the TPM as well
 * Zero TPM administrative overhead by managing Secure Boot instead of the TPM
   + Secure Boot is easier to manage
@@ -76,17 +76,17 @@ Using a splash screen and the TPM + Password option does not work correctly. If 
 Setting the authorization password to a random value without storing it enhances security because the lockout hierarchy can not be
 modified without a password after TPM provisioning. This hierarchy also prevents accidental use of the tpm2_clear command. If you know
 that you need access to the lockout hierarchy, you should remove the option `--forgetlockout` from the `sudo sectpmctl tpm provisioning`
-command in the [installation](#Installation) section. If this option is not set, the lockout password is stored in
+command in the [installation](#installation) section. If this option is not set, the lockout password is stored in
 `/var/lib/sectpmctl/keys/lockout.pwd`. You can change this option also at a later time by reinstalling sectpmctl again (see the
-[recovery](#Recovery) section for how to do it).
+[full recovery](#full-recovery) section for how to do it).
 
 ### Endorsement authorization password
 
 Setting the endorsement authorization password to a random value without storing it enhances privacy because the endorsement hierarchy
 can be used to uniquely identify your device. If you know that you need access to the endorsement hierarchy, you should remove the
-option `--setforgetendorsement` from the `sudo sectpmctl tpm provisioning` command in the [installation](#Installation) section. When this
+option `--setforgetendorsement` from the `sudo sectpmctl tpm provisioning` command in the [installation](#installation) section. When this
 option is not set, the endorsement authorization password will be empty. You can change this option also at a later time by reinstalling
-sectpmctl again (see the [recovery](#Recovery) section for how to do it).
+sectpmctl again (see the [full recovery](#full-recovery) section for how to do it).
 
 ### One optional setting is dangerous (disabled by default)
 
@@ -178,7 +178,7 @@ cd ..
 ## Build sectpmctl
 
 You can either download the prebuild version or follow the build instructions. The installation is done later in the
-[installation](#Installation) section.
+[installation](#installation) section.
 
 ### Prebuild download
 
@@ -315,16 +315,42 @@ DA key, while keep using the NODA key for signing kernels and kernel modules.
 
 All generated keys, passwords, or serialized keys are stored in `/var/lib/sectpmctl/keys`.
 
-### Upgrade
+### Upgrades
 
-TBD
+#### Upgrade sectpmctl
+
+It is highly recommended to upgrade to this version. It contains better security for broken TPM's and enables Ubuntu release upgrades.
+
+Note: It is not sufficient to only install the latest release of sectpmctl. The `sectpmctl tpm install` command needs to be executed to perform
+the update. See the [TPM resealing only](#tpm-resealing-only) section for how to do it.
+
+Execute this command to see which version is installed:
+
+`sectpmctl tpm get-installed-version`
+
+| sectpmctl version | action |
+| --- | ----- |
+| <= 1.1.5 | upgrade to 1.2.0, see [TPM resealing only](#tpm-resealing-only) |
+| 1.2.0 |  |
+
+
+#### Ubuntu release upgrades
+
+First upgrade to the latest version of sectpmctl, see the [upgrade sectpmctl](#upgrade-sectpmctl) section.
+
+| sectpmctl first installed on | release upgrades supported | notes |
+| --- | --- | --- |
+| Ubuntu 22.04 | yes | initramfs-tools and dkms propably ask which version of their config files to keep. Select the maintainer version |
+| Ubuntu >= 22.10 | yes |  |
+
+It is no problem if you miss to select the maintainer version. sectpmctl will work correctly anyway. It is possible
 
 ### Installation
 
 **Important note: The current implementation seals the LUKS key not only to the Secure Boot PCR values and optionally to a password as well
 but also to the LUKS header. That means that if the LUKS header is modified after installation, the system will not boot anymore without the
 recovery key. That is for example the case when another secret key is added to the encryted root partition. It is highly reccommended to not
-add another LUKS keys after installation, otherwise a recovery has to be done which is described in the [recovery](#Recovery) section below.**
+add another LUKS keys after installation, otherwise a recovery has to be done which is described in the [recovery](#recovery) section below.**
 
 ```
 # 1. Point of no return, you need to complete at least until the following reboot command
@@ -479,33 +505,7 @@ By default, only kernels signed by Canonical are considered to be shown in the b
 If you want to have support for all kernels, you can edit `/etc/sectpmctl/boot.conf` and set `SKIP_UNSIGNED_KERNELS` to `false`. Update the
 bootloader with `sectpmctl boot update` afterwards.
 
-
-
-
-If the TPM password is lost, a new password can be set by using the recovery key:
-
-```
-cat > install_tpm.sh <<__EOT
-#! /bin/bash
-echo -n "Enter TPM Password: "
-read -sr tpmpwda
-echo
-echo -n "Enter TPM Password again: "
-read -sr tpmpwdb
-echo
-if [[ "x\${tpmpwda}" == "x\${tpmpwdb}" ]]; then
-  sudo sectpmctl tpm install --setrecoverykey --password "\${tpmpwda}"
-else
-  echo "Passwords don't match. Exit"
-  exit 1
-fi
-__EOT
-chmod +x install_tpm.sh
-./install_tpm.sh
-rm install_tpm.sh
-```
-
-Enter the recovery key when asked for the LUKS key.
+If the TPM password is lost or needs to be changed, see the [recovery](#recovery) section. Currently it requires the recovery key.
 
 ### Kernel or kernel module updates
 
@@ -557,17 +557,38 @@ It is also possible to prevent signing of kernel modules by editing this file: `
 
 ## Recovery
 
-In case of a changed Secure Boot database or a accidentally cleared TPM, sectpmctl will not unlock anymore. 
+### Full recovery
 
-- clear the Secure Boot database
-- clear the TPM
-- boot the system by entering the recovery key
-- repeat all steps except 1. and 4. from the [installation](#Installation)
+including Secure Boot and TPM provisioning and TPM resealing
+The full recovery need to be done when the system does not boot without using the recovery key. That is the case when:
 
-When the TPM provisioning and the Secure Boot database is still valid and only another `sectpmctl tpm install` options should be used or if
-the TPM password needs to be changed then this command is sufficient:
+- **When the Secure Boot database is cleared**
+- **When the TPM is cleared**
+- **When other TPM privisioning settings should be applied**
+- **When the [TPM handles](#used-handles) 0x81000100 or 0x81000101 are cleared or overwritten**
 
-- boot the system by entering the recovery key in case of a lost TPM password
+The Secure Boot database and TPM can be restored by following this steps:
+
+- Clear the Secure Boot database
+- Clear the TPM
+- Boot the system by entering the recovery key
+- Repeat all steps except 1. and 4. from the [installation](#installation)
+
+You can omit the `--setrecoverykey` option in the `sectpmctl tpm install` command to keep your current recovery key.
+
+### TPM resealing only
+
+TPM resealing needs to be done when either the system will boot correctly but sectpmctl needs to be updated or when the TPM password is lost or
+needs to be changed:
+
+- **When the TPM password is lost or needs to be changed**
+- **When doing sectpmctl upgrades**
+- **When other sectpmctl options should be applied**
+- **When the [TPM handle](#used-handles) 0x81000102 is cleared or overwritten**
+
+Note: You need to boot the system by entering the recovery key in case of a lost TPM password.
+
+Execute this command to reseal the TPM:
 
 ```
 cat > install_tpm.sh <<__EOT
@@ -786,8 +807,10 @@ tpm2_flushcontext "session.ctx"
 
 ### Authorized policies
 
-The current implementation doesn't need authorized policies. a future release could implement them to do advanced updates without
-the need for a recovery key.
+A future release could implement authorized policies for advanced features:
+
+- easy TPM and Secure Boot updates
+- sealing to PCR 7 + PCR 4 and / or PCR 0
 
 ## Bugs and problems found
 
@@ -838,7 +861,7 @@ Inside the BIOS, sectpmctl might be shown as the boot entry `"*"`.
 
 ### Gigabyte mainboards
 
-Be careful with BIOS updates. They may delete the Secure Boot database which then makes use of a [recovery](#Recovery) necessary.
+Be careful with BIOS updates. They may delete the Secure Boot database which then makes use of a [recovery](#recovery) necessary.
 
 ### Lenovo P15 Gen 2 laptop NVidia problem
 
