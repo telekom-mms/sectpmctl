@@ -319,31 +319,56 @@ All generated keys, passwords, or serialized keys are stored in `/var/lib/sectpm
 
 #### Upgrade sectpmctl
 
-It is highly recommended to upgrade to this version. It contains better security for broken TPM's and enables Ubuntu release upgrades.
+It is highly recommended to upgrade. This version contains better security for broken TPM's and enables support for Ubuntu release upgrades.
 
 Note: It is not sufficient to only install the latest release of sectpmctl. The `sectpmctl tpm install` command needs to be executed to perform
-the update. See the [TPM resealing only](#tpm-resealing-only) section for how to do it.
+the upgrade. See the [TPM resealing only](#tpm-resealing-only) section for how to do it.
 
-Execute this command to see which version is installed:
+Execute this command to see which version is currently installed:
 
 `sectpmctl tpm get-installed-version`
 
-| sectpmctl version | action |
-| --- | ----- |
-| <= 1.1.5 | upgrade to 1.2.0, see [TPM resealing only](#tpm-resealing-only) |
-| 1.2.0 |  |
+| Version | Action |
+| - | --- |
+| <= 1.1.5 | Upgrade to [1.2.0](#tpm-resealing-only) |
+| >= 1.2.0 |  |
 
 
 #### Ubuntu release upgrades
 
-First upgrade to the latest version of sectpmctl, see the [upgrade sectpmctl](#upgrade-sectpmctl) section.
+First upgrade to sectpmctl 1.2.0. See the [upgrade sectpmctl](#upgrade-sectpmctl) section.
 
-| sectpmctl first installed on | release upgrades supported | notes |
-| --- | --- | --- |
-| Ubuntu 22.04 | yes | initramfs-tools and dkms propably ask which version of their config files to keep. Select the maintainer version |
-| Ubuntu >= 22.10 | yes |  |
+##### Upgrade 22.04 to a newwer version
 
-It is no problem if you miss to select the maintainer version. sectpmctl will work correctly anyway. It is possible
+When starting a release upgrade from Ubuntu 22.04 to a newer versions, configuration files changed made by sectpmctl probably lead to questions,
+at least when the upgrade is done by command line (`sudo do-release-upgrade`). The following two files are related:
+
+- `/etc/initramfs-tools/initramfs.conf`
+- `/etc/dkms/framework.conf`
+
+The initramfs-tools-core `initramfs.conf` file had been changed by older versions of sectpmctl. This change is not done anymore, but it could
+still be on your system. The release upgrade will ask if you want to keep the currently installed version (`N` or `O`) or the package maintainer
+version (`Y` or `I`). If you did customizations yourself to this file, you should keep the currently installed version (`N` or `O`), otherwise
+select the package maintainer version (`Y` or `I`).
+
+The dkms `framework.conf` did not support config snippets until Ubuntu 22.10. Therefor sectpmctl needed to modify `framework.conf` on Ubuntu
+22.04. The release upgrade will ask if you want to keep the currently installed version (`N` or `O`) or the package maintainer
+version (`Y` or `I`). If you did customizations yourself to this file, you should keep the currently installed version (`N` or `O`), otherwise
+select the package maintainer version (`Y` or `I`).
+
+It is no problem if you miss to select which version of this both files to keep. sectpmctl and the release upgrade will work correctly anyway.
+
+After the upgrade it is recommended to restore the original version of this two files, except if you manuelly changed this files youself.
+To restore initramfs-tools-core and dkms execute the following commands:
+
+```
+sudo apt install --reinstall -o Dpkg::Options::="--force-confask,confnew,confmiss" initramfs-tools-core
+sudo apt install --reinstall -o Dpkg::Options::="--force-confask,confnew,confmiss" dkms
+```
+
+##### Upgrade >= 22.10 to a newwer version
+
+Upgrades are supported starting from sectpmctl 1.2.0 and Ubuntu 22.10. No actions are required.
 
 ### Installation
 
