@@ -365,8 +365,7 @@ maintainer version (`Y`, `I` or `replace`). If you did customizations yourself t
 (`N`, `O` or `keep`), otherwise select replace with the package maintainer version (`Y`, `I` or `replace`).
 
 It is no problem if you miss to select which version of this files to keep. sectpmctl and the release upgrade will boot and work correctly in
-both cases. If you did not change this files manually, you can replace them after the reboot by executing the following commands to restore the
-two files of initramfs-tools-core and dkms after the release upgrade:
+both cases. If you did not change this files manually, you can replace them after the reboot by executing the following commands:
 
 ```
 sudo apt install --reinstall -o Dpkg::Options::="--force-confask,confnew,confmiss" initramfs-tools-core
