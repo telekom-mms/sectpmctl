@@ -455,8 +455,8 @@ sudo blkid -s UUID -o value /dev/$EFIPARTITION
 sudo vi /etc/fstab
   # remove /boot entry from fstab
   # change the old UUID of /boot/efi to the copied new UUID of the blkid output
-sudo mount /boot/efi
 sudo systemctl daemon-reload
+sudo mount /boot/efi
 
 
 # 5. Install the bootloader
