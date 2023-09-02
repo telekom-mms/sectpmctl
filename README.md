@@ -386,7 +386,8 @@ add another LUKS keys after installation, otherwise a recovery has to be done wh
 **Note: If the kernel signing certicate of Debian or Ubuntu changes in the future, you can temporarily allow using kernels which can not yet be
 checked. In such case, a newer version of sectpmctl will include the new certificates for the check. To allow unsigned and unchecked kernels you
 need to edit `/etc/sectpmctl/boot.conf` and set `SKIP_UNSIGNED_KERNELS` to `false`. Secure Boot lockdown is automatically enforced as sectpmctl
-adds `lockdown=integrity` to the kernel command line, see `/var/lib/sectpmctl/kernel_extra_options`.**
+adds `lockdown=integrity` to the kernel command line, see `/var/lib/sectpmctl/kernel_extra_options`. See
+[Debian](https://wiki.debian.org/SecureBoot) and [Ubuntu](https://answers.launchpad.net/ubuntu/+question/700326) for more information.**
 
 ```
 # 1. Point of no return, you need to complete at least until the following reboot command
@@ -541,9 +542,9 @@ installation and signing of the bootloader. To list the bootable kernels enter:
 sudo bootctl list
 ```
 
-By default, only kernels signed by Canonical are considered to be shown in the boot list. Unsigned kernels are ignored for safety reasons.
-If you want to have support for all kernels, you can edit `/etc/sectpmctl/boot.conf` and set `SKIP_UNSIGNED_KERNELS` to `false`. Update the
-bootloader with `sectpmctl boot update` afterwards.
+By default, only kernels signed by Canonical or Debian are considered to be shown in the boot list. Unsigned kernels are ignored for safety
+reasons. If you want to have support for all kernels, you can edit `/etc/sectpmctl/boot.conf` and set `SKIP_UNSIGNED_KERNELS` to `false`. Update
+the bootloader with `sectpmctl boot update` afterwards.
 
 If the TPM password is lost or needs to be changed, see the [recovery](#recovery) section. Currently it requires the recovery key.
 
@@ -587,9 +588,9 @@ show how to sign things manually:
 - sbsign.sh
 - kmodsign.sh
 
-A kmodsign wrapper is available at [sectpmctl-kmodsign-wrapper](https://github.com/telekom-mms/sectpmctl-kmodsign-wrapper). It is a Debian
-config package which replaces the original kmodsign binary with a wrapper which calls tpmkmodsign internally, for example to support the
-maintainance of commercial antivirus applications or such.
+A kmodsign wrapper is available at [sectpmctl-kmodsign-wrapper](https://github.com/telekom-mms/sectpmctl-kmodsign-wrapper). It is a config
+package which replaces the original kmodsign binary with a wrapper which calls tpmkmodsign internally, for example to support the maintainance
+of commercial antivirus applications or such.
 
 Please read the helper scripts before manually using them as they have specific needs for rewriting parameters.
 

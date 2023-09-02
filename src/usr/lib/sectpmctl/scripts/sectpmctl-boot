@@ -390,6 +390,11 @@ traverse_boot ()
   hook_action="${1}"
   hook_version="${2}"
 
+  VENDOR_OS_CERT="${VENDOR_KEYS}/debian-prod-2022-linux.pem"
+  if [[ "x$(lsb_release -si)" == "xUbuntu" ]]; then
+    VENDOR_OS_CERT="${VENDOR_KEYS}/canonical-master-public.pem"
+  fi
+
   if [ "x${hook_action}" = "xdel" ]; then
     cd "/boot/efi/EFI/Linux" || exit
     if [ -f "sectpmctl-${hook_version}.efi" ]; then
@@ -442,7 +447,7 @@ traverse_boot ()
     fi
 
     if [ "x${SKIP_UNSIGNED_KERNELS}" = "xtrue" ]; then
-      if ! sbverify --cert "${VENDOR_KEYS}/canonical-master-public.pem" "${linux}" 2> /dev/null > /dev/null; then
+      if ! sbverify --cert "${VENDOR_OS_CERT}" "${linux}" 2> /dev/null > /dev/null; then
         continue
       fi
     fi
@@ -508,7 +513,7 @@ traverse_boot ()
     fi
 
     if [ "x${SKIP_UNSIGNED_KERNELS}" = "xtrue" ]; then
-      if ! sbverify --cert "${VENDOR_KEYS}/canonical-master-public.pem" "${linux}" 2> /dev/null > /dev/null; then
+      if ! sbverify --cert "${VENDOR_OS_CERT}" "${linux}" 2> /dev/null > /dev/null; then
         echo "Skipped        : ${dirname}/${basename}, unsigned"
         continue
       fi
