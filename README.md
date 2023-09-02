@@ -6,12 +6,12 @@
 or efitools can't be executed successfully on your device. Create at least a backup of your data before installation. If you already
 installed DKMS modules, it is probably necessary to rebuild them after installing sectpmctl to have them signed.**
 
-We want to secure Ubuntu >= 22.04 installations with LUKS and TPM2. Please read this README carefully before installation.
+We want to secure Debian >= 12 and Ubuntu >= 22.04 installations with LUKS and TPM2. Please read this README carefully before installation.
 
-We assume an installation of Ubuntu with LVM and encryption. Don't create a recovery key in the Ubuntu
-installation, set only the LUKS password. An automated Ubuntu Server preseed installation is supported (but currently undocumented) in which the
-Secure Boot keys are applied in the subiquity phase while the LUKS key is sealed into the TPM in the boot after. Other Linux distributions can
-probably be supported in future releases.
+We assume an installation with LVM and encryption. Don't create a recovery key in the Debian or Ubuntu installation, set only the LUKS password.
+An automated Ubuntu Server preseed installation is supported (but currently undocumented) in which the Secure Boot keys are applied in the
+subiquity phase while the LUKS key is sealed into the TPM in the first boot after. Other Linux distributions can probably be supported in future
+releases.
 
 If you are not using the TPM + password option you should supply a BIOS start password. Without either a BIOS start password or
 TPM + password, the device would boot up to the login screen and someone could try to read out the memory or find a bug in the login
@@ -38,6 +38,7 @@ implementation, they are simply not needed in this decentralized implementation.
 ## Requirements
 
 * Ubuntu Desktop and Server 22.04, 22.10, 23.04 or 23.10
+* Debian 12
 * LUKS encrypted LVM installation
 
 ## Features
