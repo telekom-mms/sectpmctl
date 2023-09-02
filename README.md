@@ -384,6 +384,11 @@ but also to the LUKS header. That means that if the LUKS header is modified afte
 recovery key. That is for example the case when another secret key is added to the encryted root partition. It is highly reccommended to not
 add another LUKS keys after installation, otherwise a recovery has to be done which is described in the [recovery](#recovery) section below.**
 
+**Note: If the kernel signing certicate of Debian or Ubuntu changes in the future, you can temporarily allow using kernels which can not yet be
+checked. sectpmctl will then be updated to include the new certificates for the check. To allow unsigned kernels you need to edit
+`/etc/sectpmctl/boot.conf` and set `SKIP_UNSIGNED_KERNELS` to `false`. Secure Boot lockdown is automatically enforced because sectpmctl
+adds `lockdown=integrity` to the kernel command line, see `/var/lib/sectpmctl/kernel_extra_options`.**
+
 ```
 # 1. Point of no return, you need to complete at least until the following reboot command
 sudo apt remove --allow-remove-essential "grub*" "shim*"
