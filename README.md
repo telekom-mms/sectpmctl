@@ -331,14 +331,15 @@ sudo dpkg -i sectpmctl_1.2.0-1_amd64.deb
 Note: It is not sufficient to only install the latest release of sectpmctl. The `sectpmctl tpm install` command needs to be executed to perform
 the upgrade. See the [TPM resealing only](#tpm-resealing-only) section for how to do it.
 
-Execute this command to see which version is currently installed:
+Execute this command to see which version is currently applied:
 
-`sectpmctl tpm get-installed-version`
+`sudo sectpmctl tpm get-installed-version`
 
-| Version | Action |
-| - | --- |
-| <= 1.1.5 | Upgrade to [1.2.0](#tpm-resealing-only) |
-| >= 1.2.0 |  |
+| Installed version | Applied version | Action |
+| - | - | --- |
+| <= 1.1.5 | <= 1.1.5 | [build sectpmctl](#build-sectpmctl), sudo dpkg -i sectpmctl_1.2.0-1_amd64.deb and upgrade to [1.2.0](#tpm-resealing-only)|
+| >= 1.2.0 | <= 1.1.5 | Upgrade to [1.2.0](#tpm-resealing-only) |
+| >= 1.2.0 | >= 1.2.0 |  |
 
 
 #### Ubuntu release upgrades
@@ -347,26 +348,25 @@ First upgrade to sectpmctl 1.2.0. See the [upgrade sectpmctl](#upgrade-sectpmctl
 
 ##### Upgrade 22.04 to a newwer version
 
-When starting a release upgrade from Ubuntu 22.04 to a newer versions, configuration files changed made by sectpmctl probably lead to questions,
-at least when the upgrade is done by command line (`sudo do-release-upgrade`). The following two files are related:
+When starting a release upgrade from Ubuntu 22.04 to a newer versions, configuration files changed made by sectpmctl probably lead to the
+question if you keep the currently installed versions or replace the files with the package maintainer version:
 
 - `/etc/initramfs-tools/initramfs.conf`
 - `/etc/dkms/framework.conf`
 
 The initramfs-tools-core `initramfs.conf` file had been changed by older versions of sectpmctl. This change is not done anymore, but it could
-still be on your system. The release upgrade will ask if you want to keep the currently installed version (`N` or `O`) or the package maintainer
-version (`Y` or `I`). If you did customizations yourself to this file, you should keep the currently installed version (`N` or `O`), otherwise
-select the package maintainer version (`Y` or `I`).
+still be on your system. The release upgrade will ask if you want to keep the currently installed version (`N`, `O` or `keep`) or replace with
+the package maintainer version (`Y`, `I` or `replace`). If you did customizations yourself to this file, you should keep the currently installed
+version (`N`, `O` or `keep`), otherwise select replace with the package maintainer version (`Y`, `I` or `replace`).
 
 The dkms `framework.conf` did not support config snippets until Ubuntu 22.10. Therefor sectpmctl needed to modify `framework.conf` on Ubuntu
-22.04. The release upgrade will ask if you want to keep the currently installed version (`N` or `O`) or the package maintainer
-version (`Y` or `I`). If you did customizations yourself to this file, you should keep the currently installed version (`N` or `O`), otherwise
-select the package maintainer version (`Y` or `I`).
+22.04. The release upgrade will ask if you want to keep the currently installed version (`N`, `O` or `keep`) or replace with the package
+maintainer version (`Y`, `I` or `replace`). If you did customizations yourself to this file, you should keep the currently installed version
+(`N`, `O` or `keep`), otherwise select replace with the package maintainer version (`Y`, `I` or `replace`).
 
-It is no problem if you miss to select which version of this both files to keep. sectpmctl and the release upgrade will work correctly anyway.
-
-After the upgrade it is recommended to restore the original version of this two files, except if you manuelly changed this files youself.
-To restore initramfs-tools-core and dkms execute the following commands:
+It is no problem if you miss to select which version of this files to keep. sectpmctl and the release upgrade will boot and work correctly in
+both cases. If you did not change this files manually, you can replace them after the reboot by executing the following commands to restore the
+two files of initramfs-tools-core and dkms after the release upgrade:
 
 ```
 sudo apt install --reinstall -o Dpkg::Options::="--force-confask,confnew,confmiss" initramfs-tools-core
