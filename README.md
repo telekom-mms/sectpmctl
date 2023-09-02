@@ -346,7 +346,7 @@ Execute this command to see which version is currently applied:
 
 First upgrade to sectpmctl 1.2.0. See the [upgrade sectpmctl](#upgrade-sectpmctl) section.
 
-##### Upgrade 22.04 to a newwer version
+##### Upgrade 22.04 to a newer version
 
 When starting a release upgrade from Ubuntu 22.04 to a newer versions, configuration files changed made by sectpmctl probably lead to the
 question if you keep the currently installed versions or replace the files with the package maintainer version:
@@ -373,7 +373,7 @@ sudo apt install --reinstall -o Dpkg::Options::="--force-confask,confnew,confmis
 sudo apt install --reinstall -o Dpkg::Options::="--force-confask,confnew,confmiss" dkms
 ```
 
-##### Upgrade >= 22.10 to a newwer version
+##### Upgrade >= 22.10 to a newer version
 
 Upgrades are supported starting from sectpmctl 1.2.0 and Ubuntu 22.10. No actions are required.
 
