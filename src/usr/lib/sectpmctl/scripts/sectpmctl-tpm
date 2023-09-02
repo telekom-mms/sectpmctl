@@ -585,9 +585,13 @@ do_provisioning() {
     tpm2_changeauth -Q --object-context=lockout "$(cat "${LOCKOUT_FILE}")"
   fi
 
-  ramdir=$(mktemp -d -p /tmp)
-  mount -t tmpfs tmpfs "${ramdir}"
-  tempdir=$(mktemp -d -p "${ramdir}")
+  p1="$( grep -c "^tmpfs /run tmpfs" /proc/mounts )" || p1=""
+  if [[ "${p1}" != "1" ]]; then
+    echo "Mounted tmpfs /run is required"
+    exit
+  fi
+  install -d -m 600 "/run/sectpmctl" || exit
+  tempdir=$(mktemp -d -p "/run/sectpmctl")
   chmod 700 "${tempdir}"
   cd "${tempdir}" || exit
 
@@ -619,7 +623,6 @@ do_provisioning() {
 
   cd - > /dev/null || exit
   rmdir "${tempdir}"
-  umount "${ramdir}"
 }
 
 generate_unseal_script() {
@@ -898,12 +901,16 @@ generate_tpm2_policy() {
 
   echo "## CRYPT PARTITION: ${CRYPT_PARTITION}"
 
+  p1="$( grep -c "^tmpfs /run tmpfs" /proc/mounts )" || p1=""
+  if [[ "${p1}" != "1" ]]; then
+    echo "Mounted tmpfs /run is required"
+    exit 1
+  fi
+  install -d -m 600 "/run/sectpmctl" || exit 1
   TEMPDIR=""
-  TEMPDIR="$(mktemp -d -p /tmp)"
+  TEMPDIR="$(mktemp -d -p "/run/sectpmctl")"
   chmod 700 "${TEMPDIR}"
   TPM_SECRET_LUKS_KEY="tpmkey"
-
-  mount -t tmpfs "${TEMPDIR##*/}" "${TEMPDIR}"
 
   echo "CREATE AND ADD TPM POLICY IN TMPFS DIRECTORY ${TEMPDIR}"
   cd "${TEMPDIR}" || exit 1
@@ -1037,7 +1044,6 @@ generate_tpm2_policy() {
   shred -f -z -u "${TPM_SECRET_LUKS_KEY}"
   
   cd - > /dev/null
-  umount "${TEMPDIR}"
   rmdir "${TEMPDIR}"
   
   echo "DONE"

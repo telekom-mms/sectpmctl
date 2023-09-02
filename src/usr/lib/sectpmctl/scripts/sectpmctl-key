@@ -232,6 +232,15 @@ _check_state() {
     return 1
   fi
   
+  p1="$( grep -c "^tmpfs /run tmpfs" /proc/mounts )" || p1=""
+  if [[ "${p1}" != "1" ]]; then
+    _print_error "${ME}: Mounted tmpfs /run is required"
+    return 1
+  fi
+
+  _ex "${ME} ${CMD}: Could create /run/sectpmctl" \
+    install -d -m 600 "/run/sectpmctl" || return 1
+
   if [[ ! -d "${NAMED_OBJECTS}" ]]; then
     if ! install -m 0700 -d "${NAMED_OBJECTS}"; then
       _print_error "${ME}: Could not create directory '${NAMED_OBJECTS}'"
@@ -912,14 +921,8 @@ _extend() {
 _changepassword() {
   ERR=false
 
-  ramdir="$( _ex "${ME} ${CMD}: Could not create temporary directory" \
-    mktemp -d -p /tmp )" || return 1
-
-  _ex "${ME} ${CMD}: Could not mount temporary ramfs" \
-    mount -t tmpfs tmpfs "${ramdir}" || return 1
-
   tempdir="$( _ex "${ME} ${CMD}: Could not create temporary ramfs directory" \
-    mktemp -d -p "${ramdir}" )" || return 1
+    mktemp -d -p "/run/sectpmctl" )" || return 1
 
   _ex "${ME} ${CMD}: Could not enter temporary ramfs directory" \
     cd "${tempdir}" || return 1
@@ -968,9 +971,6 @@ _changepassword() {
   _ex "${ME} ${CMD}: Could not remove temporary ramfs directory" \
     rmdir "${tempdir}"
 
-  _ex "${ME} ${CMD}: Could not unmount temporary ramfs" \
-    umount "${ramdir}"
-
   if [[ $ERR == true ]]; then
     return 1
   fi
@@ -979,14 +979,8 @@ _changepassword() {
 _seal() {
   ERR=false
 
-  ramdir="$( _ex "${ME} ${CMD}: Could not create temporary directory" \
-    mktemp -d -p /tmp )" || return 1
-
-  _ex "${ME} ${CMD}: Could not mount temporary ramfs" \
-    mount -t tmpfs tmpfs "${ramdir}" || return 1
-
   tempdir="$( _ex "${ME} ${CMD}: Could not create temporary ramfs directory" \
-    mktemp -d -p "${ramdir}" )" || return 1
+    mktemp -d -p "/run/sectpmctl" )" || return 1
 
   _ex "${ME} ${CMD}: Could not enter temporary ramfs directory" \
     cd "${tempdir}" || return 1
@@ -1140,9 +1134,6 @@ _seal() {
   _ex "${ME} ${CMD}: Could not remove temporary ramfs directory" \
     rmdir "${tempdir}"
 
-  _ex "${ME} ${CMD}: Could not unmount temporary ramfs" \
-    umount "${ramdir}"
-
   if [[ $ERR == true ]]; then
     return 1
   fi
@@ -1151,14 +1142,8 @@ _seal() {
 _unseal() {
   ERR=false
 
-  ramdir="$( _ex "${ME} ${CMD}: Could not create temporary directory" \
-    mktemp -d -p /tmp )" || return 1
-
-  _ex "${ME} ${CMD}: Could not mount temporary ramfs" \
-    mount -t tmpfs tmpfs "${ramdir}" || return 1
-
   tempdir="$( _ex "${ME} ${CMD}: Could not create temporary ramfs directory" \
-    mktemp -d -p "${ramdir}" )" || return 1
+    mktemp -d -p "/run/sectpmctl" )" || return 1
 
   _ex "${ME} ${CMD}: Could not enter temporary ramfs directory" \
     cd "${tempdir}" || return 1
@@ -1226,9 +1211,6 @@ _unseal() {
   _ex "${ME} ${CMD}: Could not remove temporary ramfs directory" \
     rmdir "${tempdir}"
 
-  _ex "${ME} ${CMD}: Could not unmount temporary ramfs" \
-    umount "${ramdir}"
-
   if [[ $ERR == true ]]; then
     return 1
   fi
@@ -1237,14 +1219,8 @@ _unseal() {
 _testsession() {
   ERR=false
 
-  ramdir="$( _ex "${ME} ${CMD}: Could not create temporary directory" \
-    mktemp -d -p /tmp )" || return 1
-
-  _ex "${ME} ${CMD}: Could not mount temporary ramfs" \
-    mount -t tmpfs tmpfs "${ramdir}" || return 1
-
   tempdir="$( _ex "${ME} ${CMD}: Could not create temporary ramfs directory" \
-    mktemp -d -p "${ramdir}" )" || return 1
+    mktemp -d -p "/run/sectpmctl" )" || return 1
 
   _ex "${ME} ${CMD}: Could not enter temporary ramfs directory" \
     cd "${tempdir}" || return 1
@@ -1274,9 +1250,6 @@ _testsession() {
 
   _ex "${ME} ${CMD}: Could not remove temporary ramfs directory" \
     rmdir "${tempdir}"
-
-  _ex "${ME} ${CMD}: Could not unmount temporary ramfs" \
-    umount "${ramdir}"
 
   if [[ $ERR == true ]]; then
     return 1
