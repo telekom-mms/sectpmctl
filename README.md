@@ -8,7 +8,7 @@ installed DKMS modules, it is probably necessary to rebuild them after installin
 
 We want to secure Ubuntu >= 22.04 installations with LUKS and TPM2. Please read this README carefully before installation.
 
-We assume a normal installation of Ubuntu Desktop by erasing the disk and using LVM and encryption. Don't create a recovery key in the Ubuntu
+We assume an installation of Ubuntu with LVM and encryption. Don't create a recovery key in the Ubuntu
 installation, set only the LUKS password. An automated Ubuntu Server preseed installation is supported (but currently undocumented) in which the
 Secure Boot keys are applied in the subiquity phase while the LUKS key is sealed into the TPM in the boot after. Other Linux distributions can
 probably be supported in future releases.
@@ -37,7 +37,7 @@ implementation, they are simply not needed in this decentralized implementation.
 
 ## Requirements
 
-* Ubuntu Desktop 22.04, 22.10, 23.04 or 23.10
+* Ubuntu Desktop and Server 22.04, 22.10, 23.04 or 23.10
 * LUKS encrypted LVM installation
 
 ## Features
@@ -190,7 +190,7 @@ wget https://github.com/telekom-mms/sectpmctl/releases/download/1.2.0/sectpmctl_
 
 ```
 sudo apt install -y debhelper efibootmgr efitools sbsigntool binutils mokutil dkms systemd udev \
-  util-linux gdisk openssl uuid-runtime tpm2-tools fdisk git devscripts curl
+  util-linux gdisk openssl uuid-runtime tpm2-tools fdisk git devscripts
 
 git clone https://github.com/telekom-mms/sectpmctl.git
 
@@ -321,6 +321,12 @@ All generated keys, passwords, or serialized keys are stored in `/var/lib/sectpm
 
 It is highly recommended to upgrade. This version contains better security for broken TPM's and enables support for Ubuntu release upgrades.
 
+Download or build this version by following [build sectpmctl](#build-sectpmctl). Then install it:
+
+```
+sudo dpkg -i sectpmctl_1.2.0-1_amd64.deb
+```
+
 Note: It is not sufficient to only install the latest release of sectpmctl. The `sectpmctl tpm install` command needs to be executed to perform
 the upgrade. See the [TPM resealing only](#tpm-resealing-only) section for how to do it.
 
@@ -401,6 +407,11 @@ done
 while [[ $(efibootmgr | grep -c -m 1 "ubuntu") -gt 0 ]]
 do
   entryId=$(efibootmgr -v | grep -m 1 -i "ubuntu" | sed -e 's/^Boot\([0-9]\+\)\(.*\)$/\1/')
+  sudo efibootmgr -q -b "${entryId}" -B
+done
+while [[ $(efibootmgr | grep -c -m 1 "debian") -gt 0 ]]
+do
+  entryId=$(efibootmgr -v | grep -m 1 -i "debian" | sed -e 's/^Boot\([0-9]\+\)\(.*\)$/\1/')
   sudo efibootmgr -q -b "${entryId}" -B
 done
 while [[ $(efibootmgr | grep -c -m 1 "SECTPMCTL Bootloader") -gt 0 ]]

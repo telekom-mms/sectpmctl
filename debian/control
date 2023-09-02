@@ -2,7 +2,7 @@ Source: sectpmctl
 Section: misc
 Priority: optional
 Maintainer: Richard Robert Reitz <richard-robert.reitz@t-systems.com>
-Build-Depends: curl, debhelper (>= 10)
+Build-Depends: debhelper (>= 10)
 Standards-Version: 4.1.2
 
 Package: sectpmctl
