@@ -261,7 +261,10 @@ create_efi_blob ()
     echo "Mounted tmpfs /run is required"
     exit
   fi
-  install -d -m 600 "/run/sectpmctl" || exit
+  if [ ! -d "/run/sectpmctl" ]; then
+    mkdir "/run/sectpmctl" || exit
+  fi
+  chmod 700 "/run/sectpmctl" || exit
   tempbootdir=$(mktemp -d -p "/run/sectpmctl")
   chmod 700 "${tempbootdir}"
   cd "${tempbootdir}" || exit
@@ -635,7 +638,10 @@ install ()
     echo "Mounted tmpfs /run is required"
     exit
   fi
-  install -d -m 600 "/run/sectpmctl" || exit
+  if [ ! -d "/run/sectpmctl" ]; then
+    mkdir "/run/sectpmctl" || exit
+  fi
+  chmod 700 "/run/sectpmctl" || exit
   tempdirname=$(mktemp -d -p "/run/sectpmctl")
   chmod 700 "${tempdirname}"
   cd "${tempdirname}" || exit

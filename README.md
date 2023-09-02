@@ -386,7 +386,6 @@ add another LUKS keys after installation, otherwise a recovery has to be done wh
 ```
 # 1. Point of no return, you need to complete at least until the following reboot command
 sudo apt remove --allow-remove-essential "grub*" "shim*"
-sudo apt install -y systemd-boot-efi
 sudo dpkg -i sectpmctl_1.2.0-1_amd64.deb
 sudo apt install -yf
 
