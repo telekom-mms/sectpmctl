@@ -934,6 +934,7 @@ be used to select the dedicated graphic card.
 * 1.2.0
   + Added module signing blocklist in tpmsbsigntool
   + Added Ubuntu >= 22.10 and release upgrade support
+  + Added Debian 12 support
   + Updated UEFI revocation list to version May 9, 2023
 
 * 1.1.5
