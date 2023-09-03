@@ -1179,9 +1179,6 @@ update_initramfs() {
 }
 
 check_tpm2_secureboot () {
-  echo 'Check if TPM was found during boot'
-  dmesg | grep -i 'TPM' || (echo 'TPM NOT FOUND' ; exit 3)
-
   echo 'TPM2 Selftest'
   tpm2_selftest || (echo 'TPM Selftest Failed' ; exit 3)
 }
