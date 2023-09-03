@@ -1,4 +1,13 @@
+CFLAGS=-O2 -g0 -Wall -Wextra $$(pkg-config --cflags libargon2)
+LDFLAGS=$$(pkg-config --libs libargon2)
+CC=gcc
+
 all: 
+
+sectpmctl-hash: src/usr/libexec/sectpmctl/sectpmctl-hash.c
+	$(CC) $(CFLAGS) -o $@ $^ $(LDFLAGS)
+
+compile: sectpmctl-hash
 
 install:
 	install -d $(DESTDIR)/usr/sbin
@@ -32,14 +41,17 @@ install:
 	ln -s ../postinst.d/zz-update-sectpmctl-boot $(DESTDIR)/etc/kernel/postrm.d/zz-update-sectpmctl-boot
 	install -d $(DESTDIR)/etc/initramfs/post-update.d
 	ln -s ../../kernel/postinst.d/zz-update-sectpmctl-boot $(DESTDIR)/etc/initramfs/post-update.d/zz-update-sectpmctl-boot
+	install -d $(DESTDIR)/usr/libexec/sectpmctl
+	install -m 0755 sectpmctl-hash $(DESTDIR)/usr/libexec/sectpmctl/sectpmctl-hash
 
-package_build: package_clean generate_changelog
+package_build: package_clean generate_changelog compile
 	debuild -i -uc -us -b
 
 generate_changelog:
 	wget -qO - https://raw.githubusercontent.com/telekom-mms/deb-builder-base/main/git-dch.sh | /usr/bin/bash -s -- $(DIST) $(TAG)
 
 package_clean:
+	-rm sectpmctl-hash
 	-rm -Rf debian/.debhelper
 	-rm -Rf debian/$(firstword $(subst _, ,$(lastword $(subst /, ,$(shell pwd)))))*
 	-rm debian/debhelper-build-stamp debian/files

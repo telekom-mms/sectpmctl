@@ -24,11 +24,12 @@ function rand8str()
   echo "${xored}"
 }
 
-
 function rand8file()
 {
   local n8="${1}"
   local file="${2}"
+  
+  rm "${file}" 2> /dev/null > /dev/null || true
 
   local getrand=$(rand8str "${n8}")
 
@@ -688,7 +689,8 @@ echo -n "Enter TPM or LUKS Password: "
 read -sr password || true
 echo
 
-sectpmctl key unseal --handle "${PERSISTANT_HANDLE_TO_USE}" --password "\${password}" --pcr-extend 1>&3 3>&-
+pwdhashed="\$(sectpmctl hash \`cat "${SECTPMCTL_KEYS}/pwd.opts"\` "\${password}")"
+sectpmctl key unseal --handle "${PERSISTANT_HANDLE_TO_USE}" --password-hex "0x\${pwdhashed}" --pcr-extend 1>&3 3>&-
 retValUnseal=\$?
 
 if [ \$retValUnseal -ne 0 ]; then
@@ -696,6 +698,8 @@ if [ \$retValUnseal -ne 0 ]; then
         echo -n "\${password}" 1>&3 3>&-
         exit 1
 fi
+
+echo -n "\${password}" 1>&3 3>&-
 
 sectpmctl key extend --random
 retValExtend=\$?
@@ -909,12 +913,23 @@ generate_tpm2_policy() {
   TEMPDIR="$(mktemp -d -p "/run/sectpmctl")"
   chmod 700 "${TEMPDIR}"
   TPM_SECRET_LUKS_KEY="tpmkey"
+  TPM_SECRET_FOR_LUKS_KEY="lukskey"
 
   echo "CREATE AND ADD TPM POLICY IN TMPFS DIRECTORY ${TEMPDIR}"
   cd "${TEMPDIR}" || exit 1
 
   echo "CREATE SECRET TPM LUKS KEY"
   rand8file 16 "${TPM_SECRET_LUKS_KEY}"
+  cp "${TPM_SECRET_LUKS_KEY}" "${TPM_SECRET_FOR_LUKS_KEY}"
+  if [[ -n ${TPM_PASSWORD} ]]; then
+    echo -n "${TPM_PASSWORD}" >> "${TPM_SECRET_FOR_LUKS_KEY}"
+    echo "CREATE SALT FOR ARGON2"
+    rand8file 4 "${SECTPMCTL_KEYS}/pwd.salt"
+  else
+    if [[ -f "${SECTPMCTL_KEYS}/pwd.salt" ]]; then
+      rm "${SECTPMCTL_KEYS}/pwd.salt"
+    fi
+  fi
 
   if [[ $( cryptsetup luksDump "${CRYPT_PARTITION}" | grep -c "${TPM_KEYSLOT}: luks2") != 0 ]]; then
     echo "KILL EXISTING TPM LUKS KEY FROM KEYSLOT"
@@ -938,14 +953,14 @@ generate_tpm2_policy() {
       --key-slot="${TPM_KEYSLOT}" \
       luksAddKey \
       "${CRYPT_PARTITION}" \
-      "${TPM_SECRET_LUKS_KEY}" || ( echo "COULD NOT ADD KEY" && exit 2 )
+      "${TPM_SECRET_FOR_LUKS_KEY}" || ( echo "COULD NOT ADD KEY" && exit 2 )
   else
     cryptsetup \
       --key-slot="${TPM_KEYSLOT}" \
       --key-file="${KEY_FILE}" \
       luksAddKey \
       "${CRYPT_PARTITION}" \
-      "${TPM_SECRET_LUKS_KEY}" || ( echo "COULD NOT ADD KEY" && exit 2 )
+      "${TPM_SECRET_FOR_LUKS_KEY}" || ( echo "COULD NOT ADD KEY" && exit 2 )
   fi
   
   echo "EXTEND PCR 14"
@@ -1032,7 +1047,24 @@ generate_tpm2_policy() {
     USE_PRESEED_PCR="--pcr-preseed"
   fi
   if [[ -n ${TPM_PASSWORD} ]]; then
-    sectpmctl key seal --handle "${PERSISTANT_HANDLE_TO_USE}" --key-file "${TPM_SECRET_LUKS_KEY}" --password "${TPM_PASSWORD}" --pcr-extend ${USE_PRESEED_PCR}
+    KDF="$(cryptsetup luksDump --dump-json-metadata "${CRYPT_PARTITION}" | jq -r ".keyslots.\""${RECOVERY_KEYSLOT}"\".kdf.type")"
+    if [[ "x${KDF}" != "xargon2id" ]]; then
+      echo "Unexpected KDF of LUKS partition ${CRYPT_PARTITION}: ${KDF}"
+      echo "Expected: argon2id. Exit"
+      exit 1
+    fi
+
+    TIME="$(cryptsetup luksDump --dump-json-metadata "${CRYPT_PARTITION}" | jq -r ".keyslots.\""${RECOVERY_KEYSLOT}"\".kdf.time")"
+    MEMORY="$(cryptsetup luksDump --dump-json-metadata "${CRYPT_PARTITION}" | jq -r ".keyslots.\""${RECOVERY_KEYSLOT}"\".kdf.memory")"
+    CPUS="$(cryptsetup luksDump --dump-json-metadata "${CRYPT_PARTITION}" | jq -r ".keyslots.\""${RECOVERY_KEYSLOT}"\".kdf.cpus")"
+
+    if [[ -f "${SECTPMCTL_KEYS}/pwd.opts" ]]; then
+      rm "${SECTPMCTL_KEYS}/pwd.opts"
+    fi
+    echo --salt "${SECTPMCTL_KEYS}/pwd.opts" --time ${TIME} --memory ${MEMORY} --cpus ${CPUS} > "${SECTPMCTL_KEYS}/pwd.opts"
+
+    TPM_HASHED_PASSWORD="$(sectpmctl hash `cat "${SECTPMCTL_KEYS}/pwd.opts"` "${TPM_PASSWORD}")"
+    sectpmctl key seal --handle "${PERSISTANT_HANDLE_TO_USE}" --key-file "${TPM_SECRET_LUKS_KEY}" --password-hex "0x${TPM_HASHED_PASSWORD}" --pcr-extend ${USE_PRESEED_PCR}
   else
     sectpmctl key seal --handle "${PERSISTANT_HANDLE_TO_USE}" --key-file "${TPM_SECRET_LUKS_KEY}" --noda --pcr-extend ${USE_PRESEED_PCR}
   fi
@@ -1040,6 +1072,7 @@ generate_tpm2_policy() {
   echo "$(sectpmctl version)" > "${SECTPMCTL_KEYS}/installed_version"
 
   shred -f -z -u "${TPM_SECRET_LUKS_KEY}"
+  shred -f -z -u "${TPM_SECRET_FOR_LUKS_KEY}"
   
   cd - > /dev/null
   rmdir "${TEMPDIR}"
@@ -1094,6 +1127,8 @@ copy_exec /bin/bash /bin
 
 copy_exec ${SECTPMCTL_KEYS}/tpm_owner.pub ${SECTPMCTL_KEYS}/tpm_owner.pub
 copy_exec ${SECTPMCTL_KEYS}/tpm_owner_noda.pub ${SECTPMCTL_KEYS}/tpm_owner_noda.pub
+copy_exec ${SECTPMCTL_KEYS}/pwd.salt ${SECTPMCTL_KEYS}/pwd.salt
+copy_exec ${SECTPMCTL_KEYS}/pwd.opts ${SECTPMCTL_KEYS}/pwd.opts
 
 copy_exec /usr/bin/awk /usr/bin
 copy_exec /usr/bin/basename /usr/bin
@@ -1125,7 +1160,10 @@ copy_exec /usr/bin/wc /usr/bin
 
 copy_exec /usr/sbin/sectpmctl /usr/sbin
 
+copy_exec /usr/libexec/sectpmctl/sectpmctl-hash /usr/libexec/sectpmctl/sectpmctl-hash
+
 copy_exec /usr/lib/sectpmctl/scripts/sectpmctl-key /usr/lib/sectpmctl/scripts/sectpmctl-key
+
 copy_exec /usr/lib/x86_64-linux-gnu/libtss2-tcti-device.so.0 /usr/lib/x86_64-linux-gnu
 
 force_load tpm_tis
@@ -1141,9 +1179,6 @@ update_initramfs() {
 }
 
 check_tpm2_secureboot () {
-  echo 'Check if TPM was found during boot'
-  dmesg | grep -i 'TPM' || (echo 'TPM NOT FOUND' ; exit 3)
-
   echo 'TPM2 Selftest'
   tpm2_selftest || (echo 'TPM Selftest Failed' ; exit 3)
 }

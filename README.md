@@ -1,5 +1,12 @@
 # sectpmctl 1.2.0
 
+## Notes
+
+### faulTPM attack
+
+**It is highly recommended to upgrade to this version as it implements a defense-in-depth strategy for broken TPMs. See
+[Upgrade sectpmctl](#upgrade-sectpmctl) for how to upgrade without reinstallation.**
+
 ## Introduction
 
 **Warning: It is highly recommended to install sectpmctl on a fresh system installation as you could run into problems when the tpm2-tools
@@ -37,9 +44,9 @@ implementation, they are simply not needed in this decentralized implementation.
 
 ## Requirements
 
-* Ubuntu Desktop and Server 22.04, 22.10, 23.04 or 23.10
-* Debian 12
-* LUKS encrypted LVM installation
+* Ubuntu Desktop and Server 22.04, 22.10, 23.04, 23.10 or Debian 12
+* LUKS2 encrypted LVM installation
+* A TPM2 module, discrete (dTPM) or in firmware (fTPM)
 
 ## Features
 
@@ -67,10 +74,57 @@ implementation, they are simply not needed in this decentralized implementation.
 * Optional omitting of Microsoft Secure Boot keys on supported hardware
 * Option to forget the lockout authorization password set while TPM provisioning
 * Option to set and forget the endorsement password while TPM provisioning
+* Implements a defense-in-depth strategy when the TPM + password option is used
+  + Keeps software only LUKS2 security if the TPM is broken
 
 Using a splash screen and the TPM + Password option does not work correctly. If that happens you need to enter the password blindly.
 
 ## Security and privacy options
+
+### Key derivation function (KDF)
+
+[faulTPM attack](https://arxiv.org/abs/2304.14717)
+[argon2id parameters](https://datatracker.ietf.org/doc/html/rfc9106#name-parameter-choice)
+
+The rise of the faulTPM attack has shown that it is also necessary to think about security more in-depth. The attack allows to fully break the
+TPM of relative modern AMD CPUs. The mitigation strategy is to make use of key derivation as the TPM can't be trusted. Using key derivation lets
+the attacker require to brute force at least the password of the TPM + password option. That also means that TPM-only protection is not
+recommended at all. The default in this README is therefore the TPM + password option. The goal on broken TPM systems is to provide at least the
+same security as if a software-only encryption had been used instead of TPM + password.
+
+As faulTPM had shown, all key material can be extracted from the TPM without authorization. The proposed mitigation from the authors is to use
+the TPM + password option, together with a KDF and appending the password to the TPM secret which opens LUKS:
+
+Sealing
+
+    A LUKS_SECRET is computed randomly
+    User enters TPM_PASSWORD
+    PWD_HASHED = argon2(TPM_PASSWORD)
+    LUKS_SECRET is sealed in the TPM with PWD_HASHED instead of TPM_PASSWORD as authorization
+    LUKS will be encryted by LUKS_SECRET + TPM_PASSWORD
+    LUKS will use argon2 for encryption internally as well
+
+Unsealing
+
+    User enters TPM_PASSWORD
+    PWD_HASHED = argon2(TPM_PASSWORD)
+    LUKS_SECRET is unsealed from the TPM with PWD_HASHED as authorization
+    LUKS will be decryped by LUKS_SECRET + TPM_PASSWORD
+    LUKS will use argon2 for decryption internally as well
+
+The catch is that if the TPM is completely broken, then the LUKS_SECRET is known to the attacker. But that won't be sufficient to decrypt,
+because the original password needs to be known. The attacker has to brute force the password with argon2id as KDF. Therefore, sectpmctl with
+TPM + password option on a vulnerable system is at least as strong as a software-only encryption without a TPM at all.
+
+Currently, sectpmctl reads out the argon2id parameters from the LUKS2 partition itself and uses the same parameters to compute PWD_HASHED:
+
+- Iterations
+- Memory
+- CPUs
+
+LUKS2 places internal hard limits on the argon2id parameters (Memory <= 1GB, CPUs <= 4). A future release of sectpmctl could be able to support
+much stronger parameters than LUKS2 offers without sacrificing the ability to decrypt on slower devices, as there are two LUKs keys, one for
+the TPM (which may have stronger argon2id settings) and the high entropy recovery key (which may use the default argon2id LUKS settings).
 
 ### Lockout authorization password
 
@@ -147,6 +201,9 @@ sudo apt install -yf
 
 ### Build instructions and installation
 
+It is recommended to build tpmsbsigntool on Ubuntu 22.04 for compatibility with newer versions including Debian. If you don't need backward
+compatibility, you can compile it on newer systems as well.
+
 ```
 sudo apt install -y git devscripts debhelper-compat gcc-multilib binutils-dev libssl-dev \
   openssl pkg-config automake uuid-dev help2man gnu-efi tpm2-openssl
@@ -189,9 +246,13 @@ wget https://github.com/telekom-mms/sectpmctl/releases/download/1.2.0/sectpmctl_
 
 ### Build instructions
 
+It is recommended to build sectpmctl on Ubuntu 22.04 for compatibility with newer versions including Debian. If you don't need backward
+compatibility, you can compile it on newer systems as well.
+
 ```
 sudo apt install -y debhelper efibootmgr efitools sbsigntool binutils mokutil dkms systemd udev \
-  util-linux gdisk openssl uuid-runtime tpm2-tools fdisk git devscripts
+  util-linux gdisk openssl uuid-runtime tpm2-tools fdisk git devscripts build-essential pkg-config \
+  libargon2-dev
 
 git clone https://github.com/telekom-mms/sectpmctl.git
 
@@ -337,9 +398,9 @@ Execute this command to see which version is currently applied:
 
 | Installed version | Applied version | Action |
 | - | - | --- |
-| <= 1.1.5 | <= 1.1.5 | [build sectpmctl](#build-sectpmctl), sudo dpkg -i sectpmctl_1.2.0-1_amd64.deb and upgrade to [1.2.0](#tpm-resealing-only)|
-| >= 1.2.0 | <= 1.1.5 | Upgrade to [1.2.0](#tpm-resealing-only) |
-| >= 1.2.0 | >= 1.2.0 |  |
+| <= 1.1.5 | <= 1.1.5 | [build sectpmctl](#build-sectpmctl), sudo dpkg -i sectpmctl_1.2.0-1_amd64.deb and [upgrade to 1.2.0](#tpm-resealing-only)|
+| 1.2.0 | <= 1.1.5 | [upgrade to 1.2.0](#tpm-resealing-only) |
+| 1.2.0 | 1.2.0 |  |
 
 
 #### Ubuntu release upgrades
@@ -787,16 +848,21 @@ tpm2_startauthsession --policy-session --session="session.ctx" --key-context="tp
 #### Sealing with TPM password
 
 ```
-# Generate the secret
-echo mysecret > INPUT_SECRET_FILE
+# Hash the TPM password
+TPM_PASSWORD="mytpmpassword"
+echo -n 12345678123456781234567812345678 > saltfile
+TPM_HASHED_PASSWORD="$(sectpmctl hash --salt saltfile --time 4 --memory 1000000 --cpus 4 "${TPM_PASSWORD}")"
+
+# Generate the TPM key
+echo randomLuksSecret > LUKS_KEY_FILE
 
 # Foresee or read the PCR values into "pcr_values.dat"
-tpm2_pcrread "sha256:7,8,9,11,14" --output="pcr_values.dat"
+tpm2_pcrread "sha256:7,14" --output="pcr_values.dat"
 
 # Create trial PCR with authvalue policy session
 tpm2_startauthsession --session="trialsession.ctx"
 
-tpm2_policypcr --session="trialsession.ctx" --pcr-list="sha256:7,8,9,11,14" \
+tpm2_policypcr --session="trialsession.ctx" --pcr-list="sha256:7,14" \
   --pcr="pcr_values.dat" --policy="pcr.policy"
 
 tpm2_policyauthvalue --session="trialsession.ctx" --policy="pcr.policy"
@@ -809,11 +875,11 @@ tpm2_startauthsession --policy-session --session="session.ctx" --key-context="tp
 tpm2_sessionconfig "session.ctx"
 # -> Session-Attributes: continuesession|decrypt|encrypt
 
-# Seal the secret
+# Seal the TPM key with TPM_HASHED_PASSWORD as authorization
 tpm2_create --session="session.ctx" --hash-algorithm=sha256 --public="pcr_seal_key.pub" \
-  --private="pcr_seal_key.priv" --sealing-input="INPUT_SECRET_FILE" \
+  --private="pcr_seal_key.priv" --sealing-input="LUKS_KEY_FILE" \
   --parent-context="0x81000100" --policy="pcr.policy" --attributes="fixedtpm|fixedparent" \
-  --key-auth="hex:11223344"
+  --key-auth="hex:${TPM_HASHED_PASSWORD}"
 
 tpm2_flushcontext "session.ctx"
 
@@ -825,24 +891,42 @@ tpm2_load --parent-context="0x81000100" --public="pcr_seal_key.pub" \
 
 # Store secret
 tpm2_evictcontrol --object-context="pcr_seal_key.ctx" "0x81000202" --hierarchy=o
+
+# Add unhashed password to TPM key
+echo -n "${TPM_PASSWORD}" >> LUKS_KEY_FILE
+
+# Use LUKS_KEY_FILE as the LUKS key file
 ```
 
 #### Unsealing with TPM password
 
 ```
+# Hash the TPM password
+TPM_PASSWORD="mytpmpassword"
+echo -n 12345678123456781234567812345678 > saltfile
+TPM_HASHED_PASSWORD="$(sectpmctl hash --salt saltfile --time 4 --memory 1000000 --cpus 4 "${TPM_PASSWORD}")"
+
 tpm2_startauthsession --policy-session --session="session.ctx" --key-context="tpm_owner.pub"
 
 tpm2_sessionconfig "session.ctx"
 # -> Session-Attributes: continuesession|decrypt|encrypt
 
-tpm2_policypcr --session="session.ctx" --pcr-list="sha256:7,8,9,11,14"
+tpm2_policypcr --session="session.ctx" --pcr-list="sha256:7,14"
 
 tpm2_policyauthvalue --session="session.ctx"
 
-# Unseal the secret
-tpm2_unseal --auth="session:session.ctx+hex:11223344" --object-context="0x81000202"
+# Unseal the TPM key with TPM_HASHED_PASSWORD as authorization
+tpm2_unseal --auth="session:session.ctx+hex:${TPM_HASHED_PASSWORD}" --object-context="0x81000202" > LUKS_KEY_FILE
 
 tpm2_flushcontext "session.ctx"
+
+# Prevent a second unsealing
+tpm2_pcrextend "14:sha256=0000000000000000000000000000000000000000000000000000000000000000"
+
+# Add unhashed password to TPM key
+echo -n "${TPM_PASSWORD}" >> LUKS_KEY_FILE
+
+# Use LUKS_KEY_FILE as the LUKS key file
 ```
 
 ### Authorized policies
@@ -932,6 +1016,7 @@ then be used to select the dedicated graphic card.
 ## Changelog
 
 * 1.2.0
+  + Added defense-in-depth strategy to mitigate the faulTPM attack
   + Added module signing blocklist in tpmsbsigntool
   + Added Ubuntu >= 22.10 and release upgrade support
   + Added Debian 12 support
@@ -972,4 +1057,3 @@ then be used to select the dedicated graphic card.
 Every piece of information or code in this repository is written and collected with the best intentions in mind. We do not
 warrant that it is complete, correct, or that it is working on your platform. We provide everything as is and try to fix bugs and
 security issues as soon as possible. Use at your own risk.
-
