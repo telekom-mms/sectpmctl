@@ -848,16 +848,21 @@ tpm2_startauthsession --policy-session --session="session.ctx" --key-context="tp
 #### Sealing with TPM password
 
 ```
-# Generate the secret
-echo mysecret > INPUT_SECRET_FILE
+# Hash the TPM password
+TPM_PASSWORD="mytpmpassword"
+echo -n 12345678123456781234567812345678 > saltfile
+TPM_HASHED_PASSWORD="$(sectpmctl hash --salt saltfile --time 4 --memory 1000000 --cpus 4 "${TPM_PASSWORD}")"
+
+# Generate the TPM key
+echo randomLuksSecret > LUKS_KEY_FILE
 
 # Foresee or read the PCR values into "pcr_values.dat"
-tpm2_pcrread "sha256:7,8,9,11,14" --output="pcr_values.dat"
+tpm2_pcrread "sha256:7,14" --output="pcr_values.dat"
 
 # Create trial PCR with authvalue policy session
 tpm2_startauthsession --session="trialsession.ctx"
 
-tpm2_policypcr --session="trialsession.ctx" --pcr-list="sha256:7,8,9,11,14" \
+tpm2_policypcr --session="trialsession.ctx" --pcr-list="sha256:7,14" \
   --pcr="pcr_values.dat" --policy="pcr.policy"
 
 tpm2_policyauthvalue --session="trialsession.ctx" --policy="pcr.policy"
@@ -870,11 +875,11 @@ tpm2_startauthsession --policy-session --session="session.ctx" --key-context="tp
 tpm2_sessionconfig "session.ctx"
 # -> Session-Attributes: continuesession|decrypt|encrypt
 
-# Seal the secret
+# Seal the TPM key with TPM_HASHED_PASSWORD as authorization
 tpm2_create --session="session.ctx" --hash-algorithm=sha256 --public="pcr_seal_key.pub" \
-  --private="pcr_seal_key.priv" --sealing-input="INPUT_SECRET_FILE" \
+  --private="pcr_seal_key.priv" --sealing-input="LUKS_KEY_FILE" \
   --parent-context="0x81000100" --policy="pcr.policy" --attributes="fixedtpm|fixedparent" \
-  --key-auth="hex:11223344"
+  --key-auth="hex:${TPM_HASHED_PASSWORD}"
 
 tpm2_flushcontext "session.ctx"
 
@@ -886,24 +891,42 @@ tpm2_load --parent-context="0x81000100" --public="pcr_seal_key.pub" \
 
 # Store secret
 tpm2_evictcontrol --object-context="pcr_seal_key.ctx" "0x81000202" --hierarchy=o
+
+# Add unhashed password to TPM key
+echo -n "${TPM_PASSWORD}" >> LUKS_KEY_FILE
+
+# Use LUKS_KEY_FILE as the LUKS key file
 ```
 
 #### Unsealing with TPM password
 
 ```
+# Hash the TPM password
+TPM_PASSWORD="mytpmpassword"
+echo -n 12345678123456781234567812345678 > saltfile
+TPM_HASHED_PASSWORD="$(sectpmctl hash --salt saltfile --time 4 --memory 1000000 --cpus 4 "${TPM_PASSWORD}")"
+
 tpm2_startauthsession --policy-session --session="session.ctx" --key-context="tpm_owner.pub"
 
 tpm2_sessionconfig "session.ctx"
 # -> Session-Attributes: continuesession|decrypt|encrypt
 
-tpm2_policypcr --session="session.ctx" --pcr-list="sha256:7,8,9,11,14"
+tpm2_policypcr --session="session.ctx" --pcr-list="sha256:7,14"
 
 tpm2_policyauthvalue --session="session.ctx"
 
-# Unseal the secret
-tpm2_unseal --auth="session:session.ctx+hex:11223344" --object-context="0x81000202"
+# Unseal the TPM key with TPM_HASHED_PASSWORD as authorization
+tpm2_unseal --auth="session:session.ctx+hex:${TPM_HASHED_PASSWORD}" --object-context="0x81000202" > LUKS_KEY_FILE
 
 tpm2_flushcontext "session.ctx"
+
+# Prevent a second unsealing
+tpm2_pcrextend "14:sha256=0000000000000000000000000000000000000000000000000000000000000000"
+
+# Add unhashed password to TPM key
+echo -n "${TPM_PASSWORD}" >> LUKS_KEY_FILE
+
+# Use LUKS_KEY_FILE as the LUKS key file
 ```
 
 ### Authorized policies
