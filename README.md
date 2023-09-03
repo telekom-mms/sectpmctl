@@ -231,6 +231,9 @@ sudo apt install -yf
 
 ### Build instructions and installation
 
+It is recommended to build tpmsbsigntool on Ubuntu 22.04 for compatibility with newer versions including Debian. If you don't need backward
+compatibility, you can compile it on newer systems as well.
+
 ```
 sudo apt install -y git devscripts debhelper-compat gcc-multilib binutils-dev libssl-dev \
   openssl pkg-config automake uuid-dev help2man gnu-efi tpm2-openssl
@@ -272,6 +275,9 @@ wget https://github.com/telekom-mms/sectpmctl/releases/download/1.2.0/sectpmctl_
 ```
 
 ### Build instructions
+
+It is recommended to build sectpmctl on Ubuntu 22.04 for compatibility with newer versions including Debian. If you don't need backward
+compatibility, you can compile it on newer systems as well.
 
 ```
 sudo apt install -y debhelper efibootmgr efitools sbsigntool binutils mokutil dkms systemd udev \
@@ -422,9 +428,9 @@ Execute this command to see which version is currently applied:
 
 | Installed version | Applied version | Action |
 | - | - | --- |
-| <= 1.1.5 | <= 1.1.5 | [build sectpmctl](#build-sectpmctl), sudo dpkg -i sectpmctl_1.2.0-1_amd64.deb and upgrade to [1.2.0](#tpm-resealing-only)|
-| >= 1.2.0 | <= 1.1.5 | Upgrade to [1.2.0](#tpm-resealing-only) |
-| >= 1.2.0 | >= 1.2.0 |  |
+| <= 1.1.5 | <= 1.1.5 | [build sectpmctl](#build-sectpmctl), sudo dpkg -i sectpmctl_1.2.0-1_amd64.deb and [upgrade to 1.2.0](#tpm-resealing-only)|
+| 1.2.0 | <= 1.1.5 | [upgrade to 1.2.0](#tpm-resealing-only) |
+| 1.2.0 | 1.2.0 |  |
 
 
 #### Ubuntu release upgrades
