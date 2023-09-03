@@ -20,6 +20,7 @@ install:
 	install -m 0755 src/usr/lib/sectpmctl/boot.conf $(DESTDIR)/usr/lib/sectpmctl
 	install -d $(DESTDIR)/usr/lib/sectpmctl/keys
 	install -m 0644 src/usr/lib/sectpmctl/keys/canonical-master-public.pem $(DESTDIR)/usr/lib/sectpmctl/keys
+	install -m 0644 src/usr/lib/sectpmctl/keys/debian-prod-2022-linux.pem $(DESTDIR)/usr/lib/sectpmctl/keys
 	install -m 0644 src/usr/lib/sectpmctl/keys/dbxupdate_x64.bin $(DESTDIR)/usr/lib/sectpmctl/keys
 	install -m 0644 src/usr/lib/sectpmctl/keys/MicCorUEFCA2011_2011-06-27.crt $(DESTDIR)/usr/lib/sectpmctl/keys
 	install -m 0644 src/usr/lib/sectpmctl/keys/MicWinProPCA2011_2011-10-19.crt $(DESTDIR)/usr/lib/sectpmctl/keys
@@ -47,7 +48,7 @@ package_build: package_clean generate_changelog compile
 	debuild -i -uc -us -b
 
 generate_changelog:
-	curl -sL https://raw.githubusercontent.com/telekom-mms/deb-builder-base/main/git-dch.sh | /usr/bin/bash -s -- $(DIST) $(TAG)
+	wget -qO - https://raw.githubusercontent.com/telekom-mms/deb-builder-base/main/git-dch.sh | /usr/bin/bash -s -- $(DIST) $(TAG)
 
 package_clean:
 	-rm sectpmctl-hash

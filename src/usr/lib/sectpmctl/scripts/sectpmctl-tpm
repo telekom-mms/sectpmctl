@@ -1,8 +1,6 @@
 #! /bin/bash
 
 # SECTPMCTL
-# AUTHORS: Heike Pesch <heike.pesch@t-systems.com>
-#          Richard Robert Reitz <richard-robert.reitz@t-systems.com>
 
 PATH='/usr/sbin:/usr/bin:/sbin:/bin'
 
@@ -56,6 +54,7 @@ Usage: ${ME/-/ } COMMAND [OPTIONS]
 
 COMMANDS
   check
+  get-installed-version
   help
   install
     [--dont-extend] [--key <file>] [--password <tpm password>]
@@ -106,6 +105,7 @@ ${ME/-/ } COMMAND [OPTIONS]
 
 COMMANDS
   check
+  get-installed-version
   help
   install
     [--dont-extend] [--key <file>] [--password <TPM password>]
@@ -123,6 +123,11 @@ OPTIONS
 
     Currently it checks if TPM2 is found, performs TPM2 selftest
     and check if SecureBoot is enabled.
+
+
+  get-installed-version
+
+    Get the currently installed version
 
 
   help
@@ -306,9 +311,9 @@ _check_input() {
   export SEAL="false"
   export CHANGEPIN="false"
   export CHECK="false"
+  export GET_VERSION="false"
   export EXTEND="true"
   export PCR_BANK="sha256"
-  # PCR 8,9,11 and 14 are always added
   export PCR_VALUES_TO_USE="7"
   export PERSISTANT_OWNER_SRK="0x81000100"
   export PERSISTANT_OWNER_SRK_NODA="0x81000101"
@@ -406,6 +411,9 @@ _check_input() {
       check)
         export CHECK="true"
         ;;
+      get-installed-version)
+        export GET_VERSION="true"
+        ;;
       provisioning)
         export DO_PROVISIONING="true"
         ;;
@@ -494,7 +502,27 @@ _check_input() {
       "${FORGET_LOCKOUT}" \
       "${SET_FORGET_ENDORSEMENT}"
 
+  [[ "${GET_VERSION}" == "true" ]] \
+    && get_installed_version \
+      "${SECTPMCTL_KEYS}" \
+      "${KEY_SCRIPT}"
+
   exit 0
+}
+
+get_installed_version() {
+  SECTPMCTL_KEYS="${1}"
+  KEY_SCRIPT="${2}"
+
+  if [[ -f "${SECTPMCTL_KEYS}/installed_version" ]]; then
+    cat "${SECTPMCTL_KEYS}/installed_version"
+  else
+    if [[ -f "${KEY_SCRIPT}" ]]; then
+      echo "sectpmctl <= 1.1.5"
+    else
+      echo "not installed"
+    fi
+  fi
 }
 
 do_provisioning() {
@@ -556,7 +584,13 @@ do_provisioning() {
     tpm2_changeauth -Q --object-context=lockout "$(cat "${LOCKOUT_FILE}")"
   fi
 
-  tempdir=$(mktemp -d -p /dev/shm)
+  p1="$( grep -c "^tmpfs /run tmpfs" /proc/mounts )" || p1=""
+  if [[ "${p1}" != "1" ]]; then
+    echo "Mounted tmpfs /run is required"
+    exit
+  fi
+  install -d -m 600 "/run/sectpmctl" || exit
+  tempdir=$(mktemp -d -p "/run/sectpmctl")
   chmod 700 "${tempdir}"
   cd "${tempdir}" || exit
 
@@ -625,13 +659,6 @@ generate_unseal_script() {
 
 exec 3>&1 1>&2
 
-echo
-echo sectpmctl
-echo
-
-mkdir /dev/shm > /dev/null 2> /dev/null
-mount -t tmpfs tmpfs /dev/shm
-
 tpm2_flushcontext -t
 tpm2_flushcontext -l
 tpm2_flushcontext -s
@@ -640,8 +667,7 @@ sectpmctl key testsession
 retValSession=\$?
 
 if [ \$retValSession -ne 0 ]; then
-        umount /dev/shm
-        echo COULD NOT CONNECT TO KNOWN TPM
+        echo SECTPMCTL COULD NOT CONNECT TO KNOWN TPM
         keyscript="/lib/cryptsetup/askpass"
         echo
         keyscriptarg="Enter Recovery Key: "
@@ -649,13 +675,16 @@ if [ \$retValSession -ne 0 ]; then
         exit 1
 fi
 
-tpm2_pcrread sha256:11 | grep -q "^[[:space:]]\+11:[[:space:]]\+0x[0]\+$"
+tpm2_pcrread sha256:14 | grep -q "^[[:space:]]\+14:[[:space:]]\+0x[0]\+$"
 if [ \$? -eq 0 ]; then
         cryptsetup luksDump "${CRYPT_PARTITION}" > luks.dat
         sectpmctl key extend --file luks.dat
         shred -f -z -u luks.dat
 fi
 
+echo
+echo sectpmctl
+echo
 echo -n "Enter TPM or LUKS Password: "
 read -sr password || true
 echo
@@ -665,7 +694,6 @@ sectpmctl key unseal --handle "${PERSISTANT_HANDLE_TO_USE}" --password-hex "0x\$
 retValUnseal=\$?
 
 if [ \$retValUnseal -ne 0 ]; then
-        umount /dev/shm
         echo UNSEAL FAILED, CHECKING RECOVERY KEY
         echo -n "\${password}" 1>&3 3>&-
         exit 1
@@ -675,8 +703,6 @@ echo -n "\${password}" 1>&3 3>&-
 
 sectpmctl key extend --random
 retValExtend=\$?
-
-umount /dev/shm
 
 if [ \$retValExtend -ne 0 ]; then
         echo KEY COULD NOT BE SECURED. PLEASE REBOOT.
@@ -700,9 +726,6 @@ if [ "\$CRYPTTAB_TRIED" = 0 ]; then
         echo sectpmctl
         echo
         
-        mkdir /dev/shm > /dev/null 2> /dev/null
-        mount -t tmpfs tmpfs /dev/shm
-
         tpm2_flushcontext -t
         tpm2_flushcontext -l
         tpm2_flushcontext -s
@@ -727,8 +750,6 @@ if [ "\$CRYPTTAB_TRIED" = 0 ]; then
         sectpmctl key extend --random
         retValExtend=\$?
 
-        umount /dev/shm
-        
         if [ \$retValUnseal -ne 0 ]; then
                 echo UNSEAL FAILED
                 echo
@@ -763,9 +784,6 @@ if [ "\$CRYPTTAB_TRIED" = 0 ]; then
         echo sectpmctl, only for preseed usage!
         echo
 
-        mkdir /dev/shm > /dev/null 2> /dev/null
-        mount -t tmpfs tmpfs /dev/shm
-
         tpm2_flushcontext -t
         tpm2_flushcontext -l
         tpm2_flushcontext -s
@@ -787,8 +805,6 @@ if [ "\$CRYPTTAB_TRIED" = 0 ]; then
                 fi
         done
 
-        umount /dev/shm
-        
         if [ \$retValUnseal -ne 0 ]; then
                 echo UNSEAL FAILED
                 echo
@@ -887,13 +903,17 @@ generate_tpm2_policy() {
 
   echo "## CRYPT PARTITION: ${CRYPT_PARTITION}"
 
+  p1="$( grep -c "^tmpfs /run tmpfs" /proc/mounts )" || p1=""
+  if [[ "${p1}" != "1" ]]; then
+    echo "Mounted tmpfs /run is required"
+    exit 1
+  fi
+  install -d -m 600 "/run/sectpmctl" || exit 1
   TEMPDIR=""
-  TEMPDIR="$(mktemp -d -p /tmp)"
+  TEMPDIR="$(mktemp -d -p "/run/sectpmctl")"
   chmod 700 "${TEMPDIR}"
   TPM_SECRET_LUKS_KEY="tpmkey"
   TPM_SECRET_FOR_LUKS_KEY="lukskey"
-
-  mount -t tmpfs "${TEMPDIR##*/}" "${TEMPDIR}"
 
   echo "CREATE AND ADD TPM POLICY IN TMPFS DIRECTORY ${TEMPDIR}"
   cd "${TEMPDIR}" || exit 1
@@ -943,7 +963,7 @@ generate_tpm2_policy() {
       "${TPM_SECRET_FOR_LUKS_KEY}" || ( echo "COULD NOT ADD KEY" && exit 2 )
   fi
   
-  echo "EXTEND PCR 11"
+  echo "EXTEND PCR 14"
   sectpmctl key extend --random
 
   # Create empty dat for PCR 8, 9 and 14
@@ -1011,15 +1031,15 @@ generate_tpm2_policy() {
     chmod 600 "${SECTPMCTL_KEYS}/pcr7.dat"
   fi
 
-  if [[ -f "${SECTPMCTL_KEYS}/pcr11.dat" ]]; then
-    rm -f "${SECTPMCTL_KEYS}/pcr11.dat"
+  if [[ -f "${SECTPMCTL_KEYS}/pcr14.dat" ]]; then
+    rm -f "${SECTPMCTL_KEYS}/pcr14.dat"
   fi
-  # Calculate expected value for PCR 11
-  cryptsetup luksDump "${CRYPT_PARTITION}" | openssl dgst -${PCR_BANK} -binary -out pcr11luks.dat -
-  cat "${SECTPMCTL_KEYS}/pcrNull.dat" pcr11luks.dat > pcr11combined.dat
-  openssl dgst -${PCR_BANK} -binary -out "${SECTPMCTL_KEYS}/pcr11.dat" pcr11combined.dat
-  chmod 600 "${SECTPMCTL_KEYS}/pcr11.dat"
-  shred -f -z -u pcr11luks.dat pcr11combined.dat
+  # Calculate expected value for PCR 14
+  cryptsetup luksDump "${CRYPT_PARTITION}" | openssl dgst -${PCR_BANK} -binary -out pcr14luks.dat -
+  cat "${SECTPMCTL_KEYS}/pcrNull.dat" pcr14luks.dat > pcr14combined.dat
+  openssl dgst -${PCR_BANK} -binary -out "${SECTPMCTL_KEYS}/pcr14.dat" pcr14combined.dat
+  chmod 600 "${SECTPMCTL_KEYS}/pcr14.dat"
+  shred -f -z -u pcr14luks.dat pcr14combined.dat
 
   echo "SEAL LUKS KEY to TPM"
   USE_PRESEED_PCR=""
@@ -1049,11 +1069,12 @@ generate_tpm2_policy() {
     sectpmctl key seal --handle "${PERSISTANT_HANDLE_TO_USE}" --key-file "${TPM_SECRET_LUKS_KEY}" --noda --pcr-extend ${USE_PRESEED_PCR}
   fi
 
+  echo "$(sectpmctl version)" > "${SECTPMCTL_KEYS}/installed_version"
+
   shred -f -z -u "${TPM_SECRET_LUKS_KEY}"
   shred -f -z -u "${TPM_SECRET_FOR_LUKS_KEY}"
   
   cd - > /dev/null
-  umount "${TEMPDIR}"
   rmdir "${TEMPDIR}"
   
   echo "DONE"
@@ -1075,16 +1096,6 @@ edit_crypttab() {
     sed -i "${LINENR} {/^.*$/d}" /etc/crypttab
     echo "${LINE_IN_FILE}" >> /etc/crypttab
   fi
-}
-
-edit_initramfs_conf() {
-  echo "## SET UMASK IN /etc/initramfs-tools/initramfs.conf"
-  CONFIG_FILE="/etc/initramfs-tools/initramfs.conf"
-  cp -a "${CONFIG_FILE}" "${CONFIG_FILE}-$(date +%F)"
-  if [[ $(grep -c "UMASK" "${CONFIG_FILE}") != 0 ]]; then
-    sed -i '/^[#\s]*\(UMASK=\)[0-9]\+/d' "${CONFIG_FILE}"
-  fi
-  echo "UMASK=0077" >> "${CONFIG_FILE}"
 }
 
 # @TODO Check if we need to put all the bins
@@ -1148,12 +1159,10 @@ copy_exec /usr/bin/tr /usr/bin
 copy_exec /usr/bin/wc /usr/bin
 
 copy_exec /usr/sbin/sectpmctl /usr/sbin
-copy_exec /usr/sbin/cryptsetup /usr/sbin
 
 copy_exec /usr/libexec/sectpmctl/sectpmctl-hash /usr/libexec/sectpmctl/sectpmctl-hash
 
 copy_exec /usr/lib/sectpmctl/scripts/sectpmctl-key /usr/lib/sectpmctl/scripts/sectpmctl-key
-copy_exec /usr/lib/sectpmctl/scripts/sectpmctl-tpm /usr/lib/sectpmctl/scripts/sectpmctl-tpm
 
 copy_exec /usr/lib/x86_64-linux-gnu/libtss2-tcti-device.so.0 /usr/lib/x86_64-linux-gnu
 
@@ -1237,8 +1246,10 @@ initial_tpm2_setup() {
       "${CRYPTROOT_LABEL}"
   fi
 
-  edit_initramfs_conf
-
+  add_tpm2_hook \
+    "${PCR_BANK}" \
+    "${SECTPMCTL_KEYS}"
+  
   edit_crypttab \
     "${CRYPTROOT_LABEL}" \
     "${KEY_SCRIPT}" \
@@ -1263,10 +1274,6 @@ initial_tpm2_setup() {
       "${SECTPMCTL_KEYS}" \
       "${TPM_PASSWORD}"
   fi
-
-  add_tpm2_hook \
-    "${PCR_BANK}" \
-    "${SECTPMCTL_KEYS}"
 
   generate_unseal_script \
     "${PCR_BANK}" \

@@ -1,5 +1,7 @@
 #!/bin/sh
 
+# SECTPMCTL
+
 set -e
 
 exec </dev/null >&2

@@ -47,7 +47,7 @@ _sectpmctl_boot()
   cmd="${COMP_WORDS[2]}"
 
   main_opts="activate deactivate help install remove test update"
-  install_opts="--withoutmicrosoftkeys"
+  install_opts="--withoutmicrosoftkeys --skipdbx"
   remove_update_opts="--kernel"
 
   case "${cmd}" in
@@ -283,7 +283,7 @@ _sectpmctl_tpm()
   provisioning_opts="--forgetlockout --lockout-auth --setforgetendorsement"
 
   case "${cmd}" in
-    check | help)
+    check | help | get-installed-version )
       return 0
       ;;
     install)
