@@ -19,7 +19,7 @@ jobs:
           fetch-depth: 0
 
       - name: Install build tools
-        run: sudo apt-get update && sudo apt-get install debhelper build-essential devscripts -y
+        run: sudo apt-get update && sudo apt-get install debhelper build-essential devscripts pkg-config libargon2-dev -y
         env:
           DEBIAN_FRONTEND: noninteractive
 
