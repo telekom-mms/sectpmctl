@@ -44,7 +44,7 @@ implementation, they are simply not needed in this decentralized implementation.
 
 ## Requirements
 
-* Ubuntu Desktop and Server 22.04, 22.10, 23.04 or 23.10 or Debian 12
+* Ubuntu Desktop and Server 22.04, 22.10, 23.04, 23.10 or Debian 12
 * LUKS2 encrypted LVM installation
 * A TPM2 module, discrete (dTPM) or in firmware (fTPM)
 
