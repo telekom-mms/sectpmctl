@@ -95,14 +95,14 @@ When installing the sectpmctl bootloader, Microsoft keys are automatically uploa
 An option exists to suppress the uploading of the Microsoft keys. Together with a BIOS admin password, hardware without an UEFI
 OptionROM requirement, like laptops with integrated graphics, gains the protection that no other operating system can boot. This should probably
 also increase security on another end. When sectpmctl is installed without a TPM password, the device will boot unattended (if there is no
-BIOS startup password or if it has been removed). Such systems would be able to execute bootloaders signed by Microsoft, so that it could be
+BIOS startup password or if it has been removed). Such systems would be able to execute bootloaders signed by Microsoft, so it could be
 possible that an attacker can boot software that tries to read out the system memory to get access to the LUKS key which is
 still in the DDR RAM for some seconds. Disabling the booting of any other bootloader will prevent this relatively simple attack. And even if
-the attacker can put his own or Microsoft keys into the Secure Boot database, sectpmctl rejects to boot in first place because PCR 7 would then
-be invalid.
+the attacker can put his own or Microsoft keys into the Secure Boot database, sectpmctl rejects to boot in the first place because PCR 7 would
+then be invalid.
 
-When this option is used together with a BIOS administrator password and the TPM + password option, a stolen device gets useless for the thief
-as it  won't boot any other operating system anymore.
+When this option is used together with a BIOS administrator password and the TPM + password option, a stolen device becomes useless for the
+thief as it won't boot any other operating system anymore.
 
 But this option is highly dangerous. When it is used on a device (typically servers and desktops or laptops with a dedicated PCI graphic card)
 where the hardware strictly requires the Microsoft keys you will for sure at least semi-brick or completely brick the device.
@@ -223,11 +223,11 @@ not boot anymore.
 
 #### Secure Boot preparations
 
-Your BIOS has to be in Secure Boot Clear Mode. That means that your BIOS need to have Secure Boot enabled and that all keys are cleared. You
+Your BIOS has to be in Secure Boot Clear Mode. That means that your BIOS needs to have Secure Boot enabled and that all keys are cleared. You
 can do so by entering your BIOS, enabling Secure Boot, and finding inside the Secure Boot section the button to `Clear all keys`. Set a BIOS
 administrator password as well.
 
-We never came across a BIOS which does not offer a way to enter Secure Boot Setup Mode. If your BIOS supports listing all keys, after entering
+We never came across a BIOS that does not offer a way to enter Secure Boot Setup Mode. If your BIOS supports listing all keys, after entering
 the clear mode, the number of keys of all databases should be zero. If your Secure Boot settings are grayed out, you most probably
 have to set a BIOS administrator password first.
 
@@ -265,9 +265,9 @@ clear the TPM.
 
 Be warned that if you put already keys into the TPM, they will be lost by the clearing.
 
-Be also warned that when a TPM lockout password is set and you try to clear the TPM with software commands and entering a wrong lockout
+Be also warned that when a TPM lockout password is set and you try to clear the TPM with software commands and enter a wrong lockout
 password, there will be a time penalty until you can try again. The above three ways to clear should allow you to clear the TPM even when you
-entered a wrong lockout password.
+entered the wrong lockout password.
 
 To check if the TPM is in a good state enter:
 
@@ -320,7 +320,7 @@ All generated keys, passwords, or serialized keys are stored in `/var/lib/sectpm
 
 #### Upgrade sectpmctl
 
-It is highly recommended to upgrade. This version contains better security for broken TPM's and enables support for Ubuntu release upgrades.
+It is highly recommended to upgrade. This version contains better security for broken TPMs and enables support for Ubuntu release upgrades.
 
 Download or build this version by following [build sectpmctl](#build-sectpmctl). Then install it:
 
@@ -344,28 +344,28 @@ Execute this command to see which version is currently applied:
 
 #### Ubuntu release upgrades
 
-First upgrade to sectpmctl 1.2.0. See the [upgrade sectpmctl](#upgrade-sectpmctl) section.
+First, upgrade to sectpmctl 1.2.0. See the [upgrade sectpmctl](#upgrade-sectpmctl) section.
 
 ##### Upgrade 22.04 to a newer version
 
-When starting a release upgrade from Ubuntu 22.04 to a newer versions, configuration files changed made by sectpmctl probably lead to the
+When starting a release upgrade from Ubuntu 22.04 to a newer version, configuration file changes made by sectpmctl probably lead to the
 question if you keep the currently installed versions or replace the files with the package maintainer version:
 
 - `/etc/initramfs-tools/initramfs.conf`
 - `/etc/dkms/framework.conf`
 
 The initramfs-tools-core `initramfs.conf` file had been changed by older versions of sectpmctl. This change is not done anymore, but it could
-still be on your system. The release upgrade will ask if you want to keep the currently installed version (`N`, `O` or `keep`) or replace with
-the package maintainer version (`Y`, `I` or `replace`). If you did customizations yourself to this file, you should keep the currently installed
-version (`N`, `O` or `keep`), otherwise select replace with the package maintainer version (`Y`, `I` or `replace`).
+still be on your system. The release upgrade will ask if you want to keep the currently installed version (`N`, `O` or `keep`) or replace it
+with the package maintainer version (`Y`, `I` or `replace`). If you did customizations yourself to this file, you should keep the currently
+installed version (`N`, `O` or `keep`), otherwise select replace with the package maintainer version (`Y`, `I` or `replace`).
 
-The dkms `framework.conf` did not support config snippets until Ubuntu 22.10. Therefor sectpmctl needed to modify `framework.conf` on Ubuntu
-22.04. The release upgrade will ask if you want to keep the currently installed version (`N`, `O` or `keep`) or replace with the package
+The dkms `framework.conf` did not support config snippets until Ubuntu 22.10. Therefore sectpmctl needed to modify `framework.conf` on Ubuntu
+22.04. The release upgrade will ask if you want to keep the currently installed version (`N`, `O` or `keep`) or replace it with the package
 maintainer version (`Y`, `I` or `replace`). If you did customizations yourself to this file, you should keep the currently installed version
 (`N`, `O` or `keep`), otherwise select replace with the package maintainer version (`Y`, `I` or `replace`).
 
-It is no problem if you miss to select which version of this files to keep. sectpmctl and the release upgrade will boot and work correctly in
-both cases. If you did not change this files manually, you can replace them after the reboot by executing the following commands:
+It is no problem if you miss selecting which version of these files to keep. sectpmctl and the release upgrade will boot and work correctly in
+both cases. If you did not change these files manually, you can replace them after the reboot by executing the following commands:
 
 ```
 sudo apt install --reinstall -o Dpkg::Options::="--force-confask,confnew,confmiss" initramfs-tools-core
@@ -378,15 +378,15 @@ Upgrades are supported starting from sectpmctl 1.2.0 and Ubuntu 22.10. No action
 
 ### Installation
 
-**Important note: The current implementation seals the LUKS key not only to the Secure Boot PCR values and optionally to a password as well
+**Important note: The current implementation seals the LUKS key not only to the Secure Boot PCR values and optionally to a password
 but also to the LUKS header. That means that if the LUKS header is modified after installation, the system will not boot anymore without the
-recovery key. That is for example the case when another secret key is added to the encryted root partition. It is highly reccommended to not
-add another LUKS keys after installation, otherwise a recovery has to be done which is described in the [recovery](#recovery) section below.**
+recovery key. That is for example the case when another secret key is added to the encrypted root partition. It is highly recommended to not
+add other LUKS keys after installation, otherwise, a recovery has to be done which is described in the [recovery](#recovery) section below.**
 
-**Note: If the kernel signing certicate of Debian or Ubuntu changes in the future, you can temporarily allow using kernels which can not yet be
-checked. In such case, a newer version of sectpmctl will include the new certificates for the check. To allow unsigned and unchecked kernels you
-need to edit `/etc/sectpmctl/boot.conf` and set `SKIP_UNSIGNED_KERNELS` to `false`. Secure Boot lockdown is automatically enforced as sectpmctl
-adds `lockdown=integrity` to the kernel command line, see `/var/lib/sectpmctl/kernel_extra_options`. See
+**Note: If the kernel signing certificate of Debian or Ubuntu changes in the future, you can temporarily allow the use of kernels that can not
+yet be checked. In such a case, a newer version of sectpmctl will include the new certificates for the check. To allow unsigned and unchecked
+kernels you need to edit `/etc/sectpmctl/boot.conf` and set `SKIP_UNSIGNED_KERNELS` to `false`. Secure Boot lockdown is automatically enforced
+as sectpmctl adds `lockdown=integrity` to the kernel command line, see `/var/lib/sectpmctl/kernel_extra_options`. See
 [Debian](https://wiki.debian.org/SecureBoot) and [Ubuntu](https://answers.launchpad.net/ubuntu/+question/700326) for more information.**
 
 ```
@@ -529,7 +529,7 @@ After a reboot, the LUKS partition should decrypt after typing the TPM password.
 
 You can then do some bootloader configuration by editing `/etc/sectpmctl/boot.conf`. Currently, a splash screen should not be activated. It
 is disabled by default. The kernel option `quiet` is supported but disabled as well by default. It is also possible to configure a fixed set of
-kernel options in the file `/var/lib/sectpmctl/kernel_extra_options`. Remember to update the bootloader afterwards by executing
+kernel options in the file `/var/lib/sectpmctl/kernel_extra_options`. Remember to update the bootloader afterward by executing
 
 ```
 sudo sectpmctl boot update
@@ -544,9 +544,9 @@ sudo bootctl list
 
 By default, only kernels signed by Canonical or Debian are considered to be shown in the boot list. Unsigned kernels are ignored for safety
 reasons. If you want to have support for all kernels, you can edit `/etc/sectpmctl/boot.conf` and set `SKIP_UNSIGNED_KERNELS` to `false`. Update
-the bootloader with `sectpmctl boot update` afterwards.
+the bootloader with `sectpmctl boot update` afterward.
 
-If the TPM password is lost or needs to be changed, see the [recovery](#recovery) section. Currently it requires the recovery key.
+If the TPM password is lost or needs to be changed, see the [recovery](#recovery) section. Currently, it requires the recovery key.
 
 ### Kernel or kernel module updates
 
@@ -566,7 +566,7 @@ entry. You can do it also permanently by using the efibootmgr command line altho
 It seems that BIOS updates on Lenovo Thinkpads won't cause problems as they seem to keep the Secure Boot database and won't reset the TPM.
 All tested BIOS updates done so far did not result in preventing unsealing.
 
-On the other hand on Gigabyte a X570S AERO motherboard, the Secure Boot database seems to be reseted during BIOS update, with the result that
+On the other hand on Gigabyte an X570S AERO motherboard, the Secure Boot database seems to be reset during BIOS update, with the result that
 the recovery password needs to be entered on the next boot and sectpmctl needs to be installed again.
 
 If you know that Secure Boot and TPM stay stable there should be no problem in updating, otherwise, keep your recovery password within reach.
@@ -575,10 +575,10 @@ execution of a command in front of the BIOS update.
 
 ### Custom kernels or kernel modules
 
-After installing sectpmctl, a TPM backed Secure Boot db key to sign kernels and kernel modules is stored in a serialized form in
+After installing sectpmctl, a TPM-backed Secure Boot db key to sign kernels and kernel modules is stored in a serialized form in
 `/var/lib/sectpmctl/keys/db.obj`. It is used by the tpmsbsigntool tool, which is based on openssl. The password for that key is stored in
 `/var/lib/sectpmctl/keys/db.pwd`. The password is currently needed as the TPM2 openssl integration does not support binding keys to PCR values
-yet. If it would, the TPM backed signing key could only be used from within the sectpmctl secured system and the password would not be needed
+yet. If it would, the TPM-backed signing key could only be used from within the sectpmctl secured system and the password would not be needed
 anymore.
 
 You normally don't need to use the db key manually. DKMS and kernel hooks are integrated and execute the sign commands automatically
@@ -589,26 +589,25 @@ show how to sign things manually:
 - kmodsign.sh
 
 A kmodsign wrapper is available at [sectpmctl-kmodsign-wrapper](https://github.com/telekom-mms/sectpmctl-kmodsign-wrapper). It is a config
-package which replaces the original kmodsign binary with a wrapper which calls tpmkmodsign internally, for example to support the maintainance
+package that replaces the original kmodsign binary with a wrapper that calls tpmkmodsign internally, for example, to support the maintenance
 of commercial antivirus applications or such.
 
 Please read the helper scripts before manually using them as they have specific needs for rewriting parameters.
 
-It is also possible to prevent signing of kernel modules by editing this file: `/var/lib/tpmsbsigntool/tpmkmodsign_blocklist.conf`
+It is also possible to prevent the signing of kernel modules by editing this file: `/var/lib/tpmsbsigntool/tpmkmodsign_blocklist.conf`
 
 ## Recovery
 
 ### Full recovery
 
-including Secure Boot and TPM provisioning and TPM resealing
-The full recovery need to be done when the system does not boot without using the recovery key. That is the case when:
+The full recovery needs to be done when the system does not boot without using the recovery key. That is the case when:
 
 - **When the Secure Boot database is cleared**
 - **When the TPM is cleared**
-- **When other TPM privisioning settings should be applied**
+- **When other TPM provisioning settings should be applied**
 - **When the [TPM handles](#used-handles) 0x81000100 or 0x81000101 are cleared or overwritten**
 
-The Secure Boot database and TPM can be restored by following this steps:
+The Secure Boot database and TPM can be restored by following these steps:
 
 - Clear the Secure Boot database
 - Clear the TPM
@@ -713,11 +712,11 @@ PCR 14 is completely under control, while PCR 7 measurements might vary after th
 To see which measurements have been done for PCR 7, execute `sudo tpm2_eventlog /sys/kernel/security/tpm0/binary_bios_measurements` and
 search for `PCRIndex: 7` entries.
 
-Currently the following restrictions are applied:
+Currently, the following restrictions are applied:
 
 Allow every kernel to boot -> Allow only, but all, kernels signed by the custom db key (PCR 7).
 
-In a future version more restrictions should be applied:
+In a future version, more restrictions should be applied:
 
 Allow every kernel to boot -> Allow only, but all, kernels signed by the custom db key (PCR 7) -> Resrict all db signed kernels to a finite
 list of kernels (PCR 7+4) -> Restrict this list to only the latest N kernels to prevent downgrade attacks (probably by using NV).
@@ -738,7 +737,7 @@ authorization is set by default.
 The two public keys `tpm_owner.pub` and `tpm_owner_noda.pub` play an important role. They are used for session encryption, but more
 importantly, they build the foundation of the TOFU principle. These public keys are used to establish a TPM session when unsealing in the
 initrd. If the corresponding private key is not inside the TPM, then the communication is directly rejected. The public key is copied into the
-initrd and of course signed by Secure Boot so that manipulation of the public key won't boot. Deleting the private key in the TPM or using a
+initrd and of course, signed by Secure Boot so that manipulation of the public key won't boot. Deleting the private key in the TPM or using a
 different TPM also won't boot. Only when the initrd finds the private keys created at provisioning time together with the initrds public key,
 the encrypted session is established.
 
@@ -851,12 +850,12 @@ tpm2_flushcontext "session.ctx"
 A future release could implement authorized policies for advanced features:
 
 - easy TPM and Secure Boot updates
-- sealing to PCR 7 + PCR 4 and / or PCR 0
+- sealing to PCR 7 + PCR 4 and/or PCR 0
 
 ## Bugs and problems found
 
 When many TPM (policy) sessions are created and not freed after use, a kernel bug could be triggered. When that happens, the TPM will not
-answer anymore to commands. The output of dmesg will then show problems. The expected behavior is that tpm2 commands will return an error code.
+answer any more to commands. The output of dmesg will then show problems. The expected behavior is that tpm2 commands will return an error code.
 Therefore a timeout has been implemented in the key tool to prevent endless waiting. To prevent this problem at boot time (the sessions seem
 not be cleared automatically on booting) all TPM sessions are flushed before unsealing in the initrd.
 
@@ -875,13 +874,13 @@ First to know is that you have to set a BIOS administrator password. Otherwise, 
 An installation on an ACER Swift 3 SF314-42 and an ACER Nitro AN515-45 laptop, both caused this problem:
 
 * The Secure Boot Forbidden Signature Database (DBX) could not be cleared by the Clear Mode in BIOS. Workaround: Use the `--skipdbx` option in
-the `sectpmctl boot install` command. Skipping the DBX db is safe if no multi boot is used and no Microsoft certificate is in the PCR 7 chain or
+the `sectpmctl boot install` command. Skipping the DBX db is safe if no multi-boot is used and no Microsoft certificate is in the PCR 7 chain or
 if the `--withoutmicrosoftkeys` option is used. See
 [Lenovo P15 Gen 2 laptop NVidia Problem](#lenovo-p15-gen-2-laptop-nvidia-problem) for more information. When the `--skipdbx` option
 is used and a normal Ubuntu or Windows is installed at a later time, restore the Secure Boot factory keys from inside the BIOS to restore the
 DBX db before installation of the new OS.
 
-An installation on an ACER Swift 3 SF314-42 caused this problems only once and then never again:
+An installation on an ACER Swift 3 SF314-42 caused the following problems only once and then never again:
 
 * The Secure Boot Signature Database (DB) could not be cleared by the Clear Mode in BIOS. Fix: Clear it manually before installation with
 `efi-updatevar -d 0 db`.
@@ -924,11 +923,11 @@ is different with this two options:
 | Microsoft UEFI CA |
 | db cert of sectpmctl |
 
-In case of the dedicated graphics a problem arises: It is not possible to distinguish between booting the sectpmctl bootloader and booting a
+In the case of the dedicated graphics a problem arises: It is not possible to distinguish between booting the sectpmctl bootloader and booting a
 compromised bootloader which is signed with the Microsoft UEFI CA and which then boots the sectpmctl bootloader, as the NVidia card option
-forces the Microsoft UEFI CA into the boot chain. This problem can be solved in a feture version by binding to PCR 7 together with PCR 4. For
-now it is suggested to select the internal graphics option before using the `sectpmctl tpm install` command. The command `prime-select` can then
-be used to select the dedicated graphic card.
+forces the Microsoft UEFI CA into the boot chain. This problem can be solved in a future version by binding to PCR 7 together with PCR 4. For
+now, it is suggested to select the internal graphics option before using the `sectpmctl tpm install` command. The command `prime-select` can
+then be used to select the dedicated graphic card.
 
 ## Changelog
 
