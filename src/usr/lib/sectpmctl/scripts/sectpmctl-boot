@@ -732,7 +732,7 @@ install ()
   echo "Configured DKMS >= 22.10 framework."
 
   # configure framework.conf only on ubuntu 22.04
-  if [[ "x$(lsb_release -rs)" == "x22.04" ]]; then
+  if [[ "x$(lsb_release -si)" == "xUbuntu" && "x$(lsb_release -rs)" == "x22.04" ]]; then
     dkmsconf="/etc/dkms/framework.conf"
     if [ ! -f "${dkmsconf}" ]; then
       echo "DKMS framework config ${dkmsconf} not found. Exit"
