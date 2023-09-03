@@ -2,7 +2,7 @@
 
 ## Introduction
 
-**Warning: It is highly recommended to install sectpmctl on a fresh Ubuntu installation as you could run into problems when the tpm2-tools
+**Warning: It is highly recommended to install sectpmctl on a fresh system installation as you could run into problems when the tpm2-tools
 or efitools can't be executed successfully on your device. Create at least a backup of your data before installation. If you already
 installed DKMS modules, it is probably necessary to rebuild them after installing sectpmctl to have them signed.**
 
@@ -26,9 +26,9 @@ installation, see [recovery](#recovery) for more information.
 It is recommended to only have one LUKS slot in use before installation, which is mostly slot 0. sectpmctl will additionally use slot 5 to
 store the TPM key.
 
-You can easily test the installation with virt-manager on a Ubuntu 22.04 host and a supported Ubuntu guest. When creating a new VM you need to
+You can easily test the installation with virt-manager on a Ubuntu 22.04 host and a supported guest system. When creating a new VM you need to
 configure the VM before it starts automatically. In the overview select `OVMF_CODE_4M.secboot.fd` as firmware and then add a new `TPM
-emulated TIS 2.0` device. After the installation of Ubuntu, you can start installing sectpmctl.
+emulated TIS 2.0` device. After the installation of the system, you can start installing sectpmctl.
 
 For transparency, the tpm2-tools commands for session encryption, provisioning, TOFU, seal, unseal, and password change are documented at the
 end of this README. The commands for using Secure Boot are standard except for using the TPM as a key store for the db signing key. Take a
@@ -877,7 +877,7 @@ An installation on an ACER Swift 3 SF314-42 and an ACER Nitro AN515-45 laptop, b
 the `sectpmctl boot install` command. Skipping the DBX db is safe if no multi-boot is used and no Microsoft certificate is in the PCR 7 chain or
 if the `--withoutmicrosoftkeys` option is used. See
 [Lenovo P15 Gen 2 laptop NVidia Problem](#lenovo-p15-gen-2-laptop-nvidia-problem) for more information. When the `--skipdbx` option
-is used and a normal Ubuntu or Windows is installed at a later time, restore the Secure Boot factory keys from inside the BIOS to restore the
+is used and another system is installed at a later time, restore the Secure Boot factory keys from inside the BIOS to restore the
 DBX db before installation of the new OS.
 
 An installation on an ACER Swift 3 SF314-42 caused the following problems only once and then never again:
