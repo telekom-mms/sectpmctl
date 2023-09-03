@@ -1,8 +1,6 @@
 #!/bin/bash
 
 # SECTPMCTL
-# AUTHORS: Heike Pesch <heike.pesch@t-systems.com>
-#          Richard Robert Reitz <richard-robert.reitz@t-systems.com>
 
 set -E
 set -o functrace
@@ -256,7 +254,16 @@ create_efi_blob ()
     echo -n "Found          : ${linux}, ${initrd}"
   fi
 
-  tempbootdir=$(mktemp -d -p /dev/shm)
+  p1="$( grep -c "^tmpfs /run tmpfs" /proc/mounts )" || p1=""
+  if [[ "${p1}" != "1" ]]; then
+    echo "Mounted tmpfs /run is required"
+    exit
+  fi
+  if [ ! -d "/run/sectpmctl" ]; then
+    mkdir "/run/sectpmctl" || exit
+  fi
+  chmod 700 "/run/sectpmctl" || exit
+  tempbootdir=$(mktemp -d -p "/run/sectpmctl")
   chmod 700 "${tempbootdir}"
   cd "${tempbootdir}" || exit
 
@@ -381,6 +388,11 @@ traverse_boot ()
   hook_action="${1}"
   hook_version="${2}"
 
+  VENDOR_OS_CERT="${VENDOR_KEYS}/debian-prod-2022-linux.pem"
+  if [[ "x$(lsb_release -si)" == "xUbuntu" ]]; then
+    VENDOR_OS_CERT="${VENDOR_KEYS}/canonical-master-public.pem"
+  fi
+
   if [ "x${hook_action}" = "xdel" ]; then
     cd "/boot/efi/EFI/Linux" || exit
     if [ -f "sectpmctl-${hook_version}.efi" ]; then
@@ -433,7 +445,7 @@ traverse_boot ()
     fi
 
     if [ "x${SKIP_UNSIGNED_KERNELS}" = "xtrue" ]; then
-      if ! sbverify --cert "${VENDOR_KEYS}/canonical-master-public.pem" "${linux}" 2> /dev/null > /dev/null; then
+      if ! sbverify --cert "${VENDOR_OS_CERT}" "${linux}" 2> /dev/null > /dev/null; then
         continue
       fi
     fi
@@ -499,7 +511,7 @@ traverse_boot ()
     fi
 
     if [ "x${SKIP_UNSIGNED_KERNELS}" = "xtrue" ]; then
-      if ! sbverify --cert "${VENDOR_KEYS}/canonical-master-public.pem" "${linux}" 2> /dev/null > /dev/null; then
+      if ! sbverify --cert "${VENDOR_OS_CERT}" "${linux}" 2> /dev/null > /dev/null; then
         echo "Skipped        : ${dirname}/${basename}, unsigned"
         continue
       fi
@@ -535,6 +547,7 @@ traverse_boot ()
 install ()
 {
   ommit_ms_keys="${1}"
+  skip_dbx="${2}"
 
   secureboot_mode="clearmode"
   mokutil --sb-state | grep 'Platform is in Setup Mode' || (echo 'Platform is not in Setup Mode' ; exit 3)
@@ -598,6 +611,15 @@ install ()
     fi
     if [ "$( efi-readvar | grep -c 'Variable dbx has no entries')" = 0 ]; then
       echo 'Secure Boot Database dbx is not empty'
+      if [ "x${skip_dbx}" = "x0" ]; then
+        echo 'Use the "--skipdbx" option as a workaround. Please read the section'
+        echo '"Acer laptops quirks" in the documentation, as this option might'
+        echo 'impact security: less /usr/share/sectpmctl/README.md'
+        exit 3
+      fi
+    fi
+    if [ "x${skip_dbx}" = "x1" ] && [ ! "$( efi-readvar | grep -c 'Variable dbx has no entries')" = 0 ]; then
+      echo 'The "--skipdbx" option seems not to be needed, please remove it from the call.'
       exit 3
     fi
   fi
@@ -614,7 +636,16 @@ install ()
 
   cd - > /dev/null || exit
 
-  tempdirname=$(mktemp -d -p /dev/shm)
+  p1="$( grep -c "^tmpfs /run tmpfs" /proc/mounts )" || p1=""
+  if [[ "${p1}" != "1" ]]; then
+    echo "Mounted tmpfs /run is required"
+    exit
+  fi
+  if [ ! -d "/run/sectpmctl" ]; then
+    mkdir "/run/sectpmctl" || exit
+  fi
+  chmod 700 "/run/sectpmctl" || exit
+  tempdirname=$(mktemp -d -p "/run/sectpmctl")
   chmod 700 "${tempdirname}"
   cd "${tempdirname}" || exit
 
@@ -663,8 +694,9 @@ install ()
 
       efi-updatevar -f add_MS_db.auth db
     fi
-    efi-updatevar -f "${VENDOR_KEYS}/dbxupdate_x64.bin" -k KEK.key dbx
-    chattr +i /sys/firmware/efi/efivars/dbx-d719b2cb-3d3a-4596-a3bc-dad00e67656f
+    if [ "x${skip_dbx}" = "x0" ]; then
+      efi-updatevar -f "${VENDOR_KEYS}/dbxupdate_x64.bin" -k KEK.key dbx
+    fi
   fi
 
   if [ "x${ommit_ms_keys}" = "x0" ]; then
@@ -675,6 +707,7 @@ install ()
   fi
   efi-updatevar -f KEK.auth KEK
   efi-updatevar -f PK.auth PK
+  chattr +i /sys/firmware/efi/efivars/dbx-d719b2cb-3d3a-4596-a3bc-dad00e67656f
   chattr +i /sys/firmware/efi/efivars/db-d719b2cb-3d3a-4596-a3bc-dad00e67656f
   chattr +i /sys/firmware/efi/efivars/KEK-8be4df61-93ca-11d2-aa0d-00e098032b8c
   chattr +i /sys/firmware/efi/efivars/PK-8be4df61-93ca-11d2-aa0d-00e098032b8c
@@ -683,20 +716,37 @@ install ()
   cd - > /dev/null || exit
   rmdir "${tempdirname}"
 
-  # configure framework.conf of dkms to add the sign helper script
-  dkmsconf="/etc/dkms/framework.conf"
-  if [ ! -f "${dkmsconf}" ]; then
-    echo "DKMS framework config ${dkmsconf} not found. Exit"
-    exit 4
-  elif [ "$(grep -E '^\s*sign_tool\s*=\s*"?/usr/lib/sectpmctl/scripts/dkms_sign_helper.sh"?\s*$' "${dkmsconf}")" ]; then
-    echo "DKMS framework already configured."
-    # @TODO SC2143: Use grep -q instead of comparing output with [ -n .. ]
-  elif [ "$(grep -E '^\s*sign_tool\s*=.*$' "${dkmsconf}")" ]; then
-    echo "DKMS framework configured differently. Exit"
-    exit 4
-  else
-    echo 'sign_tool="/usr/lib/sectpmctl/scripts/dkms_sign_helper.sh"' >> "${dkmsconf}"
-    echo "Configured DKMS framework."
+  # configure framework.conf of dkms for ubuntu 22.04 if installed to add the sign helper script
+  # and framework.conf.d of dkms for ubuntu >= 22.10 in any case to support upgrades
+
+  # configure always framework.conf.d for ubuntu >= 22.10
+  if [ ! -d /etc/dkms/framework.conf.d ]; then
+    mkdir /etc/dkms/framework.conf.d
+    chmod 755 /etc/dkms/framework.conf.d
+  fi
+  dkmsconf="/etc/dkms/framework.conf.d/sectpmctl_sign_tool.conf"
+  echo '# sectpmctl: do not edit or remove this file' > "${dkmsconf}" || exit 4
+  echo 'sign_file="/usr/lib/sectpmctl/scripts/dkms_sign_helper.sh"' >> "${dkmsconf}" || exit 4
+  echo 'mok_signing_key="/var/lib/sectpmctl/keys/db.obj"' >> "${dkmsconf}" || exit 4
+  echo 'mok_certificate="/var/lib/sectpmctl/keys/db.cer"' >> "${dkmsconf}" || exit 4
+  echo "Configured DKMS >= 22.10 framework."
+
+  # configure framework.conf only on ubuntu 22.04
+  if [[ "x$(lsb_release -si)" == "xUbuntu" && "x$(lsb_release -rs)" == "x22.04" ]]; then
+    dkmsconf="/etc/dkms/framework.conf"
+    if [ ! -f "${dkmsconf}" ]; then
+      echo "DKMS framework config ${dkmsconf} not found. Exit"
+      exit 4
+    elif [ "$(grep -E '^\s*sign_tool\s*=\s*"?/usr/lib/sectpmctl/scripts/dkms_sign_helper.sh"?\s*$' "${dkmsconf}")" ]; then
+      echo "DKMS framework already configured."
+      # @TODO SC2143: Use grep -q instead of comparing output with [ -n .. ]
+    elif [ "$(grep -E '^\s*sign_tool\s*=.*$' "${dkmsconf}")" ]; then
+      echo "DKMS framework configured differently. Exit"
+      exit 4
+    else
+      echo 'sign_tool="/usr/lib/sectpmctl/scripts/dkms_sign_helper.sh"' >> "${dkmsconf}"
+      echo "Configured DKMS 22.04 framework."
+    fi
   fi
 
   # enable bootloader
@@ -718,7 +768,7 @@ test_state()
   dmesg | grep -i 'secure' || (echo 'SECUREBOOT NOT FOUND IN DMESG' ; exit 3)
 
   echo 'Check if kernel is in EFI Secure Boot mode kernel lockdown'
-  dmesg | grep -i 'Kernel is locked down from EFI Secure Boot mode' || (echo 'KERNEL IS NOT IN SECUREBOOT LOCKDOWN MODE' ; exit 3)
+  dmesg | grep -i 'Kernel is locked down from' || (echo 'KERNEL IS NOT IN SECUREBOOT LOCKDOWN MODE' ; exit 3)
 
   echo 'Check if TPM was found during boot'
   dmesg | grep -i 'TPM' || (echo 'TPM NOT FOUND' ; exit 3)
@@ -790,7 +840,7 @@ COMMANDS
   activate
   deactivate
   help
-  install [--withoutmicrosoftkeys]
+  install [--withoutmicrosoftkeys] [--skipdbx]
   remove --kernel <version>
   test
   update [--kernel <version>]
@@ -799,6 +849,7 @@ COMMANDS
 OPTIONS
     --kernel <version>
     --withoutmicrosoftkeys
+    --skipdbx
 
 __END
 
@@ -823,11 +874,14 @@ COMMANDS
 
     Show this help message.
 
-  install [--withoutmicrosoftkeys]
+  install [--withoutmicrosoftkeys] [--skipdbx]
      
     Install setpmctl bootloader. Read the documentation before using
     '--withoutmicrosoftkeys' as it most probably damages your hardware:
     less /usr/share/sectpmctl/README.md
+    Use '--skipdbx' only if clearing the Secure Boot does not clear
+    it completely and the sectpmctl boot install command asks to set this
+    option. See 'Acer laptops quirks' in the documentation.
 
   remove --kernel <version>
 
@@ -872,6 +926,12 @@ OPTIONS
     Read the documentation before using this option as it
     most probably damages your hardware:
     less /usr/share/sectpmctl/README.md
+    
+    --skipdbx
+    
+    Enables a quirk to don't write to the dbx database.
+    Use only if asked for by the install command.
+    Read the documentation for more information.
  
 EXAMPLES
 
@@ -927,38 +987,36 @@ case "${1}" in
     test_state
     ;;
   install)
-    if [ $# -ge 2 ]; then
-      case "${2}" in
+    shift
+    OMITMSK="0"
+    CONFIRMOMITMSK="0"
+    SKIPDBX="0"
+    while [ $# != 0 ]; do
+      case "${1}" in
         --withoutmicrosoftkeys)
-          if [ $# -eq 3 ]; then
-            case "${3}" in
-              --iamresponsiblefordamage)
-                install "1"
-                ;;
-              *)
-                echo "You also need to give this option: --iamresponsiblefordamage"
-                echo "Read the documentation before using this option as it most"
-                echo "probably damages your hardware:"
-                echo "less /usr/share/sectpmctl/README.md"
-                exit 1
-                ;;
-            esac
-          else
-            echo "You also need to give this option: --iamresponsiblefordamage"
-            echo "Read the documentation before using this option as it most"
-            echo "probably damages your hardware:"
-            echo "less /usr/share/sectpmctl/README.md"
-            exit 1
-          fi
+          OMITMSK="1"
+          ;;
+        --iamresponsiblefordamage)
+          CONFIRMOMITMSK="1"
+          ;;
+        --skipdbx)
+          SKIPDBX="1"
           ;;
         *)
           _usage
           exit 1
           ;;
       esac
-    else
-      install "0"
+      shift
+    done
+    if [ "x${OMITMSK}" = "x1" ] && [ "x${CONFIRMOMITMSK}" = "x0" ]; then
+      echo "You also need to give this option: --iamresponsiblefordamage"
+      echo "Read the documentation before using this option as it most"
+      echo "probably damages your hardware:"
+      echo "less /usr/share/sectpmctl/README.md"
+      exit 1
     fi
+    install "${OMITMSK}" "${SKIPDBX}"
     ;;
   remove)
     if [ "x${argument}" = "x" ]; then
