@@ -426,7 +426,7 @@ maintainer version (`Y`, `I` or `replace`). If you did customizations yourself t
 (`N`, `O` or `keep`), otherwise select replace with the package maintainer version (`Y`, `I` or `replace`).
 
 sectpmctl and the release upgrade will boot and work correctly even if you miss selecting which version of these files to keep. Anyhow, it is
-recommended to fix these two files after the release upgrade reboot by executing the following commands, except you modified then manually:
+recommended fixing these two files after the release upgrade reboot by executing the following commands, except you modified them manually:
 
 ```
 sudo apt install --reinstall -o Dpkg::Options::="--force-confask,confnew,confmiss" initramfs-tools-core
