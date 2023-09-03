@@ -83,8 +83,8 @@ Using a splash screen and the TPM + Password option does not work correctly. If 
 
 ### Key derivation function (KDF)
 
-[faulTPM attack](https://arxiv.org/abs/2304.14717)
-[argon2id parameters](https://datatracker.ietf.org/doc/html/rfc9106#name-parameter-choice)
+- [faulTPM attack](https://arxiv.org/abs/2304.14717)
+- [argon2id parameters](https://datatracker.ietf.org/doc/html/rfc9106#name-parameter-choice)
 
 The rise of the faulTPM attack has shown that it is also necessary to think about security more in-depth. The attack allows to fully break the
 TPM of relative modern AMD CPUs. The mitigation strategy is to make use of key derivation as the TPM can't be trusted. Using key derivation lets
