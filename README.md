@@ -200,7 +200,8 @@ wget https://github.com/telekom-mms/sectpmctl/releases/download/1.2.0/sectpmctl_
 
 ```
 sudo apt install -y debhelper efibootmgr efitools sbsigntool binutils mokutil dkms systemd udev \
-  util-linux gdisk openssl uuid-runtime tpm2-tools fdisk git devscripts
+  util-linux gdisk openssl uuid-runtime tpm2-tools fdisk git devscripts build-essential pkg-config \
+  libargon2-dev
 
 git clone https://github.com/telekom-mms/sectpmctl.git
 
