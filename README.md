@@ -83,66 +83,24 @@ Using a splash screen and the TPM + Password option does not work correctly. If 
 
 ### Key derivation function (KDF)
 
-https://arxiv.org/abs/2304.14717
-https://datatracker.ietf.org/doc/html/rfc9106#name-parameter-choice
+[faulTPM attack](https://arxiv.org/abs/2304.14717)
+[argon2id parameters](https://datatracker.ietf.org/doc/html/rfc9106#name-parameter-choice)
 
-The arise of the faulTPM attack had shown that it is also neccessary to think about security more in depth. The attack allows to fully break the
-TPM of modern AMD CPU's. The mitigation strategy is to make use of key derivation as the TPM can't be trusted anymore. Using key derivation let
-the attacker require to brute force the TPM + password option. That also means that a TPM only protection is not recommended at all. The default
-in this README is therefore the TPM + password option. The goal on broken TPM systems is to provide at least the same security, if not a bit
-better, as if a software only encryption had been used instead of the TPM. In a naive impementation of TPM + password, there absolutely no
-protection at all, the LUKS keys can directly extracted from a broken TPM without knowledge of the password which should protect the key.
+The rise of the faulTPM attack has shown that it is also necessary to think about security more in-depth. The attack allows to fully break the
+TPM of relative modern AMD CPUs. The mitigation strategy is to make use of key derivation as the TPM can't be trusted. Using key derivation lets
+the attacker require to brute force at least the password of the TPM + password option. That also means that TPM-only protection is not
+recommended at all. The default in this README is therefore the TPM + password option. The goal on broken TPM systems is to provide at least the
+same security as if a software-only encryption had been used instead of TPM + password.
 
-The default KDF used by LUKS2 in Ubuntu 22.04 onwards argon2id. That function need a set of parameters: iteration count, memory and parallelism.
-These parameters are benchmarked while doing the initial encrypted installation of Ubuntu. The following upper limits are applied: a maximum of
-1GB memory and a maximum of 4 threads. If the system provides less then this limits, these two parameters are downgraded. When this parameters
-are then discovered, the number of iterations will be benchmared, by running argon2id for a specified amount of time (2 seconds by default),
-while counting the number of iterations to fit into the given amount of time. After that all three parametrs have been determined.
-
-Whenever the LUKS disc will be decrypted, the provided password is first processed by argon2id with the determined parameters. That will output
-a hash which opens LUKS. The reason is to slow down brute force attacks and also enforces a great amount of memory to slow down fast GPU's for
-the attack. Every single try to test a password will require 2 seconds of CPU time witha maximum of 4 threads and 1 GB memory.
-
-Today, on causal or professional hardware, the maximum of 4 threads and 1GB memory doesn't look too strong anymore. Specially considering that
-the minimum system requirements of Ubuntu 22.04 is 4GB already and modern CPU's which offer a lot more of threads. The reccommendation of argon2id 
-for hard-drive encryption is to use 6GB memory, 3 seconds of iteration and the number of virtual cores as parallelism parameter (https://datatracker.ietf.org/doc/html/rfc9106#name-parameter-choice). As the KDF will happen in the boot phase, running directly after the Linux kernel started, no applications will run in parallel and higher argon2id vales could be used then which LUKS enforces. 
-The reason for the relative low values is most probably the ability to decrypt the disc on a low end device when the primary device won't boot
-anymore.
-
-Fortunately there is a solution to apply much stronger argon2id parameters while enableing to decrypt on a low end machine as well without
-sacrifizing secutiry. This come from the fact that sectpmctl makes use of two different keys. A high entropy random recovery key and the TPM +
-password key. Better argon2id parameters can be applied to the TPM + passowrd option while keeping the default parameters for the recovery key.
-
-Two approches are implemented in sectpmctl.
-
-Devices which use a discrete TPM (dTPM) are not affected by this attack. See  for more information.
-
-To better mitigate the faulTPM attack it is recommended to use the TPM + password option with a relatively strong password. But even that is not
-enough to protect the LUKS key in the current implementation of sectpmctl. The authors of the attack recommend adding the password to the key
-which is stored in the TPM and unsealed while booting and supplying that extended key (unsealed key from the TPM with the password) to decrypt
-LUKS. The reason behind this is that the attack will break the TPM in such a way that it is not necessary to deliver the password to the TPM
-which renders the TPM + password option completely useless. Therefore adding the password to the unsealed output of the TPM and using that as
-the LUKS key will ensure that at least the brute-force resistant key-derivation mechanism of LUKS (argon2) is in place. That will then provide a
-LUKS security similar to if no TPM is used at all, like in the standard installation of Ubuntu with disc encryption for example.
-
-Supporting such a feature in the current implementation is easy by itself but gets more complicated when the user wants to change the password
-of the TPM + password option. Solutions which won't require the recovery key for the password change are possible, but either exhibit the
-recovery key to user space with root access, like in Windows, or require changing the password inside the initrd boot phase. The more easy
-solution, which will be implemented in the next release, will ask for the recovery key if the password needs to be changed to support extending
-the LUKS key with the password.
-
-Give zero trust to the TPM: https://arxiv.org/abs/2304.14717
-
-As faulTPM had schown, all key material can be extracted from the TPM.
-The proposed mitigation from the authors recommend to use the TPM + password option, together with a KDF and
-appending the password to the TPM secret which opens LUKS:
+As faulTPM had shown, all key material can be extracted from the TPM without authorization. The proposed mitigation from the authors is to use
+the TPM + password option, together with a KDF and appending the password to the TPM secret which opens LUKS:
 
 Sealing
 
     A LUKS_SECRET is computed randomly
     User enters TPM_PASSWORD
     PWD_HASHED = argon2(TPM_PASSWORD)
-    LUKS_SECRET is sealed in the TPM with PWD_HASHED (and PCR) as authorization
+    LUKS_SECRET is sealed in the TPM with PWD_HASHED instead of TPM_PASSWORD as authorization
     LUKS will be encryted by LUKS_SECRET + TPM_PASSWORD
     LUKS will use argon2 for encryption internally as well
 
@@ -150,11 +108,23 @@ Unsealing
 
     User enters TPM_PASSWORD
     PWD_HASHED = argon2(TPM_PASSWORD)
-    LUKS_SECRET is unsealed from the TPM with PWD_HASHED (and PCR) as authorization
+    LUKS_SECRET is unsealed from the TPM with PWD_HASHED as authorization
     LUKS will be decryped by LUKS_SECRET + TPM_PASSWORD
     LUKS will use argon2 for decryption internally as well
 
-The catch is that if the TPM is completely broken, then the LUKS_SECRET is known to the attacker. But that won't not be sufficient to decrypt, because the original password needs to be known. The attacker has to brute force the password with argon2 as KDF. Therefor is sectpmctl with TPM+password option on a vulnerable system at least as strong as a software only encryption without a TPM at all.
+The catch is that if the TPM is completely broken, then the LUKS_SECRET is known to the attacker. But that won't be sufficient to decrypt,
+because the original password needs to be known. The attacker has to brute force the password with argon2id as KDF. Therefore, sectpmctl with
+TPM + password option on a vulnerable system is at least as strong as a software-only encryption without a TPM at all.
+
+Currently, sectpmctl reads out the argon2id parameters from the LUKS2 partition itself and uses the same parameters to compute PWD_HASHED:
+
+- Iterations
+- Memory
+- CPUs
+
+LUKS2 places internal hard limits on the argon2id parameters (Memory <= 1GB, CPUs <= 4). A future release of sectpmctl could be able to support
+much stronger parameters than LUKS2 offers without sacrificing the ability to decrypt on slower devices, as there are two LUKs keys, one for
+the TPM (which may have stronger argon2id settings) and the high entropy recovery key (which may use the default argon2id LUKS settings).
 
 ### Lockout authorization password
 
