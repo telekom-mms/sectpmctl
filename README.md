@@ -425,8 +425,8 @@ The dkms `framework.conf` did not support config snippets until Ubuntu 22.10. Th
 maintainer version (`Y`, `I` or `replace`). If you did customizations yourself to this file, you should keep the currently installed version
 (`N`, `O` or `keep`), otherwise select replace with the package maintainer version (`Y`, `I` or `replace`).
 
-It is no problem if you miss selecting which version of these files to keep. sectpmctl and the release upgrade will boot and work correctly in
-both cases. If you did not change these files manually, you can replace them after the reboot by executing the following commands:
+sectpmctl and the release upgrade will boot and work correctly even if you miss selecting which version of these files to keep. Anyhow, it is
+recommended to fix these two files after the release upgrade reboot by executing the following commands, except you modified then manually:
 
 ```
 sudo apt install --reinstall -o Dpkg::Options::="--force-confask,confnew,confmiss" initramfs-tools-core
@@ -435,7 +435,7 @@ sudo apt install --reinstall -o Dpkg::Options::="--force-confask,confnew,confmis
 
 ##### Upgrade >= 22.10 to a newer version
 
-Upgrades are supported starting from sectpmctl 1.2.0 and Ubuntu 22.10. No actions are required.
+Upgrades are working out of the box starting from sectpmctl 1.2.0 and Ubuntu 22.10. No actions are required.
 
 ### Installation
 
