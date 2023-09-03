@@ -604,7 +604,7 @@ The full recovery needs to be done when the system does not boot without using t
 
 - **When the Secure Boot database is cleared**
 - **When the TPM is cleared**
-- **When other TPM provisioning settings should be applied**
+- **When other TPM provisioning settings should be applied (`sectpmctl tpm provisioning`)**
 - **When the [TPM handles](#used-handles) 0x81000100 or 0x81000101 are cleared or overwritten**
 
 The Secure Boot database and TPM can be restored by following these steps:
@@ -623,7 +623,7 @@ needs to be changed:
 
 - **When the TPM password is lost or needs to be changed**
 - **When doing sectpmctl upgrades**
-- **When other sectpmctl options should be applied**
+- **When other sectpmctl options should be applied (`sectpmctl tpm install`)**
 - **When the [TPM handle](#used-handles) 0x81000102 is cleared or overwritten**
 
 Note: You need to boot the system by entering the recovery key in case of a lost TPM password.
