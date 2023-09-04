@@ -10,4 +10,5 @@ RUN set -eu ; \
   build-essential \
   libargon2-dev \
   binutils-dev \
-  pkg-config
+  pkg-config \
+  wget

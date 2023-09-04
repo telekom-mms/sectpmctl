@@ -9,7 +9,7 @@ sectpmctl-hash: src/usr/libexec/sectpmctl/sectpmctl-hash.c
 
 compile: sectpmctl-hash
 
-install: compile
+install:
 	install -d $(DESTDIR)/usr/sbin
 	install -m 0755 src/usr/sbin/sectpmctl $(DESTDIR)/usr/sbin
 	install -d $(DESTDIR)/usr/share/bash-completion/completions
@@ -44,7 +44,7 @@ install: compile
 	install -d $(DESTDIR)/usr/libexec/sectpmctl
 	install -m 0755 sectpmctl-hash $(DESTDIR)/usr/libexec/sectpmctl/sectpmctl-hash
 
-package_build: package_clean generate_changelog
+package_build: package_clean generate_changelog compile
 	debuild -i -uc -us -b
 
 generate_changelog:
