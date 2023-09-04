@@ -8,6 +8,12 @@
 # your system won't boot.
 # consider to use immutable flag and only root permissions. Don't chmod 777 this file!
 
+# Enable Secure Boot lockdown. Mainline or custom kernels may not set this option.
+# All kernels signed by Canonical or Debian have this option set by default. This
+# option increases security for all non default kernels, as sectpmctl interacts with
+# Secure Boot. This option may be removed, but it is not recommended to do so.
+lockdown=integrity
+
 # EXAMPLE 
 # uncomment next line to enable the audit sub-system
 #audit=1

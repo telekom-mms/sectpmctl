@@ -1,15 +1,14 @@
 #!/bin/bash
 
 # SECTPMCTL
-# AUTHORS: Heike Pesch <heike.pesch@t-systems.com>
-#          Richard Robert Reitz <richard-robert.reitz@t-systems.com>
 
 # version and name
-SECKEYCTL_VERSION="1.1.1"
+SECKEYCTL_VERSION="1.2.0"
 ME=$(basename "${0}")
 
-# path to keys
-TOOLS_PATH="/usr/lib/sectpmctl/scripts"
+# path to scripts and binaries
+SCRIPT_PATH="/usr/lib/sectpmctl/scripts"
+BIN_PATH="/usr/libexec/sectpmctl"
 
 _print_error() {
   echo "${@}" 1>&2
@@ -26,6 +25,7 @@ Commands
   boot
   key
   tpm
+  hash
   help
   version
 __END
@@ -57,6 +57,12 @@ Commands
     For more information use:
     $ME tpm help
 
+  hash
+
+    command to interact with $ME the argon2id hash tool
+    For more information use:
+    $ME hash help
+
 
   help
 
@@ -79,7 +85,12 @@ _check_input_and_state() {
   case "${cmd}" in
     boot | key | tpm)
       shift
-      "${TOOLS_PATH}/sectpmctl-${cmd}" "${@}"
+      "${SCRIPT_PATH}/sectpmctl-${cmd}" "${@}"
+      exit ${?}
+      ;;
+    hash)
+      shift
+      "${BIN_PATH}/sectpmctl-${cmd}" "${@}"
       exit ${?}
       ;;
     help)

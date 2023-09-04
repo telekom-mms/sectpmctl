@@ -47,7 +47,7 @@ _sectpmctl_boot()
   cmd="${COMP_WORDS[2]}"
 
   main_opts="activate deactivate help install remove test update"
-  install_opts="--withoutmicrosoftkeys"
+  install_opts="--withoutmicrosoftkeys --skipdbx"
   remove_update_opts="--kernel"
 
   case "${cmd}" in
@@ -283,7 +283,7 @@ _sectpmctl_tpm()
   provisioning_opts="--forgetlockout --lockout-auth --setforgetendorsement"
 
   case "${cmd}" in
-    check | help)
+    check | help | get-installed-version )
       return 0
       ;;
     install)
@@ -336,7 +336,7 @@ _sectpmctl()
   COMPREPLY=()
   cur="${COMP_WORDS[1]}"
 
-  main_opts="boot help key tpm version"
+  main_opts="boot help key tpm version hash"
 
   case "${cur}" in
     boot)
@@ -351,8 +351,7 @@ _sectpmctl()
       _sectpmctl_tpm
       return 0
       ;;
-    help | version)
-      _sectpmctl_tpm
+    help | version | hash)
       return 0
       ;;
     *)
