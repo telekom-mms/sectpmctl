@@ -1018,7 +1018,7 @@ then be used to select the dedicated graphic card.
 * 1.2.0
   + Added [defense-in-depth strategy](#key-derivation-function) to mitigate the faulTPM attack
   + Added [module signing blocklist](#custom-kernels-or-kernel-modules) in tpmsbsigntool
-  + Added Ubuntu >= 22.10 [release upgrade](#Ubuntu-release-upgrades) support
+  + Added [Ubuntu release upgrade](#Ubuntu-release-upgrades) support
   + Added Debian 12 support
   + Updated UEFI revocation list to version May 9, 2023
 
