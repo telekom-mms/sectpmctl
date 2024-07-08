@@ -26,13 +26,14 @@ PCR_BIOS="0"
 PCR_SECUREBOOT="7"
 PCR_EXTENDED="14"
 PCR_BANK="sha256"
+PCR_FIXED=",12,13"
 PCR_HASH_LENGTH="32"
 KEYED_HASH="sha256"
 MAX_PASSWORD_LENGTH="64"
-PCR_VAR=",${PCR_EXTENDED}"
+PCR_VAR="${PCR_FIXED},${PCR_EXTENDED}"
 PCRLIST_PRESEED_ONCE="${PCR_BANK}:${PCR_BIOS}${PCR_VAR}"
 PCRLIST_PRIMARY_ONCE="${PCR_BANK}:${PCR_SECUREBOOT}${PCR_VAR}"
-PCR_VAR=""
+PCR_VAR="${PCR_FIXED}"
 PCRLIST_PRESEED_MANY="${PCR_BANK}:${PCR_BIOS}${PCR_VAR}"
 PCRLIST_PRIMARY_MANY="${PCR_BANK}:${PCR_SECUREBOOT}${PCR_VAR}"
 
@@ -65,7 +66,6 @@ PARENT_HANDLE=""
 PCRLIST=""
 PCR_EXTEND=false
 PCR_PRESEED=false
-PCRLIST=""
 EXTEND_FILE=""
 EXTEND_RANDOM=false
 EXTEND_STRING=""
@@ -1000,6 +1000,11 @@ _seal() {
       _ex "${ME} ${CMD}: Could not copy PCR 7 to PCR value list" \
         cp "${PROVISIONED_PCR7_VALUE}" pcr_values.dat || break
     fi
+    # pcr 12 and 13
+    _ex "${ME} ${CMD}: Could not copy NULL PCR 12 to PCR value list" \
+      cat "${PROVISIONED_ZERO_VALUE}" >> pcr_values.dat || break
+    _ex "${ME} ${CMD}: Could not copy NULL PCR 13 to PCR value list" \
+      cat "${PROVISIONED_ZERO_VALUE}" >> pcr_values.dat || break
     # pcr 14 depends on PCR_EXTEND true
     if [[ ${PCR_EXTEND} == true ]]; then
       _ex "${ME} ${CMD}: Stored PCR 14 value not found ${PROVISIONED_PCR14_VALUE@Q}, run 'sectpmctl tpm install'" \
@@ -1010,11 +1015,11 @@ _seal() {
     fi
 
     # check size of pcr value list
-    expected_pcr_value_size="0"
+    expected_pcr_value_size="2"
     if [[ ${PCR_EXTEND} == true ]]; then
-      expected_pcr_value_size="$(( PCR_HASH_LENGTH * 2 ))"
+      expected_pcr_value_size="$(( expected_pcr_value_size + ( PCR_HASH_LENGTH * 2 ) ))"
     else
-      expected_pcr_value_size="$(( PCR_HASH_LENGTH ))"
+      expected_pcr_value_size="$(( expected_pcr_value_size + PCR_HASH_LENGTH ))"
     fi
     p1="$( _ex "${ME} ${CMD}: Could not check length of combined PCR values" \
       wc -c pcr_values.dat | awk '{print $1;}' )" || _xt $? || break
