@@ -1015,11 +1015,11 @@ _seal() {
     fi
 
     # check size of pcr value list
-    expected_pcr_value_size="2"
+    expected_pcr_value_size=""
     if [[ ${PCR_EXTEND} == true ]]; then
-      expected_pcr_value_size="$(( expected_pcr_value_size + ( PCR_HASH_LENGTH * 2 ) ))"
+      expected_pcr_value_size="$(( ( PCR_HASH_LENGTH * 2 ) + ( PCR_HASH_LENGTH * 2 ) ))"
     else
-      expected_pcr_value_size="$(( expected_pcr_value_size + PCR_HASH_LENGTH ))"
+      expected_pcr_value_size="$(( ( PCR_HASH_LENGTH * 2 ) + PCR_HASH_LENGTH ))"
     fi
     p1="$( _ex "${ME} ${CMD}: Could not check length of combined PCR values" \
       wc -c pcr_values.dat | awk '{print $1;}' )" || _xt $? || break
