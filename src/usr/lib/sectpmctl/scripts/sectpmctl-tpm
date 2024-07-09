@@ -1088,6 +1088,7 @@ generate_tpm2_policy() {
   fi
 
   echo "$(sectpmctl version)" > "${SECTPMCTL_KEYS}/installed_version"
+  chmod 600 "${SECTPMCTL_KEYS}/installed_version"
 
   shred -f -z -u "${TPM_SECRET_LUKS_KEY}"
   shred -f -z -u "${TPM_SECRET_FOR_LUKS_KEY}"
