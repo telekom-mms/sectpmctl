@@ -1043,11 +1043,16 @@ generate_tpm2_policy() {
     chmod 600 "${SECTPMCTL_KEYS}/pcr7.dat"
   fi
 
-  echo "ADDING PCR12 SUPPORT"
-  # if sysd<255, pcrread 12
-  # else 12 = null
-  tpm2_pcrread -Q -o "${SECTPMCTL_KEYS}/pcr12.dat" "sha256:12"
-  chmod 600 "${SECTPMCTL_KEYS}/pcr12.dat"
+  loader="$(cat /sys/firmware/efi/efivars/LoaderInfo-4a67b082-0a4c-41cf-b6c7-440b29bb8c4f | iconv -f utf-16le -t utf-8 | sed -e 's/^\x06\x00systemd-boot //g' | head -c 3)"
+  if (( loader < 255 )); then
+    echo "ADDING systemd <= 254 PCR12 SUPPORT"
+    tpm2_pcrread -Q -o "${SECTPMCTL_KEYS}/pcr12.dat" "sha256:12"
+    chmod 600 "${SECTPMCTL_KEYS}/pcr12.dat"
+  else
+    echo "ADDING systemd >= 255 PCR12 SUPPORT"
+    cat "${SECTPMCTL_KEYS}/pcrNull.dat" >> "${SECTPMCTL_KEYS}/pcr12.dat"
+    chmod 600 "${SECTPMCTL_KEYS}/pcr12.dat"
+  fi
 
   if [[ -f "${SECTPMCTL_KEYS}/pcr14.dat" ]]; then
     rm -f "${SECTPMCTL_KEYS}/pcr14.dat"
