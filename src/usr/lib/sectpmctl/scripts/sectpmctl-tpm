@@ -318,7 +318,8 @@ _check_input() {
   export PERSISTANT_OWNER_SRK="0x81000100"
   export PERSISTANT_OWNER_SRK_NODA="0x81000101"
   export PERSISTANT_HANDLE_TO_USE="0x81000102"
-  export KEY_SCRIPT="/var/lib/sectpmctl/scripts/unsealtpmluks.sh"
+  export KEY_SCRIPT="/var/lib/sectpmctl/scripts/unsealtpmluks_code.sh"
+  export KEY_WRAPPER_SCRIPT="/var/lib/sectpmctl/scripts/unsealtpmluks.sh"
   export CRYPTROOT_LABEL=""
   export KEY_FILE=""
   export TPM_KEYSLOT="5"
@@ -488,7 +489,8 @@ _check_input() {
       "${PERSISTANT_OWNER_SRK_NODA}" \
       "${SECTPMCTL_KEYS}" \
       "${TPM_PASSWORD}" \
-      "${POSTPRESEED}"
+      "${POSTPRESEED}" \
+      "${KEY_WRAPPER_SCRIPT}"
 
   [[ "${CHECK}" == "true" ]] \
     && check_tpm2_secureboot
@@ -632,6 +634,7 @@ generate_unseal_script() {
   EXTEND="${5}"
   SECTPMCTL_KEYS="${6}"
   TPM_PASSWORD="${7}"
+  KEY_WRAPPER_SCRIPT="${8}"
   
   # settings for retries in passwordless unsealing
   UNSEAL_RETRY_COUNT="5"
@@ -651,6 +654,15 @@ generate_unseal_script() {
   rm /tmp/hashlength
 
   echo "CREATE AND ADD TPM UNSEAL SCRIPT"
+  cat > "${KEY_WRAPPER_SCRIPT}" <<__EOT
+#! /bin/bash -
+
+/bin/bash /var/lib/sectpmctl/scripts/unsealtpmluks_code.sh
+
+exit $?
+
+__EOT
+
   # KEYSCRIPT FOR TRANSPARENT ENCRYPTION ON BOOT
   if [[ "${EXTEND}" == "true" ]]; then
     if [[ -n ${TPM_PASSWORD} ]]; then
@@ -1164,6 +1176,8 @@ copy_exec /usr/libexec/sectpmctl/sectpmctl-hash /usr/libexec/sectpmctl/sectpmctl
 
 copy_exec /usr/lib/sectpmctl/scripts/sectpmctl-key /usr/lib/sectpmctl/scripts/sectpmctl-key
 
+copy_exec /var/lib/sectpmctl/scripts/unsealtpmluks_code.sh /var/lib/sectpmctl/scripts/unsealtpmluks_code.sh
+
 copy_exec /usr/lib/x86_64-linux-gnu/libtss2-tcti-device.so.0 /usr/lib/x86_64-linux-gnu
 
 force_load tpm_tis
@@ -1228,6 +1242,7 @@ initial_tpm2_setup() {
   SECTPMCTL_KEYS="${19}"
   TPM_PASSWORD="${20}"
   POSTPRESEED="${21}"
+  KEY_WRAPPER_SCRIPT="${22}"
 
   check_tpm2_secureboot
 
@@ -1279,7 +1294,8 @@ initial_tpm2_setup() {
     "${CRYPT_PARTITION}" \
     "${EXTEND}" \
     "${SECTPMCTL_KEYS}" \
-    "${TPM_PASSWORD}"
+    "${TPM_PASSWORD}" \
+    "${KEY_WRAPPER_SCRIPT}"
 
   update_initramfs
 }
