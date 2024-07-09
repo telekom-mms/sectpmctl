@@ -49,6 +49,7 @@ O_SRK_PUB_NODA="${KEY_PATH}/tpm_owner_noda.pub"
 
 # pcr values stored by by 'sectpmctl tpm install'
 PROVISIONED_PCR7_VALUE="${KEY_PATH}/pcr7.dat"
+PROVISIONED_PCR12_VALUE="${KEY_PATH}/pcr12.dat"
 PROVISIONED_PCR14_VALUE="${KEY_PATH}/pcr14.dat"
 PROVISIONED_ZERO_VALUE="${KEY_PATH}/pcrNull.dat"
 
@@ -1000,9 +1001,14 @@ _seal() {
       _ex "${ME} ${CMD}: Could not copy PCR 7 to PCR value list" \
         cp "${PROVISIONED_PCR7_VALUE}" pcr_values.dat || break
     fi
-    # pcr 12 and 13
-    _ex "${ME} ${CMD}: Could not copy NULL PCR 12 to PCR value list" \
-      cat "${PROVISIONED_ZERO_VALUE}" >> pcr_values.dat || break
+    # pcr 12
+    _ex "${ME} ${CMD}: Stored PCR 12 value not found ${PROVISIONED_PCR12_VALUE@Q}, run 'sectpmctl tpm install'" \
+      test -f "${PROVISIONED_PCR12_VALUE}" || break
+    
+    _ex "${ME} ${CMD}: Could not copy PCR 12 to PCR value list" \
+      cp "${PROVISIONED_PCR12_VALUE}" pcr_values.dat || break
+
+    # pcr 13
     _ex "${ME} ${CMD}: Could not copy NULL PCR 13 to PCR value list" \
       cat "${PROVISIONED_ZERO_VALUE}" >> pcr_values.dat || break
     # pcr 14 depends on PCR_EXTEND true
