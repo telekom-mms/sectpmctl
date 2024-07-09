@@ -1006,7 +1006,7 @@ _seal() {
       test -f "${PROVISIONED_PCR12_VALUE}" || break
     
     _ex "${ME} ${CMD}: Could not copy PCR 12 to PCR value list" \
-      cp "${PROVISIONED_PCR12_VALUE}" pcr_values.dat || break
+      cat "${PROVISIONED_PCR12_VALUE}" >> pcr_values.dat || break
 
     # pcr 13
     _ex "${ME} ${CMD}: Could not copy NULL PCR 13 to PCR value list" \
