@@ -322,12 +322,25 @@ create_efi_blob ()
         echo Error: kernel "${linux}" exceeds "${minimumsize}" bytes
     fi
 
+    bootloader="/usr/lib/systemd/boot/efi/linuxx64.efi.stub"
+    efiline=$(objdump -h "${bootloader}" | tail -2 | head -1)
+    efioffset="0x$(echo "${efiline}" | awk '{print $4}')"
+    efisize="0x$(echo "${efiline}" | awk '{print $3}')"
+    offset_osrel=$((efisize + efioffset))
+    offset_cmdline=$((offset_osrel + $(stat -c%s "${tempbootdir}/os-release")))
+    offset_linux=$((offset_cmdline + $(stat -c%s "${tempbootdir}/cmdline")))
+    offset_initrd=$((offset_linux + $(stat -c%s "${linux}")))
     objcopy \
-        --add-section .osrel="${tempbootdir}/os-release" --change-section-vma .osrel=0x20000 \
-        --add-section .cmdline="${tempbootdir}/cmdline" --change-section-vma .cmdline=0x30000 \
-        --add-section .linux="${linux}" --change-section-vma .linux=0x2000000 \
-        --add-section .initrd="${initrd}" --change-section-vma .initrd=0x3800000 \
-        /usr/lib/systemd/boot/efi/linuxx64.efi.stub "${tempbootdir}/efi"
+      --add-section .osrel="${tempbootdir}/os-release" \
+        --change-section-vma .osrel=$(printf 0x%x $offset_osrel) \
+      --add-section .cmdline="${tempbootdir}/cmdline" \
+        --change-section-vma .cmdline=$(printf 0x%x $offset_cmdline) \
+      --add-section .linux="${linux}" \
+        --change-section-vma .linux=$(printf 0x%x $offset_linux) \
+      --add-section .initrd="${initrd}" \
+        --change-section-vma .initrd=$(printf 0x%x $offset_initrd) \
+      "${bootloader}" "${tempbootdir}/efi"
+
 
     /usr/lib/sectpmctl/scripts/sbsign.sh --key "${SECTPMCTL_KEYS}/db.obj" --cert "${SECTPMCTL_KEYS}/db.crt" --output "/boot/efi/EFI/Linux/sectpmctl-${version}.efi" "${tempbootdir}/efi" > /dev/null 2> /dev/null
     if ! sbverify --cert "${SECTPMCTL_KEYS}/db.crt" "/boot/efi/EFI/Linux/sectpmctl-${version}.efi" 2> /dev/null > /dev/null; then
